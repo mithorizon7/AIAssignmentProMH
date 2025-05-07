@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Rubric, RubricBuilder } from "@/components/instructor/rubric-builder";
 import { RubricTester } from "@/components/instructor/rubric-tester";
 import { ShareableLink } from "@/components/instructor/shareable-link";
+import { TooltipInfo } from "@/components/ui/tooltip-info";
 
 // Create a schema for assignment creation
 const assignmentSchema = z.object({
@@ -191,7 +192,21 @@ export default function CreateAssignment() {
                     name="title"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Title</FormLabel>
+                        <div className="flex items-center space-x-2">
+                          <FormLabel>Title</FormLabel>
+                          <TooltipInfo content={
+                            <>
+                              <p className="font-medium">How this is used:</p>
+                              <p>The title is displayed to students on their dashboard and appears in the AI-generated feedback. It helps students identify assignments and provides context for the AI.</p>
+                              <p className="mt-1 font-medium">Tips:</p>
+                              <ul className="list-disc pl-4 space-y-1">
+                                <li>Keep it clear, descriptive, and specific (e.g., "Python Loop Implementation Exercise")</li>
+                                <li>Include programming language/concept to help the AI contextualize</li>
+                                <li>Avoid generic titles like "Assignment 1" as they provide less context for AI feedback</li>
+                              </ul>
+                            </>
+                          } />
+                        </div>
                         <FormControl>
                           <Input 
                             placeholder="Enter assignment title"
@@ -211,7 +226,23 @@ export default function CreateAssignment() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description</FormLabel>
+                        <div className="flex items-center space-x-2">
+                          <FormLabel>Description</FormLabel>
+                          <TooltipInfo content={
+                            <>
+                              <p className="font-medium">How this is used:</p>
+                              <p>The description is sent to the AI along with student submissions to provide context for feedback. It's also shown to students when they view the assignment.</p>
+                              <p className="mt-1 font-medium">Tips:</p>
+                              <ul className="list-disc pl-4 space-y-1">
+                                <li>Be specific about what the code should accomplish</li>
+                                <li>Mention programming languages, frameworks, or libraries students should use</li>
+                                <li>Include any specific requirements or constraints</li>
+                                <li>Add examples or sample inputs/outputs if applicable</li>
+                                <li>The AI will use this context to provide more accurate feedback</li>
+                              </ul>
+                            </>
+                          } />
+                        </div>
                         <FormControl>
                           <Textarea 
                             placeholder="Enter detailed assignment instructions"
@@ -233,7 +264,21 @@ export default function CreateAssignment() {
                       name="courseId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Course</FormLabel>
+                          <div className="flex items-center space-x-2">
+                            <FormLabel>Course</FormLabel>
+                            <TooltipInfo content={
+                              <>
+                                <p className="font-medium">How this is used:</p>
+                                <p>The course determines which students will see this assignment on their dashboard and be able to submit solutions.</p>
+                                <p className="mt-1 font-medium">Tips:</p>
+                                <ul className="list-disc pl-4 space-y-1">
+                                  <li>Only students enrolled in this course will have access to the assignment</li>
+                                  <li>Make sure all students who need to complete this assignment are enrolled in the selected course</li>
+                                  <li>Students can be enrolled in multiple courses simultaneously</li>
+                                </ul>
+                              </>
+                            } />
+                          </div>
                           <Select 
                             onValueChange={field.onChange} 
                             defaultValue={field.value?.toString()}
@@ -264,7 +309,22 @@ export default function CreateAssignment() {
                       name="dueDate"
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
-                          <FormLabel>Due Date</FormLabel>
+                          <div className="flex items-center space-x-2">
+                            <FormLabel>Due Date</FormLabel>
+                            <TooltipInfo content={
+                              <>
+                                <p className="font-medium">How this is used:</p>
+                                <p>The due date is displayed to students and determines when the assignment is no longer accepting submissions. It's also useful for AI scoring context.</p>
+                                <p className="mt-1 font-medium">Tips:</p>
+                                <ul className="list-disc pl-4 space-y-1">
+                                  <li>Allow sufficient time for students to complete the assignment</li>
+                                  <li>Due dates can impact how the AI evaluates "timeliness" in feedback</li>
+                                  <li>Students can submit before the deadline but not after</li>
+                                  <li>Setting a reasonable deadline encourages better time management</li>
+                                </ul>
+                              </>
+                            } />
+                          </div>
                           <Popover>
                             <PopoverTrigger asChild>
                               <FormControl>
@@ -305,10 +365,36 @@ export default function CreateAssignment() {
                 </CardContent>
               </Card>
               
-              <RubricBuilder 
-                value={rubric} 
-                onChange={setRubric} 
-              />
+              <Card className="relative">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center space-x-2">
+                    <CardTitle>Rubric Builder</CardTitle>
+                    <TooltipInfo content={
+                      <>
+                        <p className="font-medium">How this is used:</p>
+                        <p>The rubric is the most important element for AI feedback. It defines what aspects of the submission the AI should evaluate and how to weight the scoring.</p>
+                        <p className="mt-1 font-medium">Tips:</p>
+                        <ul className="list-disc pl-4 space-y-1">
+                          <li>Each criterion should be specific and measurable</li>
+                          <li>Higher weight criteria have more impact on final score</li>
+                          <li>Include criteria for both technical correctness and code quality</li>
+                          <li>The AI uses these criteria to structure its feedback</li>
+                          <li>Use the "Test Rubric" feature below to see how the AI will apply your rubric</li>
+                        </ul>
+                      </>
+                    } />
+                  </div>
+                  <CardDescription>
+                    Define criteria for AI evaluation of student submissions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <RubricBuilder 
+                    value={rubric} 
+                    onChange={setRubric} 
+                  />
+                </CardContent>
+              </Card>
               
               {rubric.criteria.length > 0 && (
                 <RubricTester 
