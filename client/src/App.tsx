@@ -13,6 +13,7 @@ import AssignmentDetail from "@/pages/instructor/assignment-detail";
 import CreateAssignment from "@/pages/instructor/create-assignment";
 import CoursesPage from "@/pages/instructor/courses";
 import CourseDetailPage from "@/pages/instructor/course-detail";
+import CourseStudentsPage from "@/pages/instructor/course-students";
 import SubmitAssignment from "@/pages/submit";
 import AdminDashboard from "@/pages/admin/dashboard";
 import UsersPage from "@/pages/admin/users";
@@ -78,6 +79,9 @@ function Router() {
       </Route>
       <Route path="/instructor/course/:id">
         {(params) => <PrivateRoute component={CourseDetailPage} requireRole="instructor" id={params.id} />}
+      </Route>
+      <Route path="/instructor/course/:id/students">
+        {(params) => <PrivateRoute component={CourseStudentsPage} requireRole="instructor" id={params.id} />}
       </Route>
       
       {/* Admin Routes */}

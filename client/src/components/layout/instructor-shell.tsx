@@ -1,234 +1,215 @@
-import React from "react";
-import { useAuth } from "@/lib/auth";
-import { Link, useLocation } from "wouter";
+import { ReactNode, useState } from "react";
+import { useLocation } from "wouter";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   LayoutDashboard,
   BookOpen,
-  BookPlus,
-  Users,
-  LogOut,
+  GraduationCap,
+  BarChart,
+  Settings,
   Menu,
-  X,
-  User,
+  LogOut,
+  ChevronDown,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetClose,
-} from "@/components/ui/sheet";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { API_ROUTES } from "@/lib/constants";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/lib/auth";
+import { APP_ROUTES } from "@/lib/constants";
 
-interface InstructorShellProps {
-  children: React.ReactNode;
+interface NavLinkProps {
+  href: string;
+  icon: ReactNode;
+  label: string;
+  isActive?: boolean;
+  onClick?: () => void;
 }
 
-export function InstructorShell({ children }: InstructorShellProps) {
-  const { user, isLoading } = useAuth();
-  const [location] = useLocation();
-  const { toast } = useToast();
-  const isMobile = useIsMobile();
-  const [showSidebar, setShowSidebar] = React.useState(false);
-
-  const handleLogout = async () => {
-    try {
-      await apiRequest("POST", API_ROUTES.LOGOUT);
-      window.location.href = "/login";
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Logout failed",
-        description: "Failed to log out. Please try again.",
-      });
-    }
+function NavLink({ href, icon, label, isActive, onClick }: NavLinkProps) {
+  const [, navigate] = useLocation();
+  
+  const handleClick = () => {
+    navigate(href);
+    if (onClick) onClick();
   };
+  
+  return (
+    <Button
+      variant={isActive ? "secondary" : "ghost"}
+      className="w-full justify-start"
+      onClick={handleClick}
+    >
+      <span className="mr-2">{icon}</span>
+      {label}
+    </Button>
+  );
+}
 
-  const navigationItems = [
+function NavLinks({ closeMenu }: { closeMenu?: () => void }) {
+  const [location] = useLocation();
+  
+  const navItems = [
     {
-      name: "Dashboard",
-      href: "/instructor/dashboard",
-      icon: <LayoutDashboard className="h-5 w-5" />,
+      href: APP_ROUTES.INSTRUCTOR_DASHBOARD,
+      label: "Dashboard",
+      icon: <LayoutDashboard className="h-4 w-4" />,
     },
     {
-      name: "Courses",
-      href: "/instructor/courses",
-      icon: <BookOpen className="h-5 w-5" />,
+      href: APP_ROUTES.INSTRUCTOR_COURSES,
+      label: "Courses",
+      icon: <BookOpen className="h-4 w-4" />,
     },
     {
-      name: "Create Assignment",
-      href: "/instructor/create-assignment",
-      icon: <BookPlus className="h-5 w-5" />,
-    },
-    {
-      name: "Students",
       href: "/instructor/students",
-      icon: <Users className="h-5 w-5" />,
+      label: "Students",
+      icon: <GraduationCap className="h-4 w-4" />,
+    },
+    {
+      href: "/instructor/analytics",
+      label: "Analytics",
+      icon: <BarChart className="h-4 w-4" />,
+    },
+    {
+      href: "/instructor/settings",
+      label: "Settings",
+      icon: <Settings className="h-4 w-4" />,
     },
   ];
-
-  const NavLinks = () => (
-    <nav className="grid items-start px-2 text-sm font-medium">
-      {navigationItems.map((item) => {
-        const isActive = location === item.href;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:text-primary ${
-              isActive
-                ? "bg-muted font-semibold text-primary"
-                : "text-muted-foreground"
-            }`}
-          >
-            {item.icon}
-            {item.name}
-          </Link>
-        );
-      })}
-    </nav>
+  
+  return (
+    <div className="space-y-1">
+      {navItems.map((item) => (
+        <NavLink
+          key={item.href}
+          href={item.href}
+          icon={item.icon}
+          label={item.label}
+          isActive={location === item.href || location.startsWith(`${item.href}/`)}
+          onClick={closeMenu}
+        />
+      ))}
+    </div>
   );
+}
 
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
-      </div>
-    );
-  }
+function UserMenu() {
+  const { user, logout } = useAuth();
+  const [, navigate] = useLocation();
+  
+  const userInitials = user?.username 
+    ? user.username.substring(0, 2).toUpperCase()
+    : "??";
+  
+  const handleLogout = async () => {
+    await logout();
+    navigate(APP_ROUTES.LOGIN);
+  };
+  
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-10 w-full justify-start gap-2 px-2 text-base">
+          <Avatar className="h-8 w-8">
+            <AvatarImage src="" alt={user?.username || ""} />
+            <AvatarFallback>{userInitials}</AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col items-start">
+            <span className="text-sm font-medium">{user?.username || "Instructor"}</span>
+            <span className="text-xs text-muted-foreground capitalize">{user?.role || "instructor"}</span>
+          </div>
+          <ChevronDown className="h-4 w-4 ml-auto shrink-0 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="start" forceMount>
+        <DropdownMenuLabel>
+          <div className="flex flex-col space-y-1">
+            <p className="text-sm font-medium">{user?.username || "Instructor"}</p>
+            <p className="text-xs text-muted-foreground">{user?.email || ""}</p>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate("/instructor/profile")}>
+          Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/instructor/settings")}>
+          Settings
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+          <LogOut className="mr-2 h-4 w-4" />
+          Log out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
+function MobileNav() {
+  const [open, setOpen] = useState(false);
+  
+  return (
+    <div className="flex h-16 items-center border-b bg-background px-4">
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <Menu className="h-6 w-6" />
+            <span className="sr-only">Toggle menu</span>
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="flex w-72 flex-col p-0">
+          <div className="p-4">
+            <UserMenu />
+          </div>
+          <Separator />
+          <div className="p-4">
+            <NavLinks closeMenu={() => setOpen(false)} />
+          </div>
+        </SheetContent>
+      </Sheet>
+      <div className="ml-4 text-xl font-semibold">Instructor Panel</div>
+    </div>
+  );
+}
+
+export function InstructorShell({ children }: { children: ReactNode }) {
+  const isMobile = useIsMobile();
+  
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Header for mobile */}
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 sm:px-6 lg:hidden">
-        <Sheet open={showSidebar} onOpenChange={setShowSidebar}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="lg:hidden">
-              <Menu className="h-6 w-6" />
-              <span className="sr-only">Toggle Menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-72 sm:max-w-none">
-            <div className="flex h-full flex-col">
-              <div className="flex items-center gap-2 border-b p-4">
-                <SheetClose asChild>
-                  <Button variant="ghost" size="icon">
-                    <X className="h-5 w-5" />
-                  </Button>
-                </SheetClose>
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-6 w-6 text-primary" />
-                  <span className="text-lg font-semibold">AI Feedback</span>
-                </div>
-              </div>
-              <div className="flex-1 overflow-auto py-4">
-                <NavLinks />
-              </div>
-              <div className="border-t p-4">
-                <div className="flex items-center gap-4 pb-4">
-                  <Avatar>
-                    <AvatarFallback>
-                      {user?.name
-                        ? user.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                        : user?.username?.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">
-                      {user?.name || user?.username}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {user?.email}
-                    </span>
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start gap-2"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Logout</span>
-                </Button>
-              </div>
+      {isMobile ? (
+        <MobileNav />
+      ) : (
+        <div className="flex flex-1">
+          <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r bg-background md:flex">
+            <div className="p-6 text-xl font-semibold">Instructor Panel</div>
+            <Separator />
+            <div className="flex-1 overflow-auto p-4">
+              <NavLinks />
             </div>
-          </SheetContent>
-        </Sheet>
-        <div className="flex flex-1 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-primary" />
-            <span className="text-lg font-semibold">AI Feedback</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="text-xs">
-                {user?.name
-                  ? user.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                  : user?.username?.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-          </div>
+            <Separator />
+            <div className="p-4">
+              <UserMenu />
+            </div>
+          </aside>
+          <main className="flex-1 md:pl-64">
+            <div className="container mx-auto p-6">{children}</div>
+          </main>
         </div>
-      </header>
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar for desktop */}
-        <aside className="hidden w-64 flex-col border-r bg-background lg:flex">
-          <div className="flex h-16 items-center gap-2 border-b px-6">
-            <BookOpen className="h-6 w-6 text-primary" />
-            <span className="text-lg font-semibold">AI Feedback</span>
-          </div>
-          <div className="flex-1 overflow-auto py-6">
-            <NavLinks />
-          </div>
-          <div className="border-t p-6">
-            <div className="flex items-center gap-4 pb-4">
-              <Avatar>
-                <AvatarFallback>
-                  {user?.name
-                    ? user.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                    : user?.username?.slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">
-                  {user?.name || user?.username}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {user?.email}
-                </span>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-2"
-              onClick={handleLogout}
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Logout</span>
-            </Button>
-          </div>
-        </aside>
-
-        {/* Main content */}
-        <main className="flex-1 overflow-auto">
-          <div className="container mx-auto p-6">{children}</div>
+      )}
+      {isMobile && (
+        <main className="flex-1">
+          <div className="container mx-auto p-4">{children}</div>
         </main>
-      </div>
+      )}
     </div>
   );
 }
