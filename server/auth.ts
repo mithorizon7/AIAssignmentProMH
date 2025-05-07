@@ -143,3 +143,40 @@ export function configureAuth(app: any) {
 
   return { requireAuth, requireRole };
 }
+
+
+
+// Development test accounts
+const DEV_TEST_ACCOUNTS = [
+  {
+    id: 9999,
+    username: 'admin@test.com',
+    password: 'admin123',
+    name: 'Test Admin',
+    role: 'admin'
+  },
+  {
+    id: 9998,
+    username: 'instructor@test.com', 
+    password: 'instructor123',
+    name: 'Test Instructor',
+    role: 'instructor'
+  },
+  {
+    id: 9997,
+    username: 'student@test.com',
+    password: 'student123',
+    name: 'Test Student', 
+    role: 'student'
+  }
+];
+
+// Create test accounts in development
+if (process.env.NODE_ENV === 'development') {
+  DEV_TEST_ACCOUNTS.forEach(async (account) => {
+    const exists = await storage.getUserByUsername(account.username);
+    if (!exists) {
+      await storage.createUser(account);
+    }
+  });
+}
