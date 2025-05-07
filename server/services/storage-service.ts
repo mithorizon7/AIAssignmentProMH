@@ -38,6 +38,20 @@ export class StorageService {
       throw new Error('Failed to store submission file');
     }
   }
+  
+  // Store file for anonymous submissions (this would use S3 in a real implementation)
+  async storeAnonymousSubmissionFile(file: Express.Multer.File, assignmentId: number, name: string, email: string): Promise<string> {
+    try {
+      // In a real implementation, this would upload to S3 or similar
+      // For now, we'll mock a URL
+      const timestamp = Date.now();
+      const safeEmail = email.replace('@', '-at-').replace(/[^\w-]/g, '_');
+      return `https://storage.example.com/anonymous-submissions/${assignmentId}/${safeEmail}/${timestamp}/${file.originalname}`;
+    } catch (error) {
+      console.error('Error storing anonymous file:', error);
+      throw new Error('Failed to store submission file');
+    }
+  }
 
   // Check if student is enrolled in the course
   async isStudentEnrolled(userId: number, assignmentId: number): Promise<boolean> {

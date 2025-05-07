@@ -312,8 +312,7 @@ export default function SubmitAssignment() {
                   </TabsContent>
                   <TabsContent value="file" className="space-y-4 pt-4">
                     <FileUpload
-                      value={file ? [file] : []}
-                      onValueChange={(files) => setFile(files[0] || null)}
+                      onValueChange={(files: File[]) => setFile(files[0] || null)}
                       disabled={submitting}
                       accept=".py,.java,.cpp,.ipynb,.zip,.js,.ts,.html,.css,.md,.txt"
                       maxSize={10 * 1024 * 1024} // 10MB
