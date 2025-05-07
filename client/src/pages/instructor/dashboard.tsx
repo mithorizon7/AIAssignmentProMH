@@ -4,9 +4,10 @@ import { useAuth } from "@/lib/auth";
 import { API_ROUTES, USER_ROLES, APP_ROUTES } from "@/lib/constants";
 import { InstructorShell } from "@/components/layout/instructor-shell";
 import { StatsCard } from "@/components/instructor/stats-card";
-import { AssignmentTable } from "@/components/instructor/assignment-table";
-import { StudentProgress } from "@/components/instructor/student-progress";
-import { AnalyticsPanel } from "@/components/instructor/analytics-panel";
+// These components are not used in the new dashboard design
+// import { AssignmentTable } from "@/components/instructor/assignment-table";
+// import { StudentProgress } from "@/components/instructor/student-progress";
+// import { AnalyticsPanel } from "@/components/instructor/analytics-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,22 @@ export default function InstructorDashboard() {
   });
   
   // Fetch dashboard stats for the selected course/assignment
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  interface Stats {
+    totalStudents: number;
+    submissionRate: number;
+    totalSubmissions: number;
+    averageScore: number;
+    scoreDistribution: { high: number; medium: number; low: number };
+    feedbackViewRate: number;
+    feedbackViewed: number;
+    notStartedCount: number;
+    notStartedPercentage: number;
+    submittedCount: number;
+    submittedPercentage: number;
+    feedbackViewPercentage: number;
+  }
+
+  const { data: stats = {} as Stats, isLoading: statsLoading } = useQuery<Stats>({
     queryKey: [
       `${API_ROUTES.ASSIGNMENTS}/stats`,
       { courseId: selectedCourse, assignmentId: selectedAssignment }
@@ -69,8 +85,23 @@ export default function InstructorDashboard() {
     enabled: activeTab === "overview" && (!!selectedCourse || !!selectedAssignment),
   });
   
+  // Define analytics data interface
+  interface AnalyticsData {
+    assignmentStats: { 
+      submittedCount: number; 
+      inProgressCount: number; 
+      notStartedCount: number; 
+      totalCount: number;
+      submissionPercentage: number;
+    };
+    submissionTimeline: any[];
+    avgFeedbackTime: number;
+    avgRevisionsPerStudent: number;
+    avgImprovementPercentage: number;
+  }
+
   // Fetch analytics data for the selected assignment
-  const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
+  const { data: analyticsData = {} as AnalyticsData, isLoading: analyticsLoading } = useQuery<AnalyticsData>({
     queryKey: [
       `${API_ROUTES.ASSIGNMENTS}/${selectedAssignment}/analytics`,
       { courseId: selectedCourse }
@@ -78,8 +109,26 @@ export default function InstructorDashboard() {
     enabled: activeTab === "analytics" && !!selectedAssignment,
   });
 
+  // Define student data interface
+  interface StudentData {
+    id: number;
+    name: string;
+    email: string;
+    lastActivity?: string;
+    completedAssignments: number;
+    totalAssignments: number;
+    averageScore: number;
+    submissions: {
+      id: number;
+      assignmentTitle: string;
+      createdAt: string;
+      score?: number;
+      status: string;
+    }[];
+  }
+
   // Fetch individual student data when searched
-  const { data: studentData, isLoading: studentLoading } = useQuery({
+  const { data: studentData = {} as StudentData, isLoading: studentLoading } = useQuery<StudentData>({
     queryKey: [
       `${API_ROUTES.STUDENTS}/lookup`,
       { 
