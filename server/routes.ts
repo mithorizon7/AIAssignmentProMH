@@ -542,9 +542,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const course = await storage.createCourse({
         name,
         code,
-        description: description || null,
-        instructorId: (req.user as any).id
+        description: description || null
       });
+      
+      // Automatically enroll the test student in this course
+      // This ensures the instructor can test student interactions
+      const testStudent = await storage.getUserByEmail('student@test.com');
+      if (testStudent) {
+        await storage.createEnrollment({
+          userId: testStudent.id,
+          courseId: course.id
+        });
+        console.log(`Automatically enrolled test student (ID: ${testStudent.id}) in course ${course.name}`);
+      }
       
       res.status(201).json(course);
     } catch (error) {
