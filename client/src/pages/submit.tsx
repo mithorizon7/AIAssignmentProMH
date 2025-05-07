@@ -11,11 +11,18 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export default function SubmitAssignment() {
+interface SubmitAssignmentProps {
+  code?: string;
+}
+
+export default function SubmitAssignment({ code: propCode }: SubmitAssignmentProps) {
   const [match, params] = useRoute('/submit/:code');
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
+  
+  // Use the code from props or from the route params
+  const assignmentCode = propCode || params?.code;
 
   // State for assignment lookup
   const [loading, setLoading] = useState(true);
@@ -26,7 +33,7 @@ export default function SubmitAssignment() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
-  const [code, setCode] = useState('');
+  const [codeContent, setCodeContent] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [submitType, setSubmitType] = useState<'code' | 'file'>('code');
   const [submitting, setSubmitting] = useState(false);
@@ -34,14 +41,14 @@ export default function SubmitAssignment() {
   
   // Fetch assignment data using the code
   useEffect(() => {
-    if (!match || !params?.code) return;
+    if (!match || !assignmentCode) return;
     
     const fetchAssignment = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        const response = await fetch(`${API_ROUTES.ASSIGNMENTS}/code/${params.code}`);
+        const response = await fetch(`${API_ROUTES.ASSIGNMENTS}/code/${assignmentCode}`);
         
         if (!response.ok) {
           if (response.status === 404) {
@@ -61,7 +68,7 @@ export default function SubmitAssignment() {
     };
     
     fetchAssignment();
-  }, [match, params?.code]);
+  }, [match, assignmentCode]);
   
   // Pre-fill form if user is authenticated
   useEffect(() => {

@@ -12,6 +12,10 @@ import InstructorDashboard from "@/pages/instructor/dashboard";
 import AssignmentDetail from "@/pages/instructor/assignment-detail";
 import CreateAssignment from "@/pages/instructor/create-assignment";
 import SubmitAssignment from "@/pages/submit";
+import AdminDashboard from "@/pages/admin/dashboard";
+import UsersPage from "@/pages/admin/users";
+import SystemConfigPage from "@/pages/admin/system-config";
+import LogsPage from "@/pages/admin/logs";
 import { AuthProvider, useAuth } from "./lib/auth";
 
 function PrivateRoute({ component: Component, requireRole, ...rest }: any) {
@@ -21,8 +25,21 @@ function PrivateRoute({ component: Component, requireRole, ...rest }: any) {
     return <Redirect to="/login" />;
   }
   
-  if (requireRole && user?.role !== requireRole) {
-    return <Redirect to="/dashboard" />;
+  if (requireRole) {
+    // Admin can access all routes
+    if (user?.role === "admin") {
+      return <Component {...rest} />;
+    }
+    
+    // Instructors can access instructor and student routes
+    if (requireRole === "student" && user?.role === "instructor") {
+      return <Component {...rest} />;
+    }
+    
+    // Check exact role match for other cases
+    if (user?.role !== requireRole) {
+      return <Redirect to="/dashboard" />;
+    }
   }
   
   return <Component {...rest} />;
@@ -55,6 +72,20 @@ function Router() {
         {() => <PrivateRoute component={CreateAssignment} requireRole="instructor" />}
       </Route>
       
+      {/* Admin Routes */}
+      <Route path="/admin/dashboard">
+        {() => <PrivateRoute component={AdminDashboard} requireRole="admin" />}
+      </Route>
+      <Route path="/admin/users">
+        {() => <PrivateRoute component={UsersPage} requireRole="admin" />}
+      </Route>
+      <Route path="/admin/system-config">
+        {() => <PrivateRoute component={SystemConfigPage} requireRole="admin" />}
+      </Route>
+      <Route path="/admin/logs">
+        {() => <PrivateRoute component={LogsPage} requireRole="admin" />}
+      </Route>
+      
       {/* Public submission route via shareable link */}
       <Route path="/submit/:code">
         {(params) => <SubmitAssignment code={params.code} />}
@@ -63,8 +94,20 @@ function Router() {
       {/* Redirect root to dashboard or login */}
       <Route path="/">
         {() => {
-          const { isAuthenticated } = useAuth();
-          return isAuthenticated ? <Redirect to="/dashboard" /> : <Redirect to="/login" />;
+          const { isAuthenticated, user } = useAuth();
+          
+          if (!isAuthenticated) {
+            return <Redirect to="/login" />;
+          }
+          
+          // Redirect based on user role
+          if (user?.role === "admin") {
+            return <Redirect to="/admin/dashboard" />;
+          } else if (user?.role === "instructor") {
+            return <Redirect to="/instructor/dashboard" />;
+          } else {
+            return <Redirect to="/dashboard" />;
+          }
         }}
       </Route>
       
