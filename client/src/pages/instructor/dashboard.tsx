@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { API_ROUTES, USER_ROLES, APP_ROUTES } from "@/lib/constants";
-import { AppShell } from "@/components/layout/app-shell";
+import { InstructorShell } from "@/components/layout/instructor-shell";
 import { StatsCard } from "@/components/instructor/stats-card";
 import { AssignmentTable } from "@/components/instructor/assignment-table";
 import { StudentProgress } from "@/components/instructor/student-progress";
 import { AnalyticsPanel } from "@/components/instructor/analytics-panel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BookOpen, PlusCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -85,22 +89,42 @@ export default function InstructorDashboard() {
   
   if (!user) return null;
   
+  // Fetch courses
+  const { data: courses = [], isLoading: coursesLoading } = useQuery({
+    queryKey: [API_ROUTES.COURSES],
+    queryFn: async () => {
+      const response = await fetch(API_ROUTES.COURSES);
+      if (!response.ok) {
+        throw new Error("Failed to fetch courses");
+      }
+      return response.json();
+    },
+  });
+
   return (
-    <AppShell>
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+    <InstructorShell>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-800">Instructor Dashboard</h1>
-            <p className="text-neutral-600">Monitor student submissions and review AI feedback</p>
+            <h1 className="text-3xl font-bold tracking-tight">Instructor Dashboard</h1>
+            <p className="text-muted-foreground">
+              Monitor student submissions and review AI feedback
+            </p>
           </div>
-          <div className="mt-4 sm:mt-0">
-            <button 
-              onClick={() => navigate(APP_ROUTES.INSTRUCTOR_CREATE_ASSIGNMENT)} 
-              className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md flex items-center space-x-2 shadow-md transition-colors"
+          <div className="mt-4 sm:mt-0 flex space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate("/instructor/courses")}
             >
-              <span className="material-icons-outlined text-sm">add</span>
-              <span>Create Assignment</span>
-            </button>
+              <BookOpen className="mr-2 h-4 w-4" />
+              View All Courses
+            </Button>
+            <Button 
+              onClick={() => navigate(APP_ROUTES.INSTRUCTOR_CREATE_ASSIGNMENT)}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Create Assignment
+            </Button>
           </div>
         </div>
         
@@ -207,6 +231,6 @@ export default function InstructorDashboard() {
           </div>
         </div>
       </div>
-    </AppShell>
+    </InstructorShell>
   );
 }
