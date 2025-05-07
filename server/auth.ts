@@ -151,6 +151,7 @@ const DEV_TEST_ACCOUNTS = [
   {
     id: 9999,
     username: 'admin@test.com',
+    email: 'admin@test.com',
     password: 'admin123',
     name: 'Test Admin',
     role: 'admin'
@@ -158,6 +159,7 @@ const DEV_TEST_ACCOUNTS = [
   {
     id: 9998,
     username: 'instructor@test.com', 
+    email: 'instructor@test.com',
     password: 'instructor123',
     name: 'Test Instructor',
     role: 'instructor'
@@ -165,6 +167,7 @@ const DEV_TEST_ACCOUNTS = [
   {
     id: 9997,
     username: 'student@test.com',
+    email: 'student@test.com',
     password: 'student123',
     name: 'Test Student', 
     role: 'student'
