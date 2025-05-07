@@ -10,6 +10,8 @@ import Assignments from "@/pages/assignments";
 import SubmissionDetail from "@/pages/submission-detail";
 import InstructorDashboard from "@/pages/instructor/dashboard";
 import AssignmentDetail from "@/pages/instructor/assignment-detail";
+import CreateAssignment from "@/pages/instructor/create-assignment";
+import SubmitAssignment from "@/pages/submit";
 import { AuthProvider, useAuth } from "./lib/auth";
 
 function PrivateRoute({ component: Component, requireRole, ...rest }: any) {
@@ -48,6 +50,14 @@ function Router() {
       </Route>
       <Route path="/instructor/assignment/:id">
         {(params) => <PrivateRoute component={AssignmentDetail} requireRole="instructor" id={params.id} />}
+      </Route>
+      <Route path="/instructor/create-assignment">
+        {() => <PrivateRoute component={CreateAssignment} requireRole="instructor" />}
+      </Route>
+      
+      {/* Public submission route via shareable link */}
+      <Route path="/submit/:code">
+        {(params) => <SubmitAssignment code={params.code} />}
       </Route>
       
       {/* Redirect root to dashboard or login */}

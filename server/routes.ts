@@ -9,6 +9,18 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { submissions, feedback } from "@shared/schema";
+import { v4 as uuidv4 } from "uuid";
+
+// Helper function to generate a unique shareable code for assignments
+function generateShareableCode(length = 8): string {
+  // Generate a random UUID
+  const uuid = uuidv4();
+  
+  // Convert to alphanumeric characters by removing dashes and taking first 'length' characters
+  const code = uuid.replace(/-/g, '').substring(0, length).toUpperCase();
+  
+  return code;
+}
 
 // Configure multer for file uploads
 const upload = multer({
@@ -107,6 +119,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create assignment (instructor only)
+  app.post('/api/assignments', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
+    try {
+      const { title, description, courseId, dueDate, rubric } = req.body;
+      
+      // Validate request
+      const assignmentSchema = z.object({
+        title: z.string().min(3),
+        description: z.string().min(10),
+        courseId: z.number().int().positive(),
+        dueDate: z.string().refine(val => !isNaN(Date.parse(val)), {
+          message: 'Invalid date format'
+        }),
+        rubric: z.object({
+          criteria: z.array(z.object({
+            id: z.string(),
+            type: z.string(),
+            name: z.string(),
+            description: z.string(),
+            maxScore: z.number().int().min(1),
+            weight: z.number().int().min(1),
+          })).optional(),
+          totalPoints: z.number().int().positive().optional(),
+          passingThreshold: z.number().int().min(0).max(100).optional(),
+        }).optional(),
+      });
+      
+      const result = assignmentSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: 'Invalid assignment data', errors: result.error });
+      }
+      
+      // Check if course exists
+      const course = await storage.getCourse(courseId);
+      if (!course) {
+        return res.status(404).json({ message: 'Course not found' });
+      }
+      
+      // Generate a unique shareable code
+      const shareableCode = generateShareableCode();
+      
+      // Create assignment
+      const assignment = await storage.createAssignment({
+        title,
+        description,
+        courseId,
+        dueDate: new Date(dueDate).toISOString(),
+        status: 'upcoming',
+        shareableCode,
+        rubric: rubric ? JSON.stringify(rubric) : null,
+      });
+      
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error('Error creating assignment:', error);
+      res.status(500).json({ message: 'Failed to create assignment' });
+    }
+  });
+
   // Get assignment details for instructor
   app.get('/api/assignments/:id/details', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
     try {
@@ -133,6 +204,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching assignment details:', error);
       res.status(500).json({ message: 'Failed to fetch assignment details' });
+    }
+  });
+
+  // Lookup assignment by shareable code (no auth required)
+  app.get('/api/assignments/code/:code', async (req: Request, res: Response) => {
+    try {
+      const code = req.params.code;
+      
+      if (!code || code.length < 6) {
+        return res.status(400).json({ message: 'Invalid shareable code' });
+      }
+      
+      // Query assignments to find one with matching shareable code
+      const assignments = await storage.listAssignments();
+      const assignment = assignments.find(a => a.shareableCode === code);
+      
+      if (!assignment) {
+        return res.status(404).json({ message: 'Assignment not found with this code' });
+      }
+      
+      // Get course information
+      const course = await storage.getCourse(assignment.courseId);
+      
+      // Return limited information about the assignment (for public access)
+      res.json({
+        id: assignment.id,
+        title: assignment.title,
+        description: assignment.description,
+        courseCode: course.code,
+        courseName: course.name,
+        dueDate: assignment.dueDate,
+        shareableCode: assignment.shareableCode
+      });
+    } catch (error) {
+      console.error('Error looking up assignment by code:', error);
+      res.status(500).json({ message: 'Failed to lookup assignment' });
+    }
+  });
+
+  // Anonymous submission (via shareable link)
+  app.post('/api/anonymous-submissions', upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      // Validate request
+      const submissionSchema = z.object({
+        assignmentId: z.string().transform(val => parseInt(val)),
+        submissionType: z.enum(['file', 'code']),
+        name: z.string().min(1),
+        email: z.string().email(),
+        notes: z.string().optional(),
+        code: z.string().optional(),
+      });
+      
+      const result = submissionSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: 'Invalid submission data', errors: result.error });
+      }
+      
+      const { assignmentId, submissionType, name, email, notes, code } = result.data;
+      
+      // Check if assignment exists and is active
+      const isActive = await storageService.isAssignmentActive(assignmentId);
+      if (!isActive) {
+        return res.status(400).json({ message: 'Assignment is not active or has passed its due date' });
+      }
+      
+      // Create submission
+      let fileUrl = '';
+      let fileName = '';
+      let content = code || '';
+      
+      if (submissionType === 'file' && req.file) {
+        // Store file and get URL
+        fileUrl = await storageService.storeAnonymousSubmissionFile(req.file, assignmentId, name, email);
+        fileName = req.file.originalname;
+      } else if (submissionType === 'code') {
+        // Validate code content
+        if (!content.trim()) {
+          return res.status(400).json({ message: 'Code content is required for code submissions' });
+        }
+      } else {
+        return res.status(400).json({ message: 'Invalid submission type or missing file' });
+      }
+      
+      // Create or find a temporary user for the submission
+      let user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        // Create a temporary user
+        user = await storage.createUser({
+          username: email,
+          email: email,
+          password: '', // Empty password for temporary users
+          name: name,
+          role: 'student'
+        });
+        
+        // Automatically enroll the user in the course
+        const assignment = await storage.getAssignment(assignmentId);
+        if (assignment) {
+          await storage.createEnrollment({
+            userId: user.id,
+            courseId: assignment.courseId
+          });
+        }
+      }
+      
+      // Create submission in database
+      const submission = await storage.createSubmission({
+        assignmentId,
+        userId: user.id,
+        fileUrl,
+        fileName,
+        content,
+        notes: notes || null,
+        status: 'pending'
+      });
+      
+      // Queue submission for AI processing
+      submissionQueue.addSubmission(submission.id);
+      
+      res.status(201).json({
+        id: submission.id,
+        status: submission.status,
+        message: "Submission received successfully"
+      });
+    } catch (error) {
+      console.error('Error processing anonymous submission:', error);
+      res.status(500).json({ message: 'Failed to process submission' });
     }
   });
 
@@ -289,6 +488,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching assignment submissions:', error);
       res.status(500).json({ message: 'Failed to fetch assignment submissions' });
+    }
+  });
+
+  // Course endpoints
+  app.get('/api/courses', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as any;
+      let courses;
+      
+      if (user.role === 'instructor') {
+        // Instructors can see all courses
+        courses = await storage.listCourses();
+      } else {
+        // Students can only see courses they're enrolled in
+        courses = await storage.listUserEnrollments(user.id);
+      }
+      
+      res.json(courses);
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      res.status(500).json({ message: 'Failed to fetch courses' });
+    }
+  });
+  
+  // Create course (instructor only)
+  app.post('/api/courses', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
+    try {
+      const { name, code, description } = req.body;
+      
+      // Validate request
+      const courseSchema = z.object({
+        name: z.string().min(3),
+        code: z.string().min(2),
+        description: z.string().optional()
+      });
+      
+      const result = courseSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: 'Invalid course data', errors: result.error });
+      }
+      
+      // Check if course code already exists
+      const existingCourse = await storage.getCourseByCode(code);
+      if (existingCourse) {
+        return res.status(400).json({ message: 'Course code already exists' });
+      }
+      
+      // Create course
+      const course = await storage.createCourse({
+        name,
+        code,
+        description: description || null,
+        instructorId: (req.user as any).id
+      });
+      
+      res.status(201).json(course);
+    } catch (error) {
+      console.error('Error creating course:', error);
+      res.status(500).json({ message: 'Failed to create course' });
     }
   });
 

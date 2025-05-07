@@ -88,9 +88,20 @@ export default function InstructorDashboard() {
   return (
     <AppShell>
       <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-neutral-800">Instructor Dashboard</h1>
-          <p className="text-neutral-600">Monitor student submissions and review AI feedback</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-neutral-800">Instructor Dashboard</h1>
+            <p className="text-neutral-600">Monitor student submissions and review AI feedback</p>
+          </div>
+          <div className="mt-4 sm:mt-0">
+            <button 
+              onClick={() => navigate(APP_ROUTES.INSTRUCTOR_CREATE_ASSIGNMENT)} 
+              className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md flex items-center space-x-2 shadow-md transition-colors"
+            >
+              <span className="material-icons-outlined text-sm">add</span>
+              <span>Create Assignment</span>
+            </button>
+          </div>
         </div>
         
         {/* Quick Stats */}

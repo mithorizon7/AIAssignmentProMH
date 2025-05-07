@@ -7,6 +7,7 @@ export const API_ROUTES = {
   FEEDBACK: '/api/feedback',
   STUDENTS: '/api/students',
   EXPORT_CSV: '/api/export/grades',
+  COURSES: '/api/courses',
 };
 
 export const APP_ROUTES = {
@@ -16,6 +17,8 @@ export const APP_ROUTES = {
   SUBMISSION: (id: string | number) => `/submission/${id}`,
   INSTRUCTOR_DASHBOARD: '/instructor/dashboard',
   INSTRUCTOR_ASSIGNMENT: (id: string | number) => `/instructor/assignment/${id}`,
+  INSTRUCTOR_CREATE_ASSIGNMENT: '/instructor/create-assignment',
+  SUBMIT_BY_CODE: (code: string) => `/submit/${code}`,
 };
 
 export const FILE_TYPES = {
