@@ -1,0 +1,89 @@
+Below is a concise “design brief” you can hand to your designer.  Everything comes from MIT’s own brand‑guide pages, so matching it will keep you visually on‑brand and avoid guess‑work.
+
+⸻
+
+1. Core Look‑and‑Feel
+
+Element	MIT Treatment	How to Reproduce
+Overall vibe	Clean, editorial, heavy use of white space + bold splashes of MIT Red. Grid‑based sections feel “modular” rather than one long scroll.	Use a 12‑column responsive grid, wide gutters, and let content live in visually separated “modules” (hero spotlight, news cards, footer, etc.).
+Navigation	Slim white bar, left‑aligned wordmark, 8 top‑level links, a “More” dropdown, and an inline search icon that expands to a full‑width overlay.	Keep nav height ≤ 72 px.  Sticky on scroll.  Collapse to burger + wordmark below ~992 px.
+Imagery	Large editorial photos or 16:9 video thumbnails; no heavy filters; caption overlays in black or MIT red.	Require hi‑res imagery; enforce 16:9 or 4:5 ratio; add alt‑text and concise 1–2 line captions.
+Tone/voice	Concise, forward‑looking, impact‑oriented.  Story teasers seldom exceed 40 words.	Mirror that economy of words in headlines and CTA copy.
+
+
+⸻
+
+2. Color System  (exact values from MIT Brand Guide)
+
+Role	Color	HEX / RGB
+Primary brand	MIT Red	#750014  (R 117 G 0 B 20)
+ 	Silver Gray	#8B959E  (R 139 149 158)
+ 	Bright Red (highlight)	#FF1423
+ 	Black / White	#000000 / #FFFFFF
+Accessible backgrounds	Light Gray 1	#F2F4F8
+Optional accents	Expanded palette of pinks, purples, blues, greens, yellows if you need variation (see Brand Guide).	￼
+
+Usage notes
+	•	Every page should feature at least one of the core colors (usually MIT Red).
+	•	Maintain WCAG AA contrast: MIT Red on white passes; Bright Red on white does not—reserve it for small accents only.
+
+⸻
+
+### 3. Typography
+
+Use	Typeface	Details
+Primary	Neue Haas Grotesk (NHG)	Download via Adobe Fonts. Use “NHG Display” above 20 px and “NHG Text” at 20 px and below. Tight leading for headlines (85–100 %), looser for body (100–125 %).
+Fallbacks	Arial (internal docs) or Helvetica/Inter (web safe)	Only if NHG isn’t available.
+Secondary options	Roboto Serif, Sabon, Shift, Obviously, Job Clarendon	Use sparingly to add contrast.
+
+Type scale reference (desktop):
+	•	H1 48 / 44 px
+	•	H2 32 / 30 px
+	•	H3 24 / 24 px
+	•	Body 16 / 20 px
+	•	Small 14 / 18 px
+
+⸻
+
+### 4. Components & Patterns
+	1.	Hero “Spotlight” banner
+	•	Full‑width module, muted gray (#F2F4F8) background, left‑aligned text block + right‑aligned image/video.
+	•	Primary CTA uses MIT Red button (#750014, white text).
+	2.	Story grid
+	•	Two‑ or three‑column cards, equal height, 32 px gutter.
+	•	Card: image on top, 14 px category label (MIT Red), 20 px headline, 16 px teaser.
+	3.	Buttons
+	•	Primary: MIT Red bg, 4 px radius, 16 px/600 text, 20 px padding.
+	•	Secondary: Transparent bg, 2 px MIT Red border, MIT Red text. Hover: fill MIT Red, text white.
+	4.	Footer
+	•	Light Gray 1 background (#F2F4F8). Two‑column link list + social icons (black), capped by a 1 px Silver Gray divider.
+	5.	Motion
+	•	Subtle 200–300 ms fade or slide on content load; focus‑visible outlines for all interactive elements.
+
+⸻
+
+### 5. Layout & Spacing
+	•	Base unit: 8 px.  (e.g., 8, 16, 24, 32, 64 spacing increments.)
+	•	Section padding: 64 px top / bottom desktop; 48 px tablet; 32 px mobile.
+	•	Card internal padding: 16 px.
+
+⸻
+
+### 6. Accessibility & Performance Checklist
+	•	Color contrast AA minimum 4.5:1 throughout.
+	•	All images need descriptive alt text; videos require captions.
+	•	Nav, search, and dropdowns must be keyboard reachable (TAB, ESC).
+	•	Maintain ≤ 2 webfont files per weight to keep page weight low (< 250 kB fonts total).
+
+⸻
+
+### 7. Quick Copy Guidance
+	•	Headlines: present tense, active verb (“Building trust in AI”).
+	•	Teasers: 25–35 words, no Oxford comma per MIT style.
+	•	CTAs: plain verbs (“Read the story”, “See the research”).
+
+⸻
+
+Handing these specs plus the linked brand‑guide pages to your designer will let them replicate MIT’s signature style with precision. If you need deeper component specs (Hex values for the full 20‑color extended palette, exact breakpoints, etc.) they’re in the MIT Brand Guide under Color and Applying the Brand sections.
+
+Confidence: High for colors and typography (drawn straight from brand site); moderate for exact spacing and grid sizes (inferred from visible layout).

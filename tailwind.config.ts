@@ -4,13 +4,32 @@ export default {
   darkMode: ["class"],
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
+    fontFamily: {
+      sans: ['Inter', 'Helvetica', 'Arial', 'sans-serif'],
+      serif: ['Roboto Serif', 'Sabon', 'serif'],
+      display: ['Inter', 'Helvetica', 'Arial', 'sans-serif'],
+    },
     extend: {
+      spacing: {
+        '8': '0.5rem',     // 8px (base unit)
+        '16': '1rem',      // 16px (2 units)
+        '24': '1.5rem',    // 24px (3 units)
+        '32': '2rem',      // 32px (4 units)
+        '64': '4rem',      // 64px (8 units)
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
       colors: {
+        // MIT Brand Colors
+        'mit': {
+          'red': '#750014',
+          'bright-red': '#FF1423',
+          'silver-gray': '#8B959E',
+          'light-gray': '#F2F4F8',
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
@@ -79,10 +98,28 @@ export default {
             height: "0",
           },
         },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "slide-up": {
+          from: { transform: "translateY(10px)", opacity: "0" },
+          to: { transform: "translateY(0)", opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.3s ease-out",
+        "slide-up": "slide-up 0.3s ease-out",
+      },
+      gridTemplateColumns: {
+        // Grid layouts based on 12-column system
+        '12': 'repeat(12, minmax(0, 1fr))',
+      },
+      boxShadow: {
+        'soft': '0 2px 10px rgba(0, 0, 0, 0.05)',
+        'card': '0 4px 12px rgba(0, 0, 0, 0.05)',
       },
     },
   },
