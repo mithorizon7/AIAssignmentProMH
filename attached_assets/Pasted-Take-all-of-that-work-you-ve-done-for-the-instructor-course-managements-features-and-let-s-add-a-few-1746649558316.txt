@@ -1,0 +1,34 @@
+Take all of that work you’ve done for the instructor course managements features and let’s add a few more and build that into a central dashboard for the instructors. This is for very large classes, with potentially 10s of thousands of students. Handling courses with potentially 40,000 students drastically changes the design considerations for the Instructor Dashboard. For instance, displaying a full roster of students becomes impractical and unnecessary for many tasks.
+Here's the revised description of the basic, essential capabilities for the Instructor Dashboard, taking into account very large class sizes:
+The Instructor Dashboard for the AI-Powered Assignment Feedback Tool is designed to provide educators with an efficient and scalable way to manage assignments, monitor overall student engagement, access aggregated performance data, and drill down to individual student details when necessary, even in very large courses.
+Core Capabilities for the Instructor Dashboard (Scaled for Large Courses):
+1. Course and Assignment Navigation/Selection:
+    * Upon logging in (via LTI or Auth0 SSO), instructors must be able to clearly identify and select the specific course they are managing.
+    * Within a selected course, they need to access a list of assignments that use the AI feedback tool.
+2. Aggregate Submission Statistics and Progress Monitoring:
+    * No Full Roster by Default: Instead of displaying all 40,000 students, the dashboard should prioritize showing summary statistics for each assignment.
+    * Key Metrics:
+        * Total number of students enrolled (or expected to submit).
+        * Number/percentage of students who have made a submission.
+        * Number/percentage of submissions for which AI feedback has been generated.
+        * Number/percentage of students who have viewed their feedback.
+        * Average score/assessment (if applicable, from AI or instructor overrides), potentially with a distribution overview (e.g., histogram).
+        * Indication of any processing errors or submissions needing attention.
+    * These statistics should be easily digestible and provide a quick overview of class progress and engagement.
+3. Individual Student Lookup and Detailed View:
+    * Search Functionality: A robust search/filter capability is essential. Instructors must be able to quickly find an individual student (e.g., by student ID, name, or email) within the context of a specific assignment.
+    * Detailed Submission View (on demand): Once a student is located, clicking on their record should open a view that provides:
+        * Secure access to their submitted file(s) or text.
+        * The AI-generated feedback for that submission.
+        * The current grade (AI-generated and/or instructor-assigned).
+4. Bulk Data Export:
+    * Full Roster & Grade Export: The ability to download a comprehensive CSV file containing all relevant data for an assignment is critical. This file should include:
+        * Student identifiers (ID, name, email).
+        * Submission timestamps.
+        * AI-generated feedback (or a summary/link if too verbose for CSV).
+        * AI-generated scores/assessments.
+        * Instructor-overridden scores/grades.
+        * Status indicators (submitted, feedback viewed, etc.).
+    * This allows for offline analysis, record-keeping, and importing into other systems if needed.
+5. Secure and Role-Appropriate Access:
+    * This remains paramount. All access must be governed by RBAC, ensuring instructors only see data pertinent to their assigned courses and that student data is protected. 
