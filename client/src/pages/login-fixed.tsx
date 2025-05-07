@@ -117,7 +117,7 @@ export default function Login() {
               >
                 {isLoading ? (
                   <>
-                    <span className="material-icons animate-spin mr-2">refresh</span>
+                    <div className="animate-spin mr-2">⟳</div>
                     Logging in...
                   </>
                 ) : 'Sign In'}

@@ -52,7 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(userData);
       
       // Redirect based on user role
-      if (userData.role === 'instructor') {
+      if (userData.role === 'admin') {
+        navigate(APP_ROUTES.ADMIN_DASHBOARD);
+      } else if (userData.role === 'instructor') {
         navigate(APP_ROUTES.INSTRUCTOR_DASHBOARD);
       } else {
         navigate(APP_ROUTES.DASHBOARD);
