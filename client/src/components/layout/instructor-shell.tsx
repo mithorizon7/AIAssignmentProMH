@@ -1,185 +1,232 @@
-import { useState } from "react";
+import React from "react";
+import { useAuth } from "@/lib/auth";
 import { Link, useLocation } from "wouter";
+import {
+  LayoutDashboard,
+  BookOpen,
+  BookPlus,
+  Users,
+  LogOut,
+  Menu,
+  X,
+  User,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
+  SheetClose,
 } from "@/components/ui/sheet";
-import { APP_ROUTES } from "@/lib/constants";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/lib/auth";
-import {
-  LayoutDashboard,
-  BookOpen,
-  GraduationCap,
-  FileText,
-  BarChart,
-  LogOut,
-  Menu,
-  PlusCircle,
-} from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { API_ROUTES } from "@/lib/constants";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface InstructorShellProps {
   children: React.ReactNode;
 }
 
 export function InstructorShell({ children }: InstructorShellProps) {
+  const { user, isLoading } = useAuth();
   const [location] = useLocation();
-  const { logout } = useAuth();
-  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const [showSidebar, setShowSidebar] = React.useState(false);
 
-  const navItems = [
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", API_ROUTES.LOGOUT);
+      window.location.href = "/login";
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Logout failed",
+        description: "Failed to log out. Please try again.",
+      });
+    }
+  };
+
+  const navigationItems = [
     {
       name: "Dashboard",
-      href: APP_ROUTES.INSTRUCTOR_DASHBOARD,
-      icon: <LayoutDashboard size={18} />,
+      href: "/instructor/dashboard",
+      icon: <LayoutDashboard className="h-5 w-5" />,
     },
     {
       name: "Courses",
       href: "/instructor/courses",
-      icon: <BookOpen size={18} />,
+      icon: <BookOpen className="h-5 w-5" />,
     },
     {
-      name: "Assignments",
-      href: "/instructor/assignments",
-      icon: <FileText size={18} />,
+      name: "Create Assignment",
+      href: "/instructor/create-assignment",
+      icon: <BookPlus className="h-5 w-5" />,
     },
     {
       name: "Students",
       href: "/instructor/students",
-      icon: <GraduationCap size={18} />,
-    },
-    {
-      name: "Analytics",
-      href: "/instructor/analytics",
-      icon: <BarChart size={18} />,
+      icon: <Users className="h-5 w-5" />,
     },
   ];
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error("Logout failed", error);
-    }
-  };
+  const NavLinks = () => (
+    <nav className="grid items-start px-2 text-sm font-medium">
+      {navigationItems.map((item) => {
+        const isActive = location === item.href;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:text-primary ${
+              isActive
+                ? "bg-muted font-semibold text-primary"
+                : "text-muted-foreground"
+            }`}
+          >
+            {item.icon}
+            {item.name}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-screen">
-      {/* Desktop sidebar */}
-      <div className="hidden md:flex w-64 flex-col fixed inset-y-0">
-        <div className="flex flex-col flex-grow border-r bg-primary-foreground pt-5 overflow-y-auto">
-          <div className="flex items-center flex-shrink-0 px-4 mb-5">
-            <div className="h-8 w-8 rounded-full bg-primary mr-3 flex items-center justify-center">
-              <GraduationCap className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-lg">Instructor Portal</span>
-          </div>
-          <div className="flex-grow flex flex-col">
-            <nav className="flex-1 px-2 pb-4 space-y-1">
-              {navItems.map((item) => (
-                <Link key={item.href} href={item.href}>
-                  <a
-                    className={cn(
-                      "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                      location === item.href
-                        ? "bg-primary text-primary-foreground"
-                        : "text-foreground hover:bg-muted"
-                    )}
-                  >
-                    <span className="mr-3">{item.icon}</span>
-                    {item.name}
-                  </a>
-                </Link>
-              ))}
-            </nav>
-          </div>
-          <div className="px-2 pb-3">
-            <Link href={APP_ROUTES.INSTRUCTOR_CREATE_ASSIGNMENT}>
-              <Button className="w-full justify-start">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                New Assignment
-              </Button>
-            </Link>
-          </div>
-          <div className="flex-shrink-0 flex border-t p-4">
-            <Button
-              variant="outline"
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Log out
+    <div className="flex min-h-screen flex-col">
+      {/* Header for mobile */}
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 sm:px-6 lg:hidden">
+        <Sheet open={showSidebar} onOpenChange={setShowSidebar}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="lg:hidden">
+              <Menu className="h-6 w-6" />
+              <span className="sr-only">Toggle Menu</span>
             </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-72 sm:max-w-none">
+            <div className="flex h-full flex-col">
+              <div className="flex items-center gap-2 border-b p-4">
+                <SheetClose asChild>
+                  <Button variant="ghost" size="icon">
+                    <X className="h-5 w-5" />
+                  </Button>
+                </SheetClose>
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-6 w-6 text-primary" />
+                  <span className="text-lg font-semibold">AI Feedback</span>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto py-4">
+                <NavLinks />
+              </div>
+              <div className="border-t p-4">
+                <div className="flex items-center gap-4 pb-4">
+                  <Avatar>
+                    <AvatarFallback>
+                      {user?.name
+                        ? user.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                        : user?.username?.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">
+                      {user?.name || user?.username}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {user?.email}
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+        <div className="flex flex-1 items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-6 w-6 text-primary" />
+            <span className="text-lg font-semibold">AI Feedback</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="text-xs">
+                {user?.name
+                  ? user.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                  : user?.username?.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Mobile sidebar */}
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild className="md:hidden absolute top-4 left-4 z-20">
-          <Button variant="ghost" size="icon">
-            <Menu />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-0">
-          <div className="flex flex-col h-full pt-5">
-            <div className="flex items-center flex-shrink-0 px-4 mb-5">
-              <div className="h-8 w-8 rounded-full bg-primary mr-3 flex items-center justify-center">
-                <GraduationCap className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="font-semibold text-lg">Instructor Portal</span>
-            </div>
-            <div className="flex-grow flex flex-col">
-              <nav className="flex-1 px-2 pb-4 space-y-1">
-                {navItems.map((item) => (
-                  <Link key={item.href} href={item.href}>
-                    <a
-                      className={cn(
-                        "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                        location === item.href
-                          ? "bg-primary text-primary-foreground"
-                          : "text-foreground hover:bg-muted"
-                      )}
-                      onClick={() => setOpen(false)}
-                    >
-                      <span className="mr-3">{item.icon}</span>
-                      {item.name}
-                    </a>
-                  </Link>
-                ))}
-              </nav>
-            </div>
-            <div className="px-2 pb-3">
-              <Link href={APP_ROUTES.INSTRUCTOR_CREATE_ASSIGNMENT}>
-                <Button
-                  className="w-full justify-start"
-                  onClick={() => setOpen(false)}
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  New Assignment
-                </Button>
-              </Link>
-            </div>
-            <div className="flex-shrink-0 flex border-t p-4">
-              <Button
-                variant="outline"
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Log out
-              </Button>
-            </div>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar for desktop */}
+        <aside className="hidden w-64 flex-col border-r bg-background lg:flex">
+          <div className="flex h-16 items-center gap-2 border-b px-6">
+            <BookOpen className="h-6 w-6 text-primary" />
+            <span className="text-lg font-semibold">AI Feedback</span>
           </div>
-        </SheetContent>
-      </Sheet>
+          <div className="flex-1 overflow-auto py-6">
+            <NavLinks />
+          </div>
+          <div className="border-t p-6">
+            <div className="flex items-center gap-4 pb-4">
+              <Avatar>
+                <AvatarFallback>
+                  {user?.name
+                    ? user.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                    : user?.username?.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">
+                  {user?.name || user?.username}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {user?.email}
+                </span>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
+            </Button>
+          </div>
+        </aside>
 
-      {/* Main content */}
-      <div className="flex flex-col flex-1 md:pl-64">
-        <main className="flex-1 pt-16 md:pt-8 px-4 sm:px-6 md:px-8 bg-background min-h-screen">
-          {children}
+        {/* Main content */}
+        <main className="flex-1 overflow-auto">
+          <div className="container mx-auto p-6">{children}</div>
         </main>
       </div>
     </div>

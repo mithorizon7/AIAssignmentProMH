@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { AppShell } from "@/components/layout/app-shell";
+import { InstructorShell } from "@/components/layout/instructor-shell";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -111,11 +111,11 @@ export default function CreateAssignment() {
   };
   
   return (
-    <AppShell>
+    <InstructorShell>
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-neutral-800">Create Assignment</h1>
-          <p className="text-neutral-600">Define a new assignment with AI feedback criteria</p>
+          <h1 className="text-3xl font-bold tracking-tight">Create Assignment</h1>
+          <p className="text-muted-foreground">Define a new assignment with AI feedback criteria</p>
         </div>
         
         {createdAssignment ? (
@@ -334,6 +334,6 @@ export default function CreateAssignment() {
           </Form>
         )}
       </div>
-    </AppShell>
+    </InstructorShell>
   );
 }
