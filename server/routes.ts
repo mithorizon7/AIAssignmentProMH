@@ -846,6 +846,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test rubric with AI (instructor only)
+  app.post('/api/test-rubric', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
+    try {
+      const { content, assignmentContext } = req.body;
+      
+      if (!content) {
+        return res.status(400).json({ message: 'Content is required' });
+      }
+      
+      // Use AI service to analyze the content
+      const aiService = new AIService(process.env.OPENAI_API_KEY ? 
+        new OpenAIAdapter() : new GeminiAdapter());
+      
+      const feedback = await aiService.analyzeProgrammingAssignment({
+        content,
+        assignmentContext
+      });
+      
+      res.json({
+        strengths: feedback.strengths,
+        improvements: feedback.improvements,
+        suggestions: feedback.suggestions,
+        summary: feedback.summary,
+        score: feedback.score
+      });
+    } catch (error) {
+      console.error('Error testing rubric:', error);
+      res.status(500).json({ message: 'Failed to test rubric' });
+    }
+  });
+
   // Export grades as CSV
   app.get('/api/export/grades', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
     try {
