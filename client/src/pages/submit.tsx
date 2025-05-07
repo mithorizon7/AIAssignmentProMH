@@ -105,7 +105,7 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
         return;
       }
       
-      if (submitType === 'code' && !code.trim()) {
+      if (submitType === 'code' && !codeContent.trim()) {
         toast({
           title: "Missing Code",
           description: "Please enter your code.",
@@ -131,7 +131,7 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
       formData.append('email', email);
       
       if (notes) formData.append('notes', notes);
-      if (submitType === 'code') formData.append('code', code);
+      if (submitType === 'code') formData.append('code', codeContent);
       if (submitType === 'file' && file) formData.append('file', file);
       
       // Send submission
@@ -312,8 +312,8 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
                     <Textarea
                       placeholder="Paste your code here"
                       className="font-mono min-h-[200px]"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
+                      value={codeContent}
+                      onChange={(e) => setCodeContent(e.target.value)}
                       disabled={submitting}
                     />
                   </TabsContent>
