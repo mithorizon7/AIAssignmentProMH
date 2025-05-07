@@ -21,7 +21,7 @@ export function MITNavbar() {
   const getNavLinks = () => {
     if (!isAuthenticated || !user) {
       return [
-        { href: APP_ROUTES.HOME, label: "Home" },
+        { href: "/", label: "Home" },
         { href: APP_ROUTES.LOGIN, label: "Login" },
       ];
     }
@@ -30,7 +30,7 @@ export function MITNavbar() {
       return [
         { href: APP_ROUTES.ADMIN_DASHBOARD, label: "Dashboard" },
         { href: APP_ROUTES.ADMIN_USERS, label: "Users" },
-        { href: APP_ROUTES.ADMIN_SETTINGS, label: "Settings" },
+        { href: "/admin/system-config", label: "Settings" },
       ];
     }
 
@@ -39,7 +39,7 @@ export function MITNavbar() {
         { href: APP_ROUTES.INSTRUCTOR_DASHBOARD, label: "Dashboard" },
         { href: APP_ROUTES.INSTRUCTOR_COURSES, label: "Courses" },
         { href: APP_ROUTES.INSTRUCTOR_CREATE_ASSIGNMENT, label: "Create Assignment" },
-        { href: APP_ROUTES.INSTRUCTOR_ANALYTICS, label: "Analytics" },
+        { href: "/instructor/analytics", label: "Analytics" },
       ];
     }
 
@@ -47,7 +47,7 @@ export function MITNavbar() {
     return [
       { href: APP_ROUTES.DASHBOARD, label: "Dashboard" },
       { href: APP_ROUTES.ASSIGNMENTS, label: "Assignments" },
-      { href: APP_ROUTES.SUBMISSIONS, label: "My Submissions" },
+      { href: "/submissions", label: "My Submissions" },
     ];
   };
 
@@ -57,6 +57,13 @@ export function MITNavbar() {
     await logout();
   };
 
+  const getRootPath = () => {
+    if (!isAuthenticated) return "/";
+    if (user?.role === 'admin') return APP_ROUTES.ADMIN_DASHBOARD;
+    if (user?.role === 'instructor') return APP_ROUTES.INSTRUCTOR_DASHBOARD;
+    return APP_ROUTES.DASHBOARD;
+  };
+
   return (
     <header className="bg-white border-b border-mit-silver-gray/20 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -64,7 +71,7 @@ export function MITNavbar() {
           {/* Logo and main navigation */}
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <Link href={isAuthenticated ? (user?.role === 'admin' ? APP_ROUTES.ADMIN_DASHBOARD : user?.role === 'instructor' ? APP_ROUTES.INSTRUCTOR_DASHBOARD : APP_ROUTES.DASHBOARD) : APP_ROUTES.HOME}>
+              <Link href={getRootPath()}>
                 <span className="text-mit-red font-bold text-xl cursor-pointer">
                   AI Feedback <span className="text-black">Platform</span>
                 </span>
@@ -75,13 +82,13 @@ export function MITNavbar() {
             <nav className="hidden md:ml-8 md:flex md:space-x-6">
               {navLinks.map((link) => (
                 <Link key={link.href} href={link.href}>
-                  <a className={`inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 ${
+                  <span className={`inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 cursor-pointer ${
                     location === link.href 
                       ? "border-mit-red text-gray-900" 
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   }`}>
                     {link.label}
-                  </a>
+                  </span>
                 </Link>
               ))}
               
@@ -94,11 +101,11 @@ export function MITNavbar() {
                   </button>
                   <div className="hidden group-hover:block absolute left-0 mt-2 w-48 bg-white shadow-lg py-1 rounded-md z-10 animate-fade-in">
                     <Link href="/help">
-                      <a className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Help & Documentation</a>
+                      <span className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">Help & Documentation</span>
                     </Link>
                     {user?.role === "instructor" && (
                       <Link href="/rubric-library">
-                        <a className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Rubric Library</a>
+                        <span className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">Rubric Library</span>
                       </Link>
                     )}
                   </div>
@@ -162,7 +169,7 @@ export function MITNavbar() {
             ) : (
               <Button asChild className="btn-primary">
                 <Link href={APP_ROUTES.LOGIN}>
-                  Sign In
+                  <span>Sign In</span>
                 </Link>
               </Button>
             )}
@@ -191,8 +198,8 @@ export function MITNavbar() {
           <div className="pt-2 pb-4 space-y-1">
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href}>
-                <a
-                  className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                <span
+                  className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium cursor-pointer ${
                     location === link.href
                       ? "border-mit-red text-mit-red bg-accent/50"
                       : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300 hover:bg-gray-50"
@@ -200,7 +207,7 @@ export function MITNavbar() {
                   onClick={() => setIsOpen(false)}
                 >
                   {link.label}
-                </a>
+                </span>
               </Link>
             ))}
             
@@ -213,12 +220,12 @@ export function MITNavbar() {
               </button>
             ) : (
               <Link href={APP_ROUTES.LOGIN}>
-                <a
-                  className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-500 hover:text-gray-800 hover:border-mit-red hover:bg-gray-50"
+                <span
+                  className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-500 hover:text-gray-800 hover:border-mit-red hover:bg-gray-50 cursor-pointer"
                   onClick={() => setIsOpen(false)}
                 >
                   Sign In
-                </a>
+                </span>
               </Link>
             )}
           </div>
