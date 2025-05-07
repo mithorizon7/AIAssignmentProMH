@@ -1,4 +1,4 @@
-import { SUBMISSION_STATUS, USER_ROLES, FEEDBACK_TYPE } from './constants';
+import { SUBMISSION_STATUS, USER_ROLES, FEEDBACK_TYPE, RUBRIC_CRITERIA_TYPE } from './constants';
 
 export interface User {
   id: number;
@@ -16,6 +16,21 @@ export interface Course {
   description: string;
 }
 
+export interface RubricCriteria {
+  id: string;
+  type: typeof RUBRIC_CRITERIA_TYPE[keyof typeof RUBRIC_CRITERIA_TYPE];
+  name: string;
+  description: string;
+  maxScore: number;
+  weight: number; // percentage weight in the overall assignment grade
+}
+
+export interface Rubric {
+  criteria: RubricCriteria[];
+  totalPoints: number;
+  passingThreshold?: number; // minimum percentage to pass
+}
+
 export interface Assignment {
   id: number;
   title: string;
@@ -24,6 +39,8 @@ export interface Assignment {
   course: Course;
   dueDate: string;
   status: 'active' | 'completed' | 'upcoming';
+  shareableCode?: string;
+  rubric?: Rubric;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +65,12 @@ export interface FeedbackItem {
   content: string;
 }
 
+export interface CriteriaScore {
+  criteriaId: string;
+  score: number;
+  feedback: string;
+}
+
 export interface Feedback {
   id: number;
   submissionId: number;
@@ -57,6 +80,7 @@ export interface Feedback {
   suggestions: string[];
   summary: string;
   score?: number;
+  criteriaScores?: CriteriaScore[];
   processingTime: number;
   createdAt: string;
 }

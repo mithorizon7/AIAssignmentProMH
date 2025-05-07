@@ -40,3 +40,15 @@ export const FEEDBACK_TYPE = {
   IMPROVEMENTS: 'improvements',
   SUGGESTIONS: 'suggestions',
 };
+
+export const RUBRIC_CRITERIA_TYPE = {
+  CODE_QUALITY: 'code_quality',
+  FUNCTIONALITY: 'functionality',
+  DESIGN: 'design',
+  DOCUMENTATION: 'documentation',
+  CREATIVITY: 'creativity',
+  PROBLEM_SOLVING: 'problem_solving',
+  TESTING: 'testing',
+  COMPLETENESS: 'completeness',
+  OTHER: 'other',
+};

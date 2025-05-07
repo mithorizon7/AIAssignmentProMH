@@ -43,6 +43,8 @@ export const assignments = pgTable("assignments", {
   courseId: integer("course_id").references(() => courses.id).notNull(),
   dueDate: timestamp("due_date").notNull(),
   status: assignmentStatusEnum("status").notNull().default('upcoming'),
+  shareableCode: text("shareable_code"),
+  rubric: json("rubric"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -70,6 +72,7 @@ export const feedback = pgTable("feedback", {
   suggestions: json("suggestions").notNull().$type<string[]>(),
   summary: text("summary"),
   score: smallint("score"),
+  criteriaScores: json("criteria_scores"),
   processingTime: integer("processing_time").notNull(), // in milliseconds
   rawResponse: json("raw_response").$type<Record<string, any>>(),
   modelName: text("model_name"),
