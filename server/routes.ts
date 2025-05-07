@@ -168,7 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         title,
         description,
         courseId,
-        dueDate: new Date(dueDate).toISOString(),
+        dueDate: new Date(dueDate), // The client already sends an ISO string, so we just need a Date object
         status: 'upcoming',
         shareableCode,
         rubric: rubric ? JSON.stringify(rubric) : null,
@@ -446,19 +446,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user as any;
       
-      // Get 5 most recent submissions
-      const submissions = await db.select()
-        .from(submissions)
-        .where(eq(submissions.userId, user.id))
-        .orderBy({ createdAt: 'desc' })
-        .limit(5);
+      // Get recent submissions using the storage service instead of direct db access
+      const userSubmissions = await storage.listSubmissionsForUser(user.id);
+      
+      // Sort by created date (descending) and take only 5
+      const recentSubmissions = userSubmissions
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5);
       
       // For each submission, get the feedback
       const submissionsWithFeedback = await Promise.all(
-        submissions.map(async (submission) => {
-          const [feedbackItem] = await db.select()
-            .from(feedback)
-            .where(eq(feedback.submissionId, submission.id));
+        recentSubmissions.map(async (submission) => {
+          const feedbackItem = await storage.getFeedbackBySubmissionId(submission.id);
           
           return {
             ...submission,
