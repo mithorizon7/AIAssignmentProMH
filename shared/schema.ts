@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum('user_role', ['student', 'instructor']);
+export const userRoleEnum = pgEnum('user_role', ['student', 'instructor', 'admin']);
 export const assignmentStatusEnum = pgEnum('assignment_status', ['active', 'completed', 'upcoming']);
 export const submissionStatusEnum = pgEnum('submission_status', ['pending', 'processing', 'completed', 'failed']);
 

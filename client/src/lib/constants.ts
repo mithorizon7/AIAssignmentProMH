@@ -19,6 +19,10 @@ export const APP_ROUTES = {
   INSTRUCTOR_ASSIGNMENT: (id: string | number) => `/instructor/assignment/${id}`,
   INSTRUCTOR_CREATE_ASSIGNMENT: '/instructor/create-assignment',
   SUBMIT_BY_CODE: (code: string) => `/submit/${code}`,
+  ADMIN_DASHBOARD: '/admin/dashboard',
+  ADMIN_USERS: '/admin/users',
+  ADMIN_SYSTEM_CONFIG: '/admin/system-config',
+  ADMIN_LOGS: '/admin/logs',
 };
 
 export const FILE_TYPES = {
@@ -36,6 +40,7 @@ export const SUBMISSION_STATUS = {
 export const USER_ROLES = {
   STUDENT: 'student',
   INSTRUCTOR: 'instructor',
+  ADMIN: 'admin',
 };
 
 export const FEEDBACK_TYPE = {
