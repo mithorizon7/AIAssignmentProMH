@@ -5,10 +5,13 @@ import { configureAuth } from "./auth";
 import { submissionQueue } from "./queue/worker";
 import multer from "multer";
 import { StorageService } from "./services/storage-service";
+import { AIService } from "./services/ai-service";
+import { GeminiAdapter } from "./adapters/gemini-adapter";
+import { OpenAIAdapter } from "./adapters/openai-adapter";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
-import { submissions, feedback } from "@shared/schema";
+import { submissions, feedback, users } from "@shared/schema";
 import { v4 as uuidv4 } from "uuid";
 
 // Helper function to generate a unique shareable code for assignments

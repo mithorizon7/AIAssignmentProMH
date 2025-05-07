@@ -21,6 +21,7 @@ import { API_ROUTES, APP_ROUTES } from "@/lib/constants";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Rubric, RubricBuilder } from "@/components/instructor/rubric-builder";
+import { RubricTester } from "@/components/instructor/rubric-tester";
 import { ShareableLink } from "@/components/instructor/shareable-link";
 
 // Create a schema for assignment creation
@@ -308,6 +309,14 @@ export default function CreateAssignment() {
                 value={rubric} 
                 onChange={setRubric} 
               />
+              
+              {rubric.criteria.length > 0 && (
+                <RubricTester 
+                  rubric={rubric}
+                  assignmentTitle={form.watch("title") || "Untitled Assignment"}
+                  assignmentDescription={form.watch("description") || "No description provided"}
+                />
+              )}
               
               <div className="flex justify-end space-x-4">
                 <Button
