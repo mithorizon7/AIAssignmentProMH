@@ -71,7 +71,7 @@ export class GeminiAdapter implements AIAdapter {
 
 // Helper functions to extract data from non-JSON responses
 function extractListItems(text: string, section: string): string[] {
-  const regex = new RegExp(`${section}[:\\s]*(.*?)(?=\\n\\n|$)`, 'is');
+  const regex = new RegExp(`${section}[:\\s]*(.*?)(?=\\n\\n|$)`, 'i');
   const match = text.match(regex);
   if (!match) return [];
   
@@ -82,7 +82,7 @@ function extractListItems(text: string, section: string): string[] {
 }
 
 function extractSummary(text: string): string {
-  const regex = /summary[:\s]*(.*?)(?=\n\n|$)/is;
+  const regex = new RegExp('summary[:\\s]*(.*?)(?=\\n\\n|$)', 'i');
   const match = text.match(regex);
   return match ? match[1].trim() : "";
 }

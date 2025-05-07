@@ -1,5 +1,5 @@
 import { InsertFeedback } from '@shared/schema';
-import { AIAdapter } from '../adapters/openai-adapter';
+import { AIAdapter } from '../adapters/ai-adapter';
 
 interface AnalysisRequest {
   content: string;
@@ -62,9 +62,9 @@ ${submission.content}
         ...response,
         processingTime
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('AI analysis error:', error);
-      throw new Error(`Failed to analyze submission: ${error.message}`);
+      throw new Error(`Failed to analyze submission: ${error.message || String(error)}`);
     }
   }
 

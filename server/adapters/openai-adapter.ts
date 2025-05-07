@@ -43,9 +43,9 @@ export class OpenAIAdapter implements AIAdapter {
         modelName: this.model,
         tokenCount
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error("OpenAI API error:", error);
-      throw new Error(`AI generation failed: ${error.message}`);
+      throw new Error(`AI generation failed: ${error.message || String(error)}`);
     }
   }
 }
