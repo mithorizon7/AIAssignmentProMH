@@ -6,6 +6,7 @@ import { storage } from './storage';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import connectPgSimple from 'connect-pg-simple';
+import { doubleCsrf } from 'csrf-csrf';
 import { pool } from './db';
 
 // Create PostgreSQL session store
@@ -49,6 +50,57 @@ export function configureAuth(app: any) {
       res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
     next();
+  });
+  
+  // Initialize CSRF protection
+  const csrfProtection = doubleCsrf({
+    getSecret: () => process.env.CSRF_SECRET || 'csrf-secret-key',
+    cookieName: process.env.NODE_ENV === 'production' ? '__Host-csrf' : 'csrf',
+    cookieOptions: {
+      httpOnly: true,
+      sameSite: 'lax', // Recommend 'strict' in production
+      path: '/',
+      secure: process.env.NODE_ENV === 'production',
+    },
+    size: 64,
+    getTokenFromRequest: (req) => req.headers['x-csrf-token'] as string,
+  });
+  
+  // Create middleware functions from the CSRF protection object
+  const { generateToken, doubleCsrfProtection } = csrfProtection;
+  
+  // Add CSRF protection to all state-changing routes
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    // Only protect state-changing methods (not GET, HEAD, OPTIONS)
+    const nonProtectedMethods = ['GET', 'HEAD', 'OPTIONS'];
+    if (nonProtectedMethods.includes(req.method)) {
+      return next();
+    }
+    
+    // Skip CSRF check for these specific endpoints (login, register)
+    const skipCsrfForRoutes = ['/api/auth/login', '/api/auth/register', '/api/csrf-token'];
+    if (skipCsrfForRoutes.includes(req.path)) {
+      return next();
+    }
+    
+    // Apply CSRF protection for all other state-changing requests
+    try {
+      doubleCsrfProtection(req, res);
+      next();
+    } catch (error: any) {
+      // If the token is invalid, return 403 Forbidden
+      return res.status(403).json({
+        message: 'CSRF token validation failed',
+        error: error.message
+      });
+    }
+  });
+  
+  // Endpoint to get CSRF token
+  app.get('/api/csrf-token', (req: Request, res: Response) => {
+    // Generate a new token
+    const csrfToken = generateToken(req, res);
+    return res.json({ csrfToken });
   });
 
   // Initialize passport
