@@ -3,6 +3,7 @@ import { submissionQueue } from '../queue/worker';
 import { db } from '../db';
 import { submissions, users, courses, assignments, feedback } from '@shared/schema';
 import { eq, count, avg, gt, lt, between, and, desc } from 'drizzle-orm';
+import { metricsService } from '../services/metrics-service';
 
 const router = Router();
 
@@ -88,27 +89,51 @@ router.get('/failed-submissions', requireAdmin, async (req: Request, res: Respon
   }
 });
 
-// Get system load over time (hourly buckets for the last 24 hours)
+// Get system load over time using metrics service
 router.get('/load', requireAdmin, async (req: Request, res: Response) => {
   try {
-    // In a real implementation, you would use SQL window functions to bucket by hour
-    // For now, we'll just return the submissions created in the last 24 hours
-    const oneDayAgo = new Date();
-    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    const { unit = 'day', count = 7 } = req.query;
     
-    const recentSubmissions = await db
-      .select({
-        id: submissions.id,
-        createdAt: submissions.createdAt
-      })
-      .from(submissions)
-      .where(gt(submissions.createdAt, oneDayAgo))
-      .orderBy(submissions.createdAt);
+    const loadData = await metricsService.getSystemLoad(
+      String(unit), 
+      Number(count) || 7
+    );
     
-    res.json(recentSubmissions);
+    res.json(loadData);
   } catch (error) {
     console.error('Error fetching system load:', error);
-    res.status(500).json({ message: 'Failed to fetch system load', error: error.message });
+    res.status(500).json({ message: 'Failed to fetch system load', error: (error as Error).message });
+  }
+});
+
+// Get detailed processing statistics
+router.get('/performance', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const [processingStats, percentiles] = await Promise.all([
+      metricsService.getProcessingStats(),
+      metricsService.getProcessingTimePercentiles()
+    ]);
+    
+    res.json({
+      ...processingStats,
+      percentiles
+    });
+  } catch (error) {
+    console.error('Error fetching performance metrics:', error);
+    res.status(500).json({ message: 'Failed to fetch performance metrics', error: (error as Error).message });
+  }
+});
+
+// Get metrics by assignment
+router.get('/assignment-metrics/:id?', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const assignmentId = req.params.id ? parseInt(req.params.id) : undefined;
+    const metrics = await metricsService.getAssignmentMetrics(assignmentId);
+    
+    res.json(metrics);
+  } catch (error) {
+    console.error('Error fetching assignment metrics:', error);
+    res.status(500).json({ message: 'Failed to fetch assignment metrics', error: (error as Error).message });
   }
 });
 

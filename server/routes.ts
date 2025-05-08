@@ -14,6 +14,7 @@ import { db } from "./db";
 import { submissions, feedback, users } from "@shared/schema";
 import { v4 as uuidv4 } from "uuid";
 import adminRoutes from "./routes/admin";
+import instructorRoutes from "./routes/instructor";
 
 // Helper function to generate a unique shareable code for assignments
 function generateShareableCode(length = 8): string {
@@ -43,6 +44,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Mount admin routes
   app.use('/api/admin', adminRoutes);
+  
+  // Mount instructor routes
+  app.use('/api/instructor', instructorRoutes);
   
   // Define API routes
   app.get('/api/health', (req, res) => {
