@@ -2,15 +2,18 @@ import { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
-import createMemoryStore from 'memorystore';
 import { storage } from './storage';
 import { z } from 'zod';
+import bcrypt from 'bcrypt';
+import connectPgSimple from 'connect-pg-simple';
+import { pool } from './db';
 
-const MemoryStore = createMemoryStore(session);
-
-// Create a session store with a 24-hour max age
-const sessionStore = new MemoryStore({
-  checkPeriod: 86400000 // 24 hours (in milliseconds)
+// Create PostgreSQL session store
+const PgStore = connectPgSimple(session);
+const sessionStore = new PgStore({
+  pool,
+  createTableIfMissing: true,
+  tableName: 'session'
 });
 
 export function configureAuth(app: any) {
