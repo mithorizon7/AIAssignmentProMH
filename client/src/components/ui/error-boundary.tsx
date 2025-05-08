@@ -72,7 +72,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         <Card className="w-full max-w-md mx-auto mt-8 border-red-200">
           <CardHeader className="bg-red-50 border-b border-red-100">
             <CardTitle className="text-red-800 flex items-center gap-2">
-              <ExclamationTriangleIcon className="h-5 w-5" />
+              <AlertTriangle className="h-5 w-5" />
               Something went wrong
             </CardTitle>
             <CardDescription className="text-red-700">
@@ -97,7 +97,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               Refresh Page
             </Button>
             <Button onClick={this.resetErrorBoundary} className="gap-1">
-              <ReloadIcon className="h-4 w-4" />
+              <RefreshCw className="h-4 w-4" />
               Try Again
             </Button>
           </CardFooter>
