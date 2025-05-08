@@ -69,12 +69,12 @@ export function MITNavbar() {
     <header className="sticky top-0 z-50">
       {/* MIT-style top bar with the deep red background */}
       <div className="bg-mit-red text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-20">
             {/* Logo */}
             <div className="flex-shrink-0">
               <Link href={getRootPath()}>
-                <span className="font-bold text-2xl cursor-pointer tracking-tight text-white">
+                <span className="font-bold text-3xl cursor-pointer tracking-tight text-white uppercase">
                   MIT AI Feedback
                 </span>
               </Link>
@@ -164,13 +164,13 @@ export function MITNavbar() {
             <div className="md:hidden">
               <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="inline-flex items-center justify-center p-2 rounded-md text-white hover:bg-mit-red/80"
+                className="inline-flex items-center justify-center p-3 text-white hover:bg-mit-red/80"
               >
                 <span className="sr-only">Open main menu</span>
                 {isOpen ? (
-                  <X className="block h-6 w-6" />
+                  <X className="block h-8 w-8" />
                 ) : (
-                  <Menu className="block h-6 w-6" />
+                  <Menu className="block h-8 w-8" />
                 )}
               </button>
             </div>
