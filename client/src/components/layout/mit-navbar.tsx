@@ -244,7 +244,7 @@ export function MITNavbar() {
                     handleLogout();
                     setIsOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2.5 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-[#a31f34]"
+                  className="w-full text-left px-4 py-2.5 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-[#8a1a2c]"
                 >
                   Sign Out
                 </button>
