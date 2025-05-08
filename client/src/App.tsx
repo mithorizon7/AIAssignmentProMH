@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MITNavbar } from "@/components/layout/mit-navbar";
 import { MITFooter } from "@/components/layout/mit-footer";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login-fixed";
 import Dashboard from "@/pages/dashboard";
@@ -132,6 +133,12 @@ function Router() {
 }
 
 function App() {
+  // Function to log errors to monitoring service
+  const handleError = (error: Error, errorInfo: React.ErrorInfo) => {
+    // In production, you would send this to an error monitoring service
+    console.error('Error caught by error boundary:', error, errorInfo);
+  };
+  
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -140,7 +147,9 @@ function App() {
             <MITNavbar />
             <main className="flex-grow">
               <Toaster />
-              <Router />
+              <ErrorBoundary onError={handleError}>
+                <Router />
+              </ErrorBoundary>
             </main>
             <MITFooter />
           </div>
