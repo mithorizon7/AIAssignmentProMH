@@ -1,175 +1,293 @@
-import { db } from '../db';
 import { storage } from '../storage';
-import { 
-  submissions, 
-  feedback, 
-  users, 
-  courses, 
-  assignments, 
-  enrollments 
-} from '@shared/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { submissions, feedback, users, courses, assignments, enrollments } from '@shared/schema';
+import { db } from '../db';
+import { eq, and, lt, desc, sql, count, inArray } from 'drizzle-orm';
+import { stringify } from 'csv-stringify';
 
 /**
- * Service for efficient batch operations on the database.
- * This is particularly useful for operations involving large class sizes.
+ * Service for efficiently handling batch operations on large datasets
+ * These operations are optimized for handling classes with thousands of students
  */
 export class BatchOperationsService {
+  // Maximum number of records to process in a single batch
+  private batchSize = 1000;
+  
   /**
-   * Bulk enroll multiple students in a course
-   * @param courseId - The ID of the course
-   * @param userIds - Array of user IDs to enroll
+   * Batch enroll multiple students in a course
+   * @param courseId The course ID to enroll students in
+   * @param studentIds Array of student IDs to enroll
    */
-  async bulkEnrollStudents(courseId: number, userIds: number[]): Promise<void> {
-    if (!userIds.length) return;
-    
-    // Prepare enrollment objects
-    const enrollmentData = userIds.map(userId => ({
-      userId,
-      courseId
-    }));
-    
-    // Insert them all at once
-    await db.insert(enrollments).values(enrollmentData);
-  }
-
-  /**
-   * Bulk update submission statuses
-   * @param submissionIds - Array of submission IDs to update
-   * @param status - New status to set for all submissions
-   */
-  async bulkUpdateSubmissionStatus(submissionIds: number[], status: 'pending' | 'processing' | 'completed' | 'failed'): Promise<void> {
-    if (!submissionIds.length) return;
-    
-    await db
-      .update(submissions)
-      .set({ 
-        status,
-        updatedAt: new Date()
-      })
-      .where(inArray(submissions.id, submissionIds));
-  }
-
-  /**
-   * Get all submissions for a list of assignments
-   * Useful for instructors managing multiple assignments in large classes
-   */
-  async getSubmissionsForAssignments(assignmentIds: number[]): Promise<any[]> {
-    if (!assignmentIds.length) return [];
-    
-    return db
-      .select()
-      .from(submissions)
-      .where(inArray(submissions.assignmentId, assignmentIds))
-      .orderBy(submissions.updatedAt);
-  }
-
-  /**
-   * Get all user progress across multiple assignments
-   * @param courseId - The ID of the course
-   * @returns Map of user progress across assignments
-   */
-  async getUserProgressForCourse(courseId: number): Promise<any> {
-    // Get all assignments for the course
-    const courseAssignments = await db
-      .select()
-      .from(assignments)
-      .where(eq(assignments.courseId, courseId));
-    
-    if (!courseAssignments.length) return {};
-    
-    // Get all students enrolled in the course
-    const enrolledStudents = await db
-      .select({
-        userId: enrollments.userId
-      })
-      .from(enrollments)
-      .where(eq(enrollments.courseId, courseId));
-    
-    const userIds = enrolledStudents.map(e => e.userId);
-    
-    if (!userIds.length) return {};
-    
-    // Get all submissions from these students for these assignments
-    const assignmentIds = courseAssignments.map(a => a.id);
-    
-    const allSubmissions = await db
-      .select()
-      .from(submissions)
-      .where(
-        and(
-          inArray(submissions.assignmentId, assignmentIds),
-          inArray(submissions.userId, userIds)
-        )
-      );
-    
-    // Get all associated feedback
-    const submissionIds = allSubmissions.map(s => s.id);
-    
-    const allFeedback = submissionIds.length > 0 
-      ? await db
-          .select()
-          .from(feedback)
-          .where(inArray(feedback.submissionId, submissionIds))
-      : [];
-    
-    // Get all students
-    const students = await db
-      .select()
-      .from(users)
-      .where(inArray(users.id, userIds));
-    
-    // Organize data for easy consumption
-    const studentMap = new Map(students.map(s => [s.id, s]));
-    const feedbackMap = new Map(allFeedback.map(f => [f.submissionId, f]));
-    const submissionsByStudent = new Map();
-    
-    for (const submission of allSubmissions) {
-      if (!submissionsByStudent.has(submission.userId)) {
-        submissionsByStudent.set(submission.userId, []);
-      }
-      submissionsByStudent.get(submission.userId).push({
-        ...submission,
-        feedback: feedbackMap.get(submission.id) || null
-      });
+  async batchEnrollStudents(courseId: number, studentIds: number[]): Promise<{ success: number; failed: number }> {
+    // Validate the course
+    const course = await storage.getCourse(courseId);
+    if (!course) {
+      throw new Error(`Course ${courseId} not found`);
     }
     
-    // Build progress report
-    const progress = userIds.map(userId => {
-      const student = studentMap.get(userId);
-      const studentSubmissions = submissionsByStudent.get(userId) || [];
+    // Process in batches to avoid memory issues with large student lists
+    let successCount = 0;
+    let failedCount = 0;
+    
+    for (let i = 0; i < studentIds.length; i += this.batchSize) {
+      const batchIds = studentIds.slice(i, i + this.batchSize);
       
-      // Calculate assignment completion
-      const completedAssignments = new Set(
-        studentSubmissions
-          .filter(s => s.status === 'completed')
-          .map(s => s.assignmentId)
+      // Bulk check which students already exist in the course
+      const existingEnrollments = await db
+        .select({ userId: enrollments.userId })
+        .from(enrollments)
+        .where(and(
+          eq(enrollments.courseId, courseId),
+          inArray(enrollments.userId, batchIds)
+        ));
+      
+      // Create a set of already enrolled student IDs for faster lookup
+      const existingStudentIds = new Set(existingEnrollments.map(e => e.userId));
+      
+      // Filter out students who are already enrolled
+      const studentsToEnroll = batchIds.filter(id => !existingStudentIds.has(id));
+      
+      // Process enrollments
+      try {
+        // Create enrollment records in bulk
+        const enrollmentData = studentsToEnroll.map(userId => ({
+          userId,
+          courseId,
+        }));
+        
+        if (enrollmentData.length > 0) {
+          // Use bulk insert
+          const result = await db
+            .insert(enrollments)
+            .values(enrollmentData)
+            .returning({ id: enrollments.id });
+          
+          successCount += result.length;
+        }
+        
+        // Count already enrolled as "successful" since they're already enrolled
+        successCount += existingStudentIds.size;
+      } catch (error) {
+        console.error(`Error in batch enrollment:`, error);
+        failedCount += studentsToEnroll.length;
+      }
+    }
+    
+    return { success: successCount, failed: failedCount };
+  }
+  
+  /**
+   * Generate a CSV for assignment grades across a course
+   * Optimized for large classes
+   * @param courseId The course ID to export grades for
+   */
+  async exportCourseGrades(courseId: number): Promise<string> {
+    // Get all assignments for this course
+    const courseAssignments = await db
+      .select({
+        id: assignments.id,
+        title: assignments.title
+      })
+      .from(assignments)
+      .where(eq(assignments.courseId, courseId))
+      .orderBy(assignments.dueDate);
+    
+    // Get all enrolled students
+    const enrolledStudents = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        username: users.username,
+        email: users.email
+      })
+      .from(users)
+      .innerJoin(enrollments, eq(users.id, enrollments.userId))
+      .where(eq(enrollments.courseId, courseId))
+      .orderBy(users.name);
+    
+    // For CSV generation
+    const csvHeader = [
+      'Student ID', 
+      'Name', 
+      'Email',
+      ...courseAssignments.map(a => a.title)
+    ];
+    
+    // Initialize the data array for CSV
+    const csvData: (string | number | null)[][] = [];
+    
+    // Process in chunks to avoid memory issues with large classes
+    const studentChunks = this.chunkArray(enrolledStudents, this.batchSize);
+    
+    for (const studentChunk of studentChunks) {
+      // Get all student IDs in this chunk
+      const studentIds = studentChunk.map(s => s.id);
+      
+      // Get all assignments and their most recent submission scores in bulk
+      // This is much more efficient than querying each student+assignment combination
+      const submissionScores = await this.getSubmissionScores(studentIds, courseAssignments.map(a => a.id));
+      
+      // Generate a row for each student
+      for (const student of studentChunk) {
+        const studentRow = [
+          student.id.toString(),
+          student.name,
+          student.email
+        ];
+        
+        // Add the scores for each assignment
+        for (const assignment of courseAssignments) {
+          // Look up the score using a composite key
+          const key = `${student.id}-${assignment.id}`;
+          const score = submissionScores.get(key);
+          studentRow.push(score !== undefined ? score : null);
+        }
+        
+        csvData.push(studentRow);
+      }
+    }
+    
+    // Generate CSV
+    return new Promise((resolve, reject) => {
+      stringify(
+        [csvHeader, ...csvData], 
+        { 
+          header: false,
+          quoted: true 
+        }, 
+        (err, output) => {
+          if (err) reject(err);
+          else resolve(output);
+        }
       );
-      
-      const averageScore = studentSubmissions
-        .filter(s => s.feedback && s.feedback.score !== null)
-        .reduce((sum, s) => sum + (s.feedback.score || 0), 0) / 
-        (studentSubmissions.filter(s => s.feedback && s.feedback.score !== null).length || 1);
-      
-      return {
-        userId,
-        name: student?.name,
-        email: student?.email,
-        completedAssignments: Array.from(completedAssignments),
-        totalAssignments: assignmentIds.length,
-        completionRate: completedAssignments.size / assignmentIds.length,
-        averageScore,
-        submissions: studentSubmissions
-      };
     });
+  }
+  
+  /**
+   * Get submission scores for multiple students and assignments at once
+   * This is much more efficient than individual queries
+   */
+  private async getSubmissionScores(
+    studentIds: number[],
+    assignmentIds: number[]
+  ): Promise<Map<string, number | null>> {
+    // Use a subquery to find the latest submission for each student/assignment
+    const latestSubmissions = await db
+      .select({
+        submissionId: submissions.id,
+        userId: submissions.userId,
+        assignmentId: submissions.assignmentId
+      })
+      .from(submissions)
+      .where(and(
+        inArray(submissions.userId, studentIds),
+        inArray(submissions.assignmentId, assignmentIds),
+        eq(submissions.status, 'completed')
+      ))
+      .orderBy(submissions.createdAt);
+      
+    // If no submissions, return empty map
+    if (latestSubmissions.length === 0) {
+      return new Map();
+    }
+    
+    // Get submission IDs
+    const submissionIds = latestSubmissions.map(s => s.submissionId);
+    
+    // Get feedback scores for these submissions
+    const feedbackScores = await db
+      .select({
+        submissionId: feedback.submissionId,
+        score: feedback.score
+      })
+      .from(feedback)
+      .where(inArray(feedback.submissionId, submissionIds));
+    
+    // Create a map of submission ID to score
+    const scoreMap = new Map(feedbackScores.map(fs => [fs.submissionId, fs.score]));
+    
+    // Create a map of student-assignment to score
+    const result = new Map<string, number | null>();
+    
+    // Map each student-assignment pair to its score
+    for (const submission of latestSubmissions) {
+      const key = `${submission.userId}-${submission.assignmentId}`;
+      const score = scoreMap.get(submission.submissionId);
+      result.set(key, score !== undefined ? score : null);
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Get aggregated statistics for a course
+   * @param courseId The course ID to get statistics for
+   */
+  async getCourseStats(courseId: number): Promise<{
+    enrollmentCount: number,
+    assignmentCount: number,
+    submissionCount: number,
+    avgSubmissionsPerStudent: number,
+    avgScores: { assignmentId: number, avgScore: number }[]
+  }> {
+    // Get counts using a single query for efficiency
+    const [enrollmentCount, assignmentCount, submissionCount] = await Promise.all([
+      // Count enrollments
+      db.select({ count: count() })
+        .from(enrollments)
+        .where(eq(enrollments.courseId, courseId))
+        .then(result => result[0]?.count || 0),
+      
+      // Count assignments
+      db.select({ count: count() })
+        .from(assignments)
+        .where(eq(assignments.courseId, courseId))
+        .then(result => result[0]?.count || 0),
+      
+      // Count submissions (this is more complex - we need to join tables)
+      db.select({ count: count() })
+        .from(submissions)
+        .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
+        .where(eq(assignments.courseId, courseId))
+        .then(result => result[0]?.count || 0)
+    ]);
+    
+    // Calculate average submissions per student
+    const avgSubmissionsPerStudent = enrollmentCount > 0 
+      ? submissionCount / enrollmentCount 
+      : 0;
+    
+    // Get average scores per assignment using SQL aggregation
+    const avgScores = await db
+      .select({
+        assignmentId: assignments.id,
+        avgScore: sql<number>`avg(${feedback.score})`
+      })
+      .from(feedback)
+      .innerJoin(submissions, eq(feedback.submissionId, submissions.id))
+      .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
+      .where(eq(assignments.courseId, courseId))
+      .groupBy(assignments.id);
     
     return {
-      courseId,
-      assignments: courseAssignments,
-      students: progress
+      enrollmentCount,
+      assignmentCount,
+      submissionCount,
+      avgSubmissionsPerStudent,
+      avgScores
     };
+  }
+  
+  /**
+   * Utility method to chunk an array into smaller arrays
+   */
+  private chunkArray<T>(array: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
   }
 }
 
-// Singleton instance
+// Export singleton instance
 export const batchOperations = new BatchOperationsService();

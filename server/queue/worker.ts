@@ -1,37 +1,37 @@
-import { Queue, Worker, QueueEvents } from 'bullmq';
+import { EventEmitter } from 'events';
 import { AIService } from '../services/ai-service';
 import { StorageService } from '../services/storage-service';
 import { storage } from '../storage';
 import { GeminiAdapter } from '../adapters/gemini-adapter';
 import { OpenAIAdapter } from '../adapters/openai-adapter';
 import { db } from '../db';
-import { submissions, feedback } from '@shared/schema';
+import { submissions } from '@shared/schema';
 import { eq } from 'drizzle-orm';
-import redisClient, { connectionOptions } from './redis';
-
-// Job data interface
-interface SubmissionJobData {
-  submissionId: number;
-}
 
 /**
- * BullMQ-based submission queue implementation
- * This provides a robust, Redis-backed queue that can:
- * - Persist across server restarts
- * - Scale horizontally across multiple servers
- * - Handle retries, delays, and priorities
- * - Provide monitoring and analytics
+ * Enhanced submission queue implementation with Redis-like semantics
+ * This provides a robust queue that can:
+ * - Handle multiple concurrent workers
+ * - Provide retry capability with exponential backoff
+ * - Track submission statistics
  */
-class BullMQSubmissionQueue {
-  private queue: Queue<SubmissionJobData>;
-  private worker: Worker<SubmissionJobData>;
-  private queueEvents: QueueEvents;
+class EnhancedSubmissionQueue extends EventEmitter {
+  private workers: Map<number, boolean> = new Map(); // Track active worker status
+  private maxWorkers: number = 5; // Process up to 5 submissions concurrently
   private aiService: AIService;
   private storageService: StorageService;
   
+  // Job stats for monitoring
+  private stats = {
+    waiting: 0,
+    active: 0,
+    completed: 0,
+    failed: 0,
+    total: 0
+  };
+  
   constructor() {
-    // Initialize the queue
-    this.queue = new Queue<SubmissionJobData>('submissions', connectionOptions);
+    super();
     
     // Initialize services
     // Select the appropriate AI adapter based on available API keys
@@ -50,46 +50,10 @@ class BullMQSubmissionQueue {
     this.aiService = new AIService(aiAdapter);
     this.storageService = new StorageService();
     
-    // Set up the worker to process jobs
-    this.worker = new Worker<SubmissionJobData>(
-      'submissions',
-      async job => this.processSubmission(job.data),
-      {
-        ...connectionOptions,
-        concurrency: 5, // Process up to 5 submissions concurrently
-        limiter: {
-          // Rate limit to avoid overloading the AI service
-          max: 20, // Max 20 jobs
-          duration: 60000 // Per minute
-        }
-      }
-    );
+    // Start processing pending submissions in the background
+    setInterval(() => this.processPendingSubmissions(), 5000);
     
-    // Set up queue events (for monitoring)
-    this.queueEvents = new QueueEvents('submissions', connectionOptions);
-    
-    // Set up event handlers
-    this.worker.on('completed', job => {
-      console.log(`Job ${job.id} completed successfully`);
-    });
-    
-    this.worker.on('failed', (job, error) => {
-      console.error(`Job ${job?.id} failed:`, error);
-    });
-    
-    this.queueEvents.on('completed', ({ jobId }) => {
-      console.log(`Job ${jobId} completed`);
-    });
-    
-    this.queueEvents.on('failed', ({ jobId, failedReason }) => {
-      console.error(`Job ${jobId} failed: ${failedReason}`);
-    });
-    
-    this.queueEvents.on('stalled', ({ jobId }) => {
-      console.warn(`Job ${jobId} stalled (may indicate worker crash)`);
-    });
-    
-    console.log('BullMQ submission queue initialized');
+    console.log('Enhanced submission queue initialized');
   }
   
   /**
@@ -101,23 +65,14 @@ class BullMQSubmissionQueue {
       // Mark the submission as pending in the database
       await storage.updateSubmissionStatus(submissionId, 'pending');
       
-      // Add the job to the queue
-      await this.queue.add(
-        `submission-${submissionId}`, 
-        { submissionId },
-        { 
-          // Configure job options
-          attempts: 3, // Retry up to 3 times
-          backoff: {
-            type: 'exponential',
-            delay: 5000 // Start with 5s delay, then double
-          },
-          removeOnComplete: true, // Remove job from queue when complete
-          removeOnFail: false // Keep failed jobs for inspection
-        }
-      );
+      this.stats.waiting++;
+      this.stats.total++;
       
       console.log(`Submission ${submissionId} added to queue`);
+      this.emit('added', submissionId);
+      
+      // Try to process right away if we have capacity
+      this.processPendingSubmissions();
     } catch (error) {
       console.error(`Error adding submission ${submissionId} to queue:`, error);
       throw error;
@@ -125,10 +80,44 @@ class BullMQSubmissionQueue {
   }
   
   /**
-   * Process a submission job
-   * @param jobData The job data containing the submission ID
+   * Check for pending submissions and process them if we have capacity
    */
-  private async processSubmission({ submissionId }: SubmissionJobData): Promise<void> {
+  private async processPendingSubmissions(): Promise<void> {
+    // Calculate how many more workers we can start
+    const activeWorkers = Array.from(this.workers.values()).filter(active => active).length;
+    const availableSlots = this.maxWorkers - activeWorkers;
+    
+    if (availableSlots <= 0) {
+      return; // At capacity, nothing to do
+    }
+    
+    try {
+      // Get pending submissions from the database up to our capacity
+      const pendingSubmissions = await db
+        .select({ id: submissions.id })
+        .from(submissions)
+        .where(eq(submissions.status, 'pending'))
+        .limit(availableSlots);
+      
+      // Start processing each submission
+      for (const submission of pendingSubmissions) {
+        this.processSubmission(submission.id);
+      }
+    } catch (error) {
+      console.error('Error fetching pending submissions:', error);
+    }
+  }
+  
+  /**
+   * Process a submission
+   * @param submissionId The ID of the submission to process
+   */
+  private async processSubmission(submissionId: number, attempt: number = 1): Promise<void> {
+    // Set this worker as active
+    this.workers.set(submissionId, true);
+    this.stats.waiting--;
+    this.stats.active++;
+    
     try {
       // Get submission from database
       const submission = await storage.getSubmission(submissionId);
@@ -170,19 +159,55 @@ class BullMQSubmissionQueue {
       // Update submission status to completed
       await storage.updateSubmissionStatus(submission.id, 'completed');
       
-      console.log(`Successfully processed submission ${submissionId}`);
-    } catch (error) {
-      console.error(`Error processing submission ${submissionId}:`, error);
+      // Update stats
+      this.stats.active--;
+      this.stats.completed++;
       
-      // Mark submission as failed
+      console.log(`Successfully processed submission ${submissionId}`);
+      this.emit('completed', submissionId);
+    } catch (error) {
+      console.error(`Error processing submission ${submissionId} (attempt ${attempt}):`, error);
+      
+      const maxRetries = 3;
+      if (attempt < maxRetries) {
+        // Calculate exponential backoff
+        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s...
+        
+        console.log(`Retrying submission ${submissionId} in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+        
+        // Schedule retry with exponential backoff
+        setTimeout(() => {
+          this.processSubmission(submissionId, attempt + 1);
+        }, delay);
+        
+        // This worker is no longer active (for now)
+        this.workers.set(submissionId, false);
+        this.stats.active--;
+        this.stats.waiting++; // Back to waiting
+        
+        return;
+      }
+      
+      // Mark submission as failed after all retries
       try {
         await storage.updateSubmissionStatus(submissionId, 'failed');
       } catch (updateError) {
         console.error(`Failed to update submission status:`, updateError);
       }
       
-      // Re-throw the error to let BullMQ handle retries
-      throw error;
+      // Update stats
+      this.stats.active--;
+      this.stats.failed++;
+      
+      this.emit('failed', submissionId, error);
+    } finally {
+      // If we haven't already handled retries, mark this worker as inactive
+      if (this.workers.get(submissionId)) {
+        this.workers.delete(submissionId);
+        
+        // Check for more submissions to process
+        this.processPendingSubmissions();
+      }
     }
   }
   
@@ -212,33 +237,9 @@ class BullMQSubmissionQueue {
    * Get queue statistics
    */
   async getStats(): Promise<any> {
-    const [waiting, active, completed, failed, delayed] = await Promise.all([
-      this.queue.getWaitingCount(),
-      this.queue.getActiveCount(),
-      this.queue.getCompletedCount(),
-      this.queue.getFailedCount(),
-      this.queue.getDelayedCount()
-    ]);
-    
-    return {
-      waiting,
-      active,
-      completed,
-      failed,
-      delayed,
-      total: waiting + active + completed + failed + delayed
-    };
-  }
-  
-  /**
-   * Shutdown the queue and worker (for clean app shutdown)
-   */
-  async shutdown(): Promise<void> {
-    await this.worker.close();
-    await this.queue.close();
-    await this.queueEvents.close();
+    return { ...this.stats };
   }
 }
 
 // Export singleton instance
-export const submissionQueue = new BullMQSubmissionQueue();
+export const submissionQueue = new EnhancedSubmissionQueue();

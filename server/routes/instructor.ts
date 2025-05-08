@@ -29,8 +29,37 @@ router.get('/students/progress/:courseId', requireInstructor, async (req: Reques
       return res.status(404).json({ message: 'Course not found' });
     }
     
-    // Use batch operations to efficiently retrieve all data
-    const progressData = await batchOperations.getUserProgressForCourse(courseId);
+    // Get course stats using our optimized batch operations
+    const stats = await batchOperations.getCourseStats(courseId);
+    
+    // Get all assignments for this course
+    const courseAssignments = await db
+      .select()
+      .from(assignments)
+      .where(eq(assignments.courseId, courseId))
+      .orderBy(assignments.dueDate);
+      
+    // Get all students and their submissions
+    const enrolledStudents = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email
+      })
+      .from(users)
+      .innerJoin(enrollments, eq(users.id, enrollments.userId))
+      .where(eq(enrollments.courseId, courseId))
+      .orderBy(users.name);
+      
+    // Format the data with high-level stats
+    const progressData = {
+      courseId,
+      courseName: course.name,
+      stats,
+      assignments: courseAssignments,
+      studentCount: enrolledStudents.length,
+      students: enrolledStudents
+    };
     
     res.json(progressData);
   } catch (error) {
@@ -55,13 +84,15 @@ router.post('/course/:courseId/enroll-students', requireInstructor, async (req: 
       return res.status(404).json({ message: 'Course not found' });
     }
     
-    // Bulk enroll students
-    await batchOperations.bulkEnrollStudents(courseId, studentIds);
+    // Use our optimized batch enrollment service for large classes
+    const result = await batchOperations.batchEnrollStudents(courseId, studentIds);
     
     res.json({ 
-      message: `Successfully enrolled ${studentIds.length} students in the course`,
+      message: `Successfully enrolled ${result.success} students in the course (${result.failed} failed)`,
       courseId,
-      enrolledCount: studentIds.length
+      success: result.success,
+      failed: result.failed,
+      total: studentIds.length
     });
   } catch (error) {
     console.error('Error bulk enrolling students:', error);
@@ -143,40 +174,15 @@ router.get('/export/grades/:courseId', requireInstructor, async (req: Request, r
       return res.status(404).json({ message: 'Course not found' });
     }
     
-    // Use batch operations to get all grades efficiently
-    const progressData = await batchOperations.getUserProgressForCourse(courseId);
-    
-    // Format data for CSV export
-    const csvData = progressData.students.map((student: any) => {
-      const studentAssignments = student.submissions.reduce((acc: any, submission: any) => {
-        acc[`Assignment ${submission.assignmentId} Score`] = 
-          submission.feedback?.score !== undefined ? submission.feedback.score : 'N/A';
-        return acc;
-      }, {});
-      
-      return {
-        'Student ID': student.userId,
-        'Name': student.name,
-        'Email': student.email,
-        'Completion Rate': `${(student.completionRate * 100).toFixed(1)}%`,
-        'Average Score': student.averageScore.toFixed(1),
-        ...studentAssignments
-      };
-    });
-    
-    // Generate CSV
-    const stringifier = stringify(csvData, { header: true });
-    let csvOutput = '';
-    
-    for await (const chunk of stringifier) {
-      csvOutput += chunk;
-    }
+    // Use our optimized batch operations to generate CSV efficiently
+    // This implementation can handle tens of thousands of students
+    const csvData = await batchOperations.exportCourseGrades(courseId);
     
     // Set headers for file download
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="grades-course-${courseId}.csv"`);
     
-    res.send(csvOutput);
+    res.send(csvData);
   } catch (error) {
     console.error('Error exporting grades:', error);
     res.status(500).json({ message: 'Failed to export grades', error: (error as Error).message });
