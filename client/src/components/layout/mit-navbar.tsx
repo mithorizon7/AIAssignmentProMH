@@ -67,27 +67,27 @@ export function MITNavbar() {
 
   return (
     <header className="sticky top-0 z-50">
-      {/* MIT-style top bar with the deep red background */}
-      <div className="bg-mit-red text-white">
+      {/* Top navigation bar with white background */}
+      <div className="bg-white text-gray-900 border-b border-gray-200">
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             {/* Logo */}
             <div className="flex-shrink-0">
               <Link href={getRootPath()}>
-                <span className="font-bold text-3xl cursor-pointer tracking-tight text-white uppercase">
-                  MIT AI Feedback
+                <span className="font-bold text-2xl cursor-pointer tracking-tight text-maroon-600">
+                  AI Feedback Platform
                 </span>
               </Link>
             </div>
             
             {/* Desktop navigation */}
-            <div className="hidden md:flex md:space-x-8">
+            <div className="hidden md:flex md:space-x-6">
               {navLinks.map((link) => (
                 <Link key={link.href} href={link.href}>
-                  <span className={`inline-flex items-center px-3 py-4 text-base font-medium cursor-pointer text-white ${
+                  <span className={`inline-flex items-center px-3 py-4 text-base font-medium cursor-pointer ${
                     location === link.href 
-                      ? "bg-mit-red/80" 
-                      : "hover:bg-mit-red/80"
+                      ? "text-maroon-600 border-b-2 border-maroon-600" 
+                      : "text-gray-700 hover:text-maroon-600"
                   }`}>
                     {link.label}
                   </span>
@@ -96,7 +96,7 @@ export function MITNavbar() {
               
               {isAuthenticated && (
                 <div className="relative group">
-                  <button className="inline-flex items-center px-3 py-4 text-base font-medium cursor-pointer text-white hover:bg-mit-red/80">
+                  <button className="inline-flex items-center px-3 py-4 text-base font-medium cursor-pointer text-gray-700 hover:text-maroon-600">
                     More
                     <ChevronDown className="ml-1 h-4 w-4" />
                   </button>
@@ -124,17 +124,17 @@ export function MITNavbar() {
                 <>
                   <button
                     onClick={() => setSearchOpen(!searchOpen)}
-                    className="p-2 text-white hover:bg-mit-red/80 rounded-md"
+                    className="p-2 text-gray-600 hover:text-maroon-600 rounded-md"
                   >
                     <Search className="h-5 w-5" />
                   </button>
                   
-                  <button className="p-2 text-white hover:bg-mit-red/80 rounded-md relative">
+                  <button className="p-2 text-gray-600 hover:text-maroon-600 rounded-md relative">
                     <Bell className="h-5 w-5" />
-                    <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-white"></span>
+                    <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-maroon-600"></span>
                   </button>
                   
-                  <div className="text-sm font-medium text-white ml-1 mr-2">
+                  <div className="text-sm font-medium text-gray-700 ml-2 mr-3">
                     {user?.name || 'User'}
                   </div>
                 </>
@@ -144,14 +144,14 @@ export function MITNavbar() {
                 <Button
                   variant="outline"
                   onClick={handleLogout}
-                  className="text-sm font-medium bg-white text-mit-red border-white hover:bg-white/90"
+                  className="text-sm font-medium bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                 >
                   Sign Out
                 </Button>
               ) : (
                 <Button 
                   asChild 
-                  className="bg-white text-mit-red hover:bg-white/90 border-white"
+                  className="bg-maroon-600 text-white hover:bg-maroon-700 border-0"
                 >
                   <Link href={APP_ROUTES.LOGIN}>
                     <span>Sign In</span>
@@ -164,13 +164,13 @@ export function MITNavbar() {
             <div className="md:hidden">
               <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="inline-flex items-center justify-center p-3 text-white hover:bg-mit-red/80"
+                className="inline-flex items-center justify-center p-3 text-gray-600 hover:text-maroon-600"
               >
                 <span className="sr-only">Open main menu</span>
                 {isOpen ? (
-                  <X className="block h-8 w-8" />
+                  <X className="block h-7 w-7" />
                 ) : (
-                  <Menu className="block h-8 w-8" />
+                  <Menu className="block h-7 w-7" />
                 )}
               </button>
             </div>
@@ -184,12 +184,12 @@ export function MITNavbar() {
           <input
             type="text"
             placeholder="Search assignments, courses..."
-            className="flex-1 h-12 px-4 bg-gray-50 rounded-md border border-gray-300 focus:ring-1 focus:ring-mit-red focus:border-mit-red"
+            className="flex-1 h-12 px-4 bg-gray-50 rounded-md border border-gray-300 focus:ring-1 focus:ring-maroon-600 focus:border-maroon-600"
             autoFocus
           />
           <button 
             onClick={() => setSearchOpen(false)}
-            className="ml-4 p-2 text-gray-500 hover:text-gray-700"
+            className="ml-4 p-2 text-gray-500 hover:text-maroon-600"
           >
             <X className="h-5 w-5" />
           </button>
@@ -202,7 +202,7 @@ export function MITNavbar() {
           <div className="pt-2 pb-3 space-y-1 px-2">
             {isAuthenticated && (
               <div className="flex items-center p-3 bg-gray-50 rounded-md mb-2">
-                <div className="flex-shrink-0 bg-mit-red/10 text-mit-red rounded-full p-2">
+                <div className="flex-shrink-0 bg-maroon-50 text-maroon-600 rounded-full p-2">
                   <User className="h-5 w-5" />
                 </div>
                 <div className="ml-3">
@@ -217,8 +217,8 @@ export function MITNavbar() {
                 <div
                   className={`block px-4 py-2.5 rounded-md text-base font-medium cursor-pointer ${
                     location === link.href
-                      ? "bg-gray-50 text-mit-red"
-                      : "text-gray-700 hover:bg-gray-50 hover:text-mit-red"
+                      ? "bg-gray-50 text-maroon-600"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-maroon-600"
                   }`}
                   onClick={() => setIsOpen(false)}
                 >
@@ -232,7 +232,7 @@ export function MITNavbar() {
                 <div className="border-t border-gray-200 my-3"></div>
                 <Link href="/help">
                   <div 
-                    className="block px-4 py-2.5 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-mit-red cursor-pointer"
+                    className="block px-4 py-2.5 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-maroon-600 cursor-pointer"
                     onClick={() => setIsOpen(false)}
                   >
                     Help & Documentation
@@ -243,7 +243,7 @@ export function MITNavbar() {
                     handleLogout();
                     setIsOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2.5 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-mit-red"
+                  className="w-full text-left px-4 py-2.5 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-maroon-600"
                 >
                   Sign Out
                 </button>
@@ -253,7 +253,7 @@ export function MITNavbar() {
             {!isAuthenticated && (
               <Link href={APP_ROUTES.LOGIN}>
                 <div
-                  className="mt-3 block px-4 py-2.5 rounded-md text-base font-medium bg-mit-red text-white hover:bg-mit-red/90 cursor-pointer text-center"
+                  className="mt-3 block px-4 py-2.5 rounded-md text-base font-medium bg-maroon-600 text-white hover:bg-maroon-700 cursor-pointer text-center"
                   onClick={() => setIsOpen(false)}
                 >
                   Sign In
