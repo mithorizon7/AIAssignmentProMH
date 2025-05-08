@@ -67,9 +67,9 @@ export function MITNavbar() {
   return (
     <header className="bg-white border-b border-mit-silver-gray/20 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex justify-between items-center h-16">
           {/* Logo and main navigation */}
-          <div className="flex">
+          <div className="flex items-center">
             <div className="flex-shrink-0 flex items-center">
               <Link href={getRootPath()}>
                 <span className="text-mit-red font-bold text-xl cursor-pointer">
@@ -79,10 +79,10 @@ export function MITNavbar() {
             </div>
             
             {/* Desktop navigation */}
-            <nav className="hidden md:ml-8 md:flex md:space-x-6">
+            <nav className="hidden md:ml-8 md:flex md:space-x-8">
               {navLinks.map((link) => (
                 <Link key={link.href} href={link.href}>
-                  <span className={`inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 cursor-pointer ${
+                  <span className={`inline-flex items-center px-2 py-1 text-sm font-medium border-b-2 cursor-pointer ${
                     location === link.href 
                       ? "border-mit-red text-gray-900" 
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -95,7 +95,7 @@ export function MITNavbar() {
               {/* More dropdown placeholder (if needed) */}
               {isAuthenticated && (
                 <div className="relative group">
-                  <button className="inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 group-hover:border-gray-300">
+                  <button className="inline-flex items-center px-2 py-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 group-hover:border-gray-300">
                     More
                     <ChevronDown className="ml-1 h-4 w-4" />
                   </button>
@@ -115,7 +115,7 @@ export function MITNavbar() {
           </div>
           
           {/* Search and user actions */}
-          <div className="hidden md:flex md:items-center md:space-x-4">
+          <div className="hidden md:flex md:items-center md:space-x-5">
             {/* Search */}
             {isAuthenticated && (
               <>
@@ -153,21 +153,21 @@ export function MITNavbar() {
             
             {/* Login/Logout buttons */}
             {isAuthenticated ? (
-              <div className="flex items-center space-x-2">
-                <div className="text-sm font-medium text-gray-700 mr-2">
+              <div className="flex items-center gap-3">
+                <div className="text-sm font-medium text-gray-800">
                   {user?.name}
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleLogout}
-                  className="text-sm font-medium border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                  className="text-sm font-medium border border-mit-red text-mit-red hover:bg-mit-red hover:text-white transition-colors"
                 >
                   Sign Out
                 </Button>
               </div>
             ) : (
-              <Button asChild className="btn-primary">
+              <Button asChild className="bg-mit-red hover:bg-mit-red/90 text-white border-0">
                 <Link href={APP_ROUTES.LOGIN}>
                   <span>Sign In</span>
                 </Link>

@@ -204,24 +204,26 @@ export default function InstructorDashboard() {
 
   return (
     <InstructorShell>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="space-y-8 max-w-7xl mx-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Instructor Dashboard</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Instructor Dashboard</h1>
+            <p className="text-muted-foreground mt-1">
               Monitor student progress across large classes
             </p>
           </div>
-          <div className="mt-4 sm:mt-0 flex space-x-2">
+          <div className="mt-4 sm:mt-0 flex gap-3">
             <Button
               variant="outline"
               onClick={() => navigate("/instructor/courses")}
+              className="shadow-sm border-gray-200"
             >
               <BookOpen className="mr-2 h-4 w-4" />
               Manage Courses
             </Button>
             <Button 
               onClick={() => navigate(APP_ROUTES.INSTRUCTOR_CREATE_ASSIGNMENT)}
+              className="bg-mit-red hover:bg-mit-red/90 text-white border-0"
             >
               <PlusCircle className="mr-2 h-4 w-4" />
               Create Assignment
@@ -230,15 +232,15 @@ export default function InstructorDashboard() {
         </div>
         
         {/* Course & Assignment Selection */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Course & Assignment Selection</CardTitle>
+        <Card className="border border-gray-200 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xl">Course & Assignment Selection</CardTitle>
             <CardDescription>
               Select a course and assignment to view detailed statistics
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-8 md:grid-cols-2">
               <div className="space-y-2">
                 <label htmlFor="course-select" className="text-sm font-medium">
                   Course
@@ -300,18 +302,18 @@ export default function InstructorDashboard() {
         </Card>
         
         {/* Main Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full md:w-auto grid-cols-4">
-            <TabsTrigger value="overview">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="inline-flex h-10 bg-gray-100 p-1 text-gray-700 rounded-md border border-gray-200">
+            <TabsTrigger value="overview" className="rounded px-4 py-1.5 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm">
               Overview
             </TabsTrigger>
-            <TabsTrigger value="search">
+            <TabsTrigger value="search" className="rounded px-4 py-1.5 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm">
               Student Lookup
             </TabsTrigger>
-            <TabsTrigger value="analytics">
+            <TabsTrigger value="analytics" className="rounded px-4 py-1.5 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm">
               Analytics
             </TabsTrigger>
-            <TabsTrigger value="export">
+            <TabsTrigger value="export" className="rounded px-4 py-1.5 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm">
               Export Data
             </TabsTrigger>
           </TabsList>
