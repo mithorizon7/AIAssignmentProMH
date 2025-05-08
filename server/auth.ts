@@ -36,15 +36,21 @@ export function configureAuth(app: any) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Configure passport to use local strategy
+  // Configure passport to use local strategy with bcrypt password verification
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
         // Find the user
         const user = await storage.getUserByUsername(username);
         
-        // If user doesn't exist or password doesn't match
-        if (!user || user.password !== password) {
+        // If user doesn't exist
+        if (!user) {
+          return done(null, false, { message: 'Incorrect username or password' });
+        }
+        
+        // Verify password with bcrypt
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
           return done(null, false, { message: 'Incorrect username or password' });
         }
         
@@ -149,40 +155,51 @@ export function configureAuth(app: any) {
 
 
 
-// Development test accounts
+// Helper function to hash passwords
+async function hashPassword(password: string): Promise<string> {
+  const saltRounds = 10;
+  return bcrypt.hash(password, saltRounds);
+}
+
+// Development test accounts (passwords will be hashed before storing)
 const DEV_TEST_ACCOUNTS = [
   {
     id: 9999,
     username: 'admin@test.com',
     email: 'admin@test.com',
-    password: 'admin123',
+    password: 'admin123', // Will be hashed before storage
     name: 'Test Admin',
-    role: 'admin'
+    role: 'admin' as const
   },
   {
     id: 9998,
     username: 'instructor@test.com', 
     email: 'instructor@test.com',
-    password: 'instructor123',
+    password: 'instructor123', // Will be hashed before storage
     name: 'Test Instructor',
-    role: 'instructor'
+    role: 'instructor' as const
   },
   {
     id: 9997,
     username: 'student@test.com',
     email: 'student@test.com',
-    password: 'student123',
+    password: 'student123', // Will be hashed before storage
     name: 'Test Student', 
-    role: 'student'
+    role: 'student' as const
   }
 ];
 
-// Create test accounts in development
+// Create test accounts in development with hashed passwords
 if (process.env.NODE_ENV === 'development') {
   DEV_TEST_ACCOUNTS.forEach(async (account) => {
     const exists = await storage.getUserByUsername(account.username);
     if (!exists) {
-      await storage.createUser(account);
+      // Hash the password before storing
+      const hashedPassword = await hashPassword(account.password);
+      await storage.createUser({
+        ...account,
+        password: hashedPassword
+      });
     }
   });
 }
