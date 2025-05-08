@@ -140,26 +140,27 @@ router.get('/assignment-metrics/:id?', requireAdmin, async (req: Request, res: R
 // Retry failed submissions
 router.post('/retry-failed', requireAdmin, async (req: Request, res: Response) => {
   try {
-    // Get all failed submissions
-    const failedSubmissions = await db
-      .select({ id: submissions.id })
-      .from(submissions)
-      .where(eq(submissions.status, 'failed'));
-      
-    // Mark them as pending to be picked up by the queue
-    const retryPromises = failedSubmissions.map(submission => 
-      submissionQueue.addSubmission(submission.id)
-    );
-    
-    await Promise.all(retryPromises);
+    // Use the BullMQ queue's built-in method to retry all failed submissions
+    const count = await submissionQueue.retryFailedSubmissions();
     
     res.json({ 
-      message: `Requeued ${failedSubmissions.length} failed submissions`,
-      count: failedSubmissions.length
+      message: `Requeued ${count} failed submissions`,
+      count
     });
   } catch (error) {
     console.error('Error retrying failed submissions:', error);
-    res.status(500).json({ message: 'Failed to retry submissions', error: error.message });
+    res.status(500).json({ message: 'Failed to retry submissions', error: (error as Error).message });
+  }
+});
+
+// Get queue statistics
+router.get('/queue-stats', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const stats = await submissionQueue.getStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching queue stats:', error);
+    res.status(500).json({ message: 'Failed to fetch queue statistics', error: (error as Error).message });
   }
 });
 

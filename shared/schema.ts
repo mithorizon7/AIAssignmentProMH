@@ -116,7 +116,9 @@ export const feedback = pgTable("feedback", {
 }, (table) => {
   return {
     submissionIdIdx: index("idx_feedback_submission_id").on(table.submissionId),
-    scoreIdx: index("idx_feedback_score").on(table.score)
+    scoreIdx: index("idx_feedback_score").on(table.score),
+    processingTimeIdx: index("idx_feedback_processing_time").on(table.processingTime),
+    createdAtIdx: index("idx_feedback_created_at").on(table.createdAt)
   };
 });
 
