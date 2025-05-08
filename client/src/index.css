@@ -8,6 +8,7 @@
 :root {
   /* MIT Brand Colors - From Design Guide */
   --mit-red: 347 100% 23%;          /* #750014 */
+  --mit-maroon: 347 68% 32%;        /* #8a1a2c - MIT's burgundy/maroon color */
   --mit-bright-red: 357 100% 54%;   /* #FF1423 */
   --mit-silver-gray: 214 8% 58%;    /* #8B959E */
   --mit-light-gray: 216 33% 97%;    /* #F2F4F8 */

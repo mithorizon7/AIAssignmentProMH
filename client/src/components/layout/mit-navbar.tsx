@@ -75,7 +75,7 @@ export function MITNavbar() {
             <div className="flex-shrink-0">
               <Link href={getRootPath()}>
                 <span className="font-bold text-2xl cursor-pointer tracking-tight">
-                  <span className="text-[#a31f34]">AI Feedback</span>{" "}
+                  <span className="text-[#8a1a2c]">AI Feedback</span>{" "}
                   <span className="text-gray-900">Platform</span>
                 </span>
               </Link>
@@ -87,8 +87,8 @@ export function MITNavbar() {
                 <Link key={link.href} href={link.href}>
                   <span className={`inline-flex items-center px-3 py-4 text-base font-medium cursor-pointer ${
                     location === link.href 
-                      ? "text-[#a31f34] border-b-2 border-[#a31f34]" 
-                      : "text-gray-700 hover:text-[#a31f34]"
+                      ? "text-[#8a1a2c] border-b-2 border-[#8a1a2c]" 
+                      : "text-gray-700 hover:text-[#8a1a2c]"
                   }`}>
                     {link.label}
                   </span>
@@ -97,19 +97,19 @@ export function MITNavbar() {
               
               {isAuthenticated && (
                 <div className="relative group">
-                  <button className="inline-flex items-center px-3 py-4 text-base font-medium cursor-pointer text-gray-700 hover:text-[#a31f34]">
+                  <button className="inline-flex items-center px-3 py-4 text-base font-medium cursor-pointer text-gray-700 hover:text-[#8a1a2c]">
                     More
                     <ChevronDown className="ml-1 h-4 w-4" />
                   </button>
                   <div className="hidden group-hover:block absolute right-0 mt-1 w-48 bg-white shadow-lg py-2 rounded-md z-10 animate-fade-in border border-gray-200">
                     <Link href="/help">
-                      <span className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#a31f34] cursor-pointer">
+                      <span className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#8a1a2c] cursor-pointer">
                         Help & Documentation
                       </span>
                     </Link>
                     {user?.role === "instructor" && (
                       <Link href="/rubric-library">
-                        <span className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#a31f34] cursor-pointer">
+                        <span className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#8a1a2c] cursor-pointer">
                           Rubric Library
                         </span>
                       </Link>
@@ -125,14 +125,14 @@ export function MITNavbar() {
                 <>
                   <button
                     onClick={() => setSearchOpen(!searchOpen)}
-                    className="p-2 text-gray-600 hover:text-[#a31f34] rounded-md"
+                    className="p-2 text-gray-600 hover:text-[#8a1a2c] rounded-md"
                   >
                     <Search className="h-5 w-5" />
                   </button>
                   
-                  <button className="p-2 text-gray-600 hover:text-[#a31f34] rounded-md relative">
+                  <button className="p-2 text-gray-600 hover:text-[#8a1a2c] rounded-md relative">
                     <Bell className="h-5 w-5" />
-                    <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-[#a31f34]"></span>
+                    <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-[#8a1a2c]"></span>
                   </button>
                   
                   <div className="text-sm font-medium text-gray-700 ml-2 mr-3">
@@ -152,7 +152,7 @@ export function MITNavbar() {
               ) : (
                 <Button 
                   asChild 
-                  className="bg-[#a31f34] text-white hover:bg-[#8a1a2c] border-0"
+                  className="bg-[#8a1a2c] text-white hover:bg-[#750014] border-0"
                 >
                   <Link href={APP_ROUTES.LOGIN}>
                     <span>Sign In</span>
@@ -165,7 +165,7 @@ export function MITNavbar() {
             <div className="md:hidden">
               <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="inline-flex items-center justify-center p-3 text-gray-600 hover:text-[#a31f34]"
+                className="inline-flex items-center justify-center p-3 text-gray-600 hover:text-[#8a1a2c]"
               >
                 <span className="sr-only">Open main menu</span>
                 {isOpen ? (
@@ -218,8 +218,8 @@ export function MITNavbar() {
                 <div
                   className={`block px-4 py-2.5 rounded-md text-base font-medium cursor-pointer ${
                     location === link.href
-                      ? "bg-gray-50 text-[#a31f34]"
-                      : "text-gray-700 hover:bg-gray-50 hover:text-[#a31f34]"
+                      ? "bg-gray-50 text-[#8a1a2c]"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-[#8a1a2c]"
                   }`}
                   onClick={() => setIsOpen(false)}
                 >
@@ -233,7 +233,7 @@ export function MITNavbar() {
                 <div className="border-t border-gray-200 my-3"></div>
                 <Link href="/help">
                   <div 
-                    className="block px-4 py-2.5 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-[#a31f34] cursor-pointer"
+                    className="block px-4 py-2.5 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-[#8a1a2c] cursor-pointer"
                     onClick={() => setIsOpen(false)}
                   >
                     Help & Documentation
