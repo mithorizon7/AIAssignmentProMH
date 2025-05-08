@@ -13,6 +13,152 @@ export class BatchOperationsService {
   private batchSize = 1000;
   
   /**
+   * Get comprehensive progress data for all students in a course
+   * This implementation is optimized for large classes with thousands of students
+   * @param courseId The course ID to get progress for
+   */
+  async getUserProgressForCourse(courseId: number): Promise<any> {
+    // Get course information
+    const course = await storage.getCourse(courseId);
+    if (!course) {
+      throw new Error(`Course ${courseId} not found`);
+    }
+    
+    // Get all assignments for this course
+    const courseAssignments = await db
+      .select()
+      .from(assignments)
+      .where(eq(assignments.courseId, courseId))
+      .orderBy(assignments.dueDate);
+    
+    // Get all enrollments for this course with student details
+    const enrolledStudents = await db
+      .select({
+        userId: users.id,
+        name: users.name,
+        email: users.email
+      })
+      .from(users)
+      .innerJoin(enrollments, eq(users.id, enrollments.userId))
+      .where(eq(enrollments.courseId, courseId))
+      .orderBy(users.name);
+    
+    // Get all submissions for this course (across all assignments and students)
+    // Using batching to handle large datasets efficiently
+    const studentBatches = this.chunkArray(enrolledStudents.map(s => s.userId), this.batchSize);
+    
+    // Process each batch of students
+    const studentsWithProgress = [];
+    
+    for (const batchUserIds of studentBatches) {
+      // Get all submissions from students in this batch
+      const studentSubmissions = await db
+        .select({
+          id: submissions.id,
+          userId: submissions.userId,
+          assignmentId: submissions.assignmentId,
+          status: submissions.status,
+          createdAt: submissions.createdAt
+        })
+        .from(submissions)
+        .where(and(
+          inArray(submissions.userId, batchUserIds),
+          inArray(submissions.assignmentId, courseAssignments.map(a => a.id))
+        ))
+        .orderBy(submissions.createdAt);
+      
+      // Get feedback for all submissions
+      const submissionIds = studentSubmissions.map(s => s.id);
+      const feedbackItems = submissionIds.length > 0
+        ? await db
+            .select()
+            .from(feedback)
+            .where(inArray(feedback.submissionId, submissionIds))
+        : [];
+      
+      // Create a map for easy lookup of feedback
+      const feedbackMap = new Map();
+      for (const item of feedbackItems) {
+        feedbackMap.set(item.submissionId, item);
+      }
+      
+      // Group submissions by student
+      const submissionsByStudent = new Map();
+      for (const submission of studentSubmissions) {
+        if (!submissionsByStudent.has(submission.userId)) {
+          submissionsByStudent.set(submission.userId, []);
+        }
+        
+        // Add feedback to submission if available
+        const submissionWithFeedback = {
+          ...submission,
+          feedback: feedbackMap.get(submission.id) || null
+        };
+        
+        submissionsByStudent.get(submission.userId).push(submissionWithFeedback);
+      }
+      
+      // Calculate progress for each student in the batch
+      for (const student of enrolledStudents.filter(s => batchUserIds.includes(s.userId))) {
+        const studentSubmissions = submissionsByStudent.get(student.userId) || [];
+        
+        // Calculate completion rate (completed submissions / total assignments)
+        const completedCount = studentSubmissions.filter(s => s.status === 'completed').length;
+        const completionRate = courseAssignments.length > 0
+          ? completedCount / courseAssignments.length
+          : 0;
+        
+        // Calculate average score across all submissions with feedback
+        const submissionsWithScores = studentSubmissions.filter(s => 
+          s.feedback && typeof s.feedback.score === 'number'
+        );
+        
+        const totalScore = submissionsWithScores.reduce(
+          (sum, s) => sum + (s.feedback.score || 0), 
+          0
+        );
+        
+        const averageScore = submissionsWithScores.length > 0
+          ? totalScore / submissionsWithScores.length
+          : 0;
+        
+        // Add to result
+        studentsWithProgress.push({
+          userId: student.userId,
+          name: student.name,
+          email: student.email,
+          completionRate,
+          averageScore,
+          completedAssignments: completedCount,
+          totalAssignments: courseAssignments.length,
+          submissions: studentSubmissions
+        });
+      }
+    }
+    
+    // Calculate course-level statistics
+    const avgCompletionRate = studentsWithProgress.length > 0
+      ? studentsWithProgress.reduce((sum, s) => sum + s.completionRate, 0) / studentsWithProgress.length
+      : 0;
+    
+    const avgScore = studentsWithProgress.length > 0
+      ? studentsWithProgress.reduce((sum, s) => sum + s.averageScore, 0) / studentsWithProgress.length
+      : 0;
+    
+    // Return comprehensive progress data
+    return {
+      courseId,
+      courseName: course.name,
+      totalStudents: enrolledStudents.length,
+      totalAssignments: courseAssignments.length,
+      avgCompletionRate,
+      avgScore,
+      assignments: courseAssignments,
+      students: studentsWithProgress
+    };
+  }
+  
+  /**
    * Batch enroll multiple students in a course
    * @param courseId The course ID to enroll students in
    * @param studentIds Array of student IDs to enroll
