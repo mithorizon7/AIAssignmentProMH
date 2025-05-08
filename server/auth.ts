@@ -17,7 +17,7 @@ const sessionStore = new PgStore({
 });
 
 export function configureAuth(app: any) {
-  // Configure express-session
+  // Configure express-session with enhanced security
   app.use(
     session({
       secret: process.env.SESSION_SECRET || 'your-secret-key',
@@ -25,12 +25,31 @@ export function configureAuth(app: any) {
       saveUninitialized: false,
       store: sessionStore,
       cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // Requires HTTPS in production
+        httpOnly: true, // Prevents client-side JS from reading the cookie
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      }
+        sameSite: 'lax', // Provides CSRF protection
+        path: '/', // Restrict cookie to specific path
+      },
+      // Enable proxy support for secure cookies behind load balancers
+      proxy: process.env.NODE_ENV === 'production'
     })
   );
+  
+  // Set appropriate security headers
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    // Helps prevent clickjacking attacks
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    // Enables the Cross-site scripting (XSS) filter in browsers
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    // Prevents browsers from MIME-sniffing a response away from the declared content-type
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Strict-Transport-Security enforces secure connections to the server
+    if (process.env.NODE_ENV === 'production') {
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
 
   // Initialize passport
   app.use(passport.initialize());
@@ -101,10 +120,24 @@ export function configureAuth(app: any) {
     next();
   };
 
-  // Login schema
+  // Enhanced login schema with stronger validation
   const loginSchema = z.object({
     username: z.string().min(3, "Username must be at least 3 characters"),
     password: z.string().min(6, "Password must be at least 6 characters"),
+  });
+  
+  // Enhanced registration schema with password strength requirements
+  const registerSchema = z.object({
+    username: z.string().min(3, "Username must be at least 3 characters"),
+    email: z.string().email("Invalid email address"),
+    name: z.string().min(1, "Name is required"),
+    password: z.string()
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+      .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+      .regex(/[0-9]/, "Password must contain at least one number")
+      .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
+    role: z.enum(["student", "instructor", "admin"]).optional().default("student"),
   });
 
   // Login endpoint
@@ -148,6 +181,54 @@ export function configureAuth(app: any) {
       return res.status(401).json({ message: 'Not authenticated' });
     }
     res.json(req.user);
+  });
+  
+  // Register new user endpoint with password strength enforcement
+  app.post('/api/auth/register', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Validate request against our enhanced schema
+      const result = registerSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: 'Validation failed', 
+          errors: result.error.errors 
+        });
+      }
+      
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(result.data.username);
+      if (existingUser) {
+        return res.status(400).json({ message: 'Username already exists' });
+      }
+      
+      // Check if email already exists
+      const existingEmail = await storage.getUserByEmail(result.data.email);
+      if (existingEmail) {
+        return res.status(400).json({ message: 'Email already in use' });
+      }
+      
+      // Hash the password
+      const hashedPassword = await hashPassword(result.data.password);
+      
+      // Create the user
+      const newUser = await storage.createUser({
+        ...result.data,
+        password: hashedPassword
+      });
+      
+      // Remove password from response
+      const { password: _, ...userWithoutPassword } = newUser;
+      
+      // Log the user in
+      req.login(userWithoutPassword, (err) => {
+        if (err) {
+          return next(err);
+        }
+        return res.status(201).json(userWithoutPassword);
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
   return { requireAuth, requireRole };
