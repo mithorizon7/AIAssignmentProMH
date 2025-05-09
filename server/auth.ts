@@ -63,11 +63,10 @@ export function configureAuth(app: any) {
       secure: process.env.NODE_ENV === 'production',
     },
     size: 64,
-    getTokenFromRequest: (req) => req.headers['x-csrf-token'] as string,
+    getTokenFromRequest: (req: any) => req.headers['x-csrf-token'] as string,
+    // Adding a simple session identifier based on session ID or IP
+    getSessionId: (req: any) => req.sessionID || req.ip || '',
   });
-  
-  // Create middleware functions from the CSRF protection object
-  const { generateToken, doubleCsrfProtection } = csrfProtection;
   
   // Add CSRF protection to all state-changing routes
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -85,7 +84,7 @@ export function configureAuth(app: any) {
     
     // Apply CSRF protection for all other state-changing requests
     try {
-      doubleCsrfProtection(req, res);
+      csrfProtection.doubleCsrfProtection(req, res, next);
       next();
     } catch (error: any) {
       // If the token is invalid, return 403 Forbidden
@@ -99,7 +98,7 @@ export function configureAuth(app: any) {
   // Endpoint to get CSRF token
   app.get('/api/csrf-token', (req: Request, res: Response) => {
     // Generate a new token
-    const csrfToken = generateToken(req, res);
+    const csrfToken = csrfProtection.generateCsrfToken(req, res);
     return res.json({ csrfToken });
   });
 
