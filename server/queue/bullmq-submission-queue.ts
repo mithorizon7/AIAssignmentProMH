@@ -143,9 +143,39 @@ if (queueActive) {
         const aiService = createAIService();
 
         // Parse the rubric if it exists in the assignment
-        const rubric = assignment.rubric ? (typeof assignment.rubric === 'string' 
-          ? JSON.parse(assignment.rubric) 
-          : assignment.rubric) : undefined;
+        let rubric;
+        if (assignment.rubric) {
+          try {
+            // Handle string vs object representation
+            if (typeof assignment.rubric === 'string') {
+              rubric = JSON.parse(assignment.rubric);
+            } else {
+              rubric = assignment.rubric;
+            }
+          } catch (parseError: any) {
+            // Log detailed information about the parsing error
+            logger.error(`Failed to parse rubric for assignment`, {
+              assignmentId: assignment.id,
+              submissionId,
+              error: parseError.message,
+              rubricString: typeof assignment.rubric === 'string' 
+                ? (assignment.rubric.length > 500 
+                   ? assignment.rubric.substring(0, 500) + '...' 
+                   : assignment.rubric)
+                : 'Not a string',
+              errorCode: 'RUBRIC_PARSE_ERROR'
+            });
+            // Continue without rubric but with warning
+            logger.warn(`Proceeding with submission processing without rubric`, {
+              assignmentId: assignment.id,
+              submissionId,
+              fallbackMode: true
+            });
+            rubric = undefined;
+          }
+        } else {
+          rubric = undefined;
+        }
         
         // Analyze the submission with AI using the new method
         const feedbackResult = await aiService.analyzeSubmission({
@@ -290,9 +320,35 @@ export const queueApi = {
             const aiService = createAIService();
             
             // Parse the rubric if it exists
-            const rubric = assignment.rubric ? (typeof assignment.rubric === 'string' 
-              ? JSON.parse(assignment.rubric) 
-              : assignment.rubric) : undefined;
+            let rubric;
+            if (assignment.rubric) {
+              try {
+                // Handle string vs object representation
+                if (typeof assignment.rubric === 'string') {
+                  rubric = JSON.parse(assignment.rubric);
+                } else {
+                  rubric = assignment.rubric;
+                }
+              } catch (parseError: any) {
+                // Log detailed information about the parsing error
+                console.error(`[DEVELOPMENT] Failed to parse rubric for assignment ${assignment.id}:`, {
+                  assignmentId: assignment.id,
+                  submissionId,
+                  error: parseError.message,
+                  rubricString: typeof assignment.rubric === 'string' 
+                    ? (assignment.rubric.length > 500 
+                      ? assignment.rubric.substring(0, 500) + '...' 
+                      : assignment.rubric)
+                    : 'Not a string',
+                  errorCode: 'RUBRIC_PARSE_ERROR'
+                });
+                // Continue without rubric but with warning
+                console.warn(`[DEVELOPMENT] Proceeding with submission processing without rubric for assignment ${assignment.id}`);
+                rubric = undefined;
+              }
+            } else {
+              rubric = undefined;
+            }
               
             // Analyze submission with the new method
             const feedbackResult = await aiService.analyzeSubmission({
