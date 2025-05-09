@@ -2,17 +2,22 @@ import { pgTable, text, serial, integer, timestamp, json, pgEnum, smallint, bool
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+import { RubricCriteriaTypeValue } from './enums';
+
 // Rubric type definitions
 export interface RubricCriterion {
   id: string;
+  type: RubricCriteriaTypeValue;
   name: string;
   description: string;
   maxScore: number;
-  weight?: number;
+  weight: number; // percentage weight in the overall assignment grade
 }
 
 export interface Rubric {
   criteria: RubricCriterion[];
+  totalPoints: number;
+  passingThreshold?: number; // minimum percentage to pass
 }
 
 export interface CriteriaScore {
@@ -126,7 +131,7 @@ export const feedback = pgTable("feedback", {
   suggestions: json("suggestions").notNull().$type<string[]>(),
   summary: text("summary"),
   score: smallint("score"),
-  criteriaScores: json("criteria_scores"),
+  criteriaScores: json("criteria_scores").$type<CriteriaScore[]>(),
   processingTime: integer("processing_time").notNull(), // in milliseconds
   rawResponse: json("raw_response").$type<Record<string, any>>(),
   modelName: text("model_name"),
@@ -143,46 +148,46 @@ export const feedback = pgTable("feedback", {
 
 // Schema Relationships
 export const usersRelations = {
-  submissions: (users) => ({
+  submissions: (users: typeof users) => ({
     one: { submissions, fields: [users.id], references: [submissions.userId] },
   }),
-  enrollments: (users) => ({
+  enrollments: (users: typeof users) => ({
     one: { enrollments, fields: [users.id], references: [enrollments.userId] },
   }),
 };
 
 export const coursesRelations = {
-  assignments: (courses) => ({
+  assignments: (courses: typeof courses) => ({
     one: { assignments, fields: [courses.id], references: [assignments.courseId] },
   }),
-  enrollments: (courses) => ({
+  enrollments: (courses: typeof courses) => ({
     one: { enrollments, fields: [courses.id], references: [enrollments.courseId] },
   }),
 };
 
 export const assignmentsRelations = {
-  submissions: (assignments) => ({
+  submissions: (assignments: typeof assignments) => ({
     one: { submissions, fields: [assignments.id], references: [submissions.assignmentId] },
   }),
-  course: (assignments) => ({
+  course: (assignments: typeof assignments) => ({
     many: { courses, fields: [assignments.courseId], references: [courses.id] },
   }),
 };
 
 export const submissionsRelations = {
-  feedback: (submissions) => ({
+  feedback: (submissions: typeof submissions) => ({
     one: { feedback, fields: [submissions.id], references: [feedback.submissionId] },
   }),
-  assignment: (submissions) => ({
+  assignment: (submissions: typeof submissions) => ({
     many: { assignments, fields: [submissions.assignmentId], references: [assignments.id] },
   }),
-  user: (submissions) => ({
+  user: (submissions: typeof submissions) => ({
     many: { users, fields: [submissions.userId], references: [users.id] },
   }),
 };
 
 export const feedbackRelations = {
-  submission: (feedback) => ({
+  submission: (feedback: typeof feedback) => ({
     many: { submissions, fields: [feedback.submissionId], references: [submissions.id] },
   }),
 };

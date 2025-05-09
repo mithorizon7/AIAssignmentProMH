@@ -1,4 +1,5 @@
-import { SUBMISSION_STATUS, USER_ROLES, FEEDBACK_TYPE, RUBRIC_CRITERIA_TYPE } from './constants';
+import { SUBMISSION_STATUS, USER_ROLES } from './constants';
+import { FEEDBACK_TYPE, RUBRIC_CRITERIA_TYPE, FeedbackTypeValue, RubricCriteriaTypeValue } from '@shared/enums';
 
 export interface User {
   id: number;

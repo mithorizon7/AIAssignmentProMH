@@ -51,20 +51,5 @@ export const USER_ROLES = {
   ADMIN: 'admin',
 };
 
-export const FEEDBACK_TYPE = {
-  STRENGTHS: 'strengths',
-  IMPROVEMENTS: 'improvements',
-  SUGGESTIONS: 'suggestions',
-};
-
-export const RUBRIC_CRITERIA_TYPE = {
-  CODE_QUALITY: 'code_quality',
-  FUNCTIONALITY: 'functionality',
-  DESIGN: 'design',
-  DOCUMENTATION: 'documentation',
-  CREATIVITY: 'creativity',
-  PROBLEM_SOLVING: 'problem_solving',
-  TESTING: 'testing',
-  COMPLETENESS: 'completeness',
-  OTHER: 'other',
-};
+// FEEDBACK_TYPE and RUBRIC_CRITERIA_TYPE have been moved to shared/enums.ts
+// Import them from there in your components

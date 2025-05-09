@@ -1,0 +1,161 @@
+I. What Needs to Be Done (Instructions for your AI Coder):
+
+Tell your AI agent to perform the following modifications:
+
+Update server/services/ai-service.ts:
+
+Modify the AnalysisRequest interface to include assignmentTitle and an optional rubric object.
+You'll likely want to import the Rubric type. Since Rubric is defined in client/src/lib/types.ts, you might need to move it (and its dependent RubricCriteria, FEEDBACK_TYPE, RUBRIC_CRITERIA_TYPE) to the shared/ directory (e.g., in a new shared/types.ts or integrated into shared/schema.ts if appropriate) so it can be easily used by both client and server. For now, let's assume you'll make a Rubric type available to the server.
+Replace the existing static promptContext string in the analyzeProgrammingAssignment method with logic to dynamically build the prompt based on the new AnalysisRequest parameters (title, description, and rubric if present). Use the "Full Dynamic Prompt Text" provided below as the template for this construction.
+The method signature will change from analyzeProgrammingAssignment(submission: AnalysisRequest) to something like analyzeSubmission(submissionDetails: EnhancedAnalysisRequest), where EnhancedAnalysisRequest includes the student's content, assignment title, assignment description (context), and the parsed rubric object.
+Update server/queue/worker.ts:
+
+When an assignment is fetched (const assignment = await storage.getAssignment(submission.assignmentId);), ensure that the assignment.rubric field (which is a JSON string from the database) is parsed into a JavaScript object.
+It might look like this:
+TypeScript
+let parsedRubric: Rubric | undefined = undefined;
+if (assignment.rubric) {
+    try {
+        // Drizzle might return it as an object already if type is json, or string if type is text
+        if (typeof assignment.rubric === 'string') {
+            parsedRubric = JSON.parse(assignment.rubric) as Rubric;
+        } else if (typeof assignment.rubric === 'object' && assignment.rubric !== null) {
+            parsedRubric = assignment.rubric as Rubric;
+        }
+    } catch (e) {
+        console.error(`Failed to parse rubric for assignment ${assignment.id}:`, assignment.rubric, e);
+        // Decide on fallback: proceed without rubric, or mark as error?
+    }
+}
+Modify the call to the AI service method (which will now be analyzeSubmission or similar) to pass the assignment title, description, and the parsed parsedRubric object.
+TypeScript
+const feedbackResult = await this.aiService.analyzeSubmission({
+    content: submissionContent, // The student's work
+    assignmentTitle: assignment.title,
+    assignmentContext: assignment.description || undefined,
+    rubric: parsedRubric // Pass the parsed rubric object here
+});
+ Define or Share Rubric and RubricCriteria Types (Server-Side):
+
+As mentioned, the Rubric and RubricCriteria types need to be accessible to the server-side code (ai-service.ts and worker.ts). The best way is to move these type definitions to your shared/ directory (e.g., create shared/types.ts or add them to shared/schema.ts if you're not auto-generating types from schema directly for this).
+Instruction to AI: "Refactor the Rubric and RubricCriteria type definitions (and any dependent enums like RUBRIC_CRITERIA_TYPE) from AIGrader/client/src/lib/types.ts and AIGrader/client/src/lib/constants.ts into a new file at AIGrader/shared/custom-types.ts (or similar name). Update all client and server imports to use these shared types."
+II. Full Dynamic Prompt Text (To be constructed in ai-service.ts):
+
+This is the template logic for the AI to build the prompt dynamically. The AI should implement code that generates this string, filling in the placeholders.
+
+JavaScript
+// --- Start of Dynamic Prompt Construction Logic ---
+
+// Assume these are available from the method's input:
+// studentSubmissionContent: string
+// assignmentTitle: string
+// assignmentDescription: string (general context)
+// rubric: Rubric | undefined (parsed rubric object)
+
+let promptSegments = [];
+
+promptSegments.push(
+`You are an expert AI Teaching Assistant. Your primary goal is to provide comprehensive, constructive, and actionable feedback on a student's assignment submission.
+Your feedback should be encouraging, specific, and aimed at helping the student learn and improve their work according to the provided assignment details and evaluation criteria.
+You MUST respond in a valid JSON format only. Do not include any explanatory text before or after the JSON object.`
+);
+
+promptSegments.push(
+`\n## Assignment Details:
+Title: "${assignmentTitle}"
+Description: "${assignmentDescription || 'No general description provided.'}"`
+);
+
+let jsonOutputStructureFields = [
+  `"strengths": ["A list of 2-5 specific positive aspects of the submission, clearly explained (array of strings). Relate these to the assignment goals or rubric if applicable."],`,
+  `"improvements": ["A list of 2-5 specific areas where the submission could be improved, with constructive explanations (array of strings). Relate these to the assignment goals or rubric if applicable."],`,
+  `"suggestions": ["A list of 2-5 concrete, actionable suggestions the student can implement to improve their work or understanding (array of strings)."],`,
+  `"summary": "A concise (2-4 sentences) overall summary of the submission's quality, highlighting key takeaways for the student."`
+];
+
+if (rubric && rubric.criteria && rubric.criteria.length > 0) {
+  promptSegments.push("\n## Evaluation Rubric:");
+  promptSegments.push("You MUST evaluate the student's submission against EACH of the following rubric criteria meticulously. For each criterion, provide specific feedback and a numeric score within the specified range.");
+
+  let criteriaDetails = rubric.criteria.map(criterion => {
+    let criterionString = `- Criterion Name: "${criterion.name}" (ID: ${criterion.id})\n`;
+    criterionString += `  Description: "${criterion.description}"\n`;
+    criterionString += `  Maximum Score: ${criterion.maxScore}`;
+    if (criterion.weight) {
+      criterionString += ` (Weight: ${criterion.weight}%)`;
+    }
+    return criterionString;
+  }).join("\n");
+  promptSegments.push(criteriaDetails);
+
+  jsonOutputStructureFields.push(
+`"criteriaScores": [
+    // For EACH criterion listed above, include an object like this:
+    {
+      "criteriaId": "ID_of_the_criterion",
+      "score": <numeric_score_for_this_criterion_up_to_its_maxScore>,
+      "feedback": "Specific, detailed feedback for this particular criterion, explaining the rationale for the score and how to improve (string)."
+    }
+    // ... ensure one object per criterion
+  ],`
+  );
+  jsonOutputStructureFields.push(
+`"score": <OPTIONAL but Recommended: An overall numeric score from 0-100. If rubric criteria have weights, attempt to calculate a weighted average. Otherwise, provide a holistic quality score.>`
+  );
+} else {
+  promptSegments.push(
+`\n## General Evaluation Focus (No specific rubric provided):
+Please analyze the submission for:
+1.  Clarity, coherence, and organization of the content.
+2.  Fulfillment of the assignment requirements as per the description.
+3.  Identification of strengths and positive aspects.
+4.  Areas that could be improved, with constructive explanations.
+5.  Actionable suggestions for the student.
+6.  If the submission appears to be code or involves technical problem-solving, also consider aspects like correctness, efficiency (if discernible), and clarity/documentation.`
+  );
+  jsonOutputStructureFields.push(
+`"criteriaScores": [] // Empty array as no specific rubric criteria were provided for itemized scoring.`
+  );
+  jsonOutputStructureFields.push(
+`"score": <A numeric score from 0-100 representing the overall quality based on the general evaluation focus above.>`
+  );
+}
+
+promptSegments.push(
+`\n## JSON Output Structure:
+Your response MUST be a single, valid JSON object adhering to the following structure. Ensure all string values are properly escaped within the JSON.
+{
+  ${jsonOutputStructureFields.join("\n  ")}
+}`
+);
+
+promptSegments.push(
+`\n## Student's Submission Content to Evaluate:
+\`\`\`
+${studentSubmissionContent}
+\`\`\`
+`
+);
+
+promptSegments.push("\nProvide your feedback now as a single, valid JSON object:");
+
+const finalConstructedPrompt = promptSegments.join("\n");
+
+// This finalConstructedPrompt is what you pass to the AI adapter.
+// console.log("DEBUG: Final Constructed Prompt:\n", finalConstructedPrompt); // For debugging
+
+// --- End of Dynamic Prompt Construction Logic ---
+Key parts of this prompt structure:
+
+Role and Goal Setting: Clearly defines the AI's persona and objective.
+Assignment Context: Provides the title and description.
+Dynamic Rubric Injection: If a rubric exists, its criteria, descriptions, max scores, and weights are listed, and the AI is explicitly told to use them for evaluation and scoring.
+Fallback Evaluation: If no rubric, it provides more general (but still improved) evaluation guidelines.
+Detailed JSON Structure: Clearly specifies the expected JSON output, including the criteriaScores array when a rubric is present. This is crucial for reliable parsing.
+Emphasis on Actionable Feedback: Reinforces the need for feedback that helps students learn.
+Strict JSON Output Instruction: Explicitly states to only output valid JSON.
+Instructing the AI with this:
+
+You would tell your AI agent: "Please refactor the analyzeProgrammingAssignment method in server/services/ai-service.ts. It should now be named analyzeSubmission (or similar) and take an object containing the student's submission content, the assignment title, the assignment description, and an optional parsed rubric object. Use these details to dynamically construct an AI prompt following this template logic: [insert the JavaScript-commented prompt construction logic above]. Ensure the shared/ types for Rubric are correctly imported and used. Also, update the calling code in server/queue/worker.ts to parse the rubric from the assignment and pass all required details to this new analyzeSubmission method."
+
+This approach will make your AI Grader significantly more powerful and aligned with providing nuanced, rubric-based feedback.
