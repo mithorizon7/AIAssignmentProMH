@@ -17,20 +17,9 @@ export interface Course {
   description: string;
 }
 
-export interface RubricCriteria {
-  id: string;
-  type: typeof SharedEnums.RUBRIC_CRITERIA_TYPE[keyof typeof SharedEnums.RUBRIC_CRITERIA_TYPE];
-  name: string;
-  description: string;
-  maxScore: number;
-  weight: number; // percentage weight in the overall assignment grade
-}
+// Use RubricCriterion from shared/schema.ts instead
 
-export interface Rubric {
-  criteria: RubricCriteria[];
-  totalPoints: number;
-  passingThreshold?: number; // minimum percentage to pass
-}
+// Use Rubric from shared/schema.ts instead
 
 export interface Assignment {
   id: number;

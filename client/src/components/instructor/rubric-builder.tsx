@@ -7,12 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as SharedEnums from '@shared/enums';
 import { v4 as uuidv4 } from 'uuid';
-import { RubricCriterion, Rubric as SchemaRubric } from '@shared/schema';
-
-// Local extension of the Rubric interface
-export interface Rubric extends SchemaRubric {
-  totalPoints?: number;
-}
+import { RubricCriterion, Rubric } from '@shared/schema';
 
 interface RubricBuilderProps {
   value: Rubric;

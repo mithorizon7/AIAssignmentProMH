@@ -16,7 +16,7 @@ export interface RubricCriterion {
 
 export interface Rubric {
   criteria: RubricCriterion[];
-  totalPoints: number;
+  totalPoints?: number; // May be calculated from criteria or stored directly
   passingThreshold?: number; // minimum percentage to pass
 }
 
