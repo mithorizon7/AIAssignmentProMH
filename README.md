@@ -1,6 +1,6 @@
-# AI-Powered Assignment Feedback Platform
+# AIGrader - AI-Powered Assignment Feedback Platform
 
-An AI-powered assignment feedback platform that enhances educational workflows through intelligent error handling and robust parsing mechanisms.
+An AI-powered assignment feedback platform that enhances educational workflows through intelligent error handling and robust parsing mechanisms. Designed to scale for large classes with potentially tens of thousands of students.
 
 ## Key Features
 
@@ -10,15 +10,18 @@ An AI-powered assignment feedback platform that enhances educational workflows t
 - **Rubric Creation**: Create rubrics to guide the AI assessment
 - **Submissions Management**: Track student submissions and progress
 - **Batch Processing**: Handle large volumes of submissions through a robust queue system
+- **Analytics Dashboard**: Visualize student performance and submission patterns
+- **Anonymous Submissions**: Support for shareable links that don't require student accounts
 
 ## Technology Stack
 
-- **Frontend**: React.js with TypeScript and Tailwind CSS
+- **Frontend**: React.js with TypeScript and Tailwind CSS + Shadcn UI
 - **Backend**: Express.js with PostgreSQL database
 - **ORM**: Drizzle ORM for type-safe database interactions
-- **Authentication**: Secure authentication with bcrypt password hashing
-- **Queue**: BullMQ for reliable background processing
-- **AI Integration**: Modular AI service with adapters for different models
+- **Authentication**: Secure authentication with bcrypt password hashing and CSRF protection
+- **Queue**: BullMQ for reliable asynchronous job processing
+- **Cache**: Redis for session storage and queue management
+- **AI Integration**: Modular AI service with adapters for Google Gemini and OpenAI
 
 ## Environment Variables
 
@@ -83,6 +86,53 @@ The development server runs the Express backend and the React frontend in a sing
 npm run dev
 ```
 
+## Directory Structure
+
+The project is organized into the following main directories:
+
+```
+/
+├── client/              # React frontend application
+│   ├── src/
+│   │   ├── components/  # UI components
+│   │   ├── hooks/       # Custom React hooks
+│   │   ├── lib/         # Utility functions and types
+│   │   └── pages/       # Page components
+│   └── index.html       # HTML template
+│
+├── server/              # Express backend application
+│   ├── adapters/        # AI service adapters
+│   ├── config/          # Environment-specific configurations
+│   ├── lib/             # Utility libraries
+│   ├── queue/           # BullMQ implementation
+│   └── services/        # Business logic
+│
+├── shared/              # Code shared between client and server
+│   ├── enums.ts         # Shared enum definitions
+│   └── schema.ts        # Database schema and shared types
+│
+├── test/                # Test files
+│
+└── attached_assets/     # Additional assets for the project
+```
+
+Detailed README files are available in each major directory:
+- [Server Documentation](server/README.md)
+- [Client Documentation](client/README.md)
+- [Shared Types Documentation](shared/README.md)
+
+## Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start the development server (both frontend and backend) |
+| `npm run build` | Build the application for production |
+| `npm start` | Start the production server after building |
+| `npm run db:push` | Push schema changes to the database |
+| `npm test` | Run tests |
+| `npm run lint` | Lint the codebase |
+| `npm run typecheck` | Check TypeScript types |
+
 ## Production Deployment
 
 For production deployment:
@@ -92,6 +142,13 @@ For production deployment:
 3. Set up a PostgreSQL database and configure the connection
 4. Build the application: `npm run build`
 5. Start the server: `npm start`
+
+For more detailed information about production optimizations, see [BUILD_OPTIMIZATION.md](BUILD_OPTIMIZATION.md).
+
+## Additional Documentation
+
+- [Redis Configuration Guide](REDIS_CONFIGURATION.md): Detailed Redis setup instructions
+- [Build Optimization Guide](BUILD_OPTIMIZATION.md): Production build configuration
 
 ## License
 
