@@ -2,6 +2,25 @@ import { pgTable, text, serial, integer, timestamp, json, pgEnum, smallint, bool
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Rubric type definitions
+export interface RubricCriterion {
+  id: string;
+  name: string;
+  description: string;
+  maxScore: number;
+  weight?: number;
+}
+
+export interface Rubric {
+  criteria: RubricCriterion[];
+}
+
+export interface CriteriaScore {
+  criteriaId: string;
+  score: number;
+  feedback: string;
+}
+
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['student', 'instructor', 'admin']);
 export const assignmentStatusEnum = pgEnum('assignment_status', ['active', 'completed', 'upcoming']);

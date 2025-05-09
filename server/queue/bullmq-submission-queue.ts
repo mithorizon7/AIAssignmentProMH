@@ -142,11 +142,17 @@ if (queueActive) {
         // Initialize AI service on demand
         const aiService = createAIService();
 
-        // Analyze the submission with AI
-        const feedbackResult = await aiService.analyzeProgrammingAssignment({
-          content: content,
-          assignmentContext: assignment.description || undefined
-          // Note: rubric parameter would be added here when AIService interface supports it
+        // Parse the rubric if it exists in the assignment
+        const rubric = assignment.rubric ? (typeof assignment.rubric === 'string' 
+          ? JSON.parse(assignment.rubric) 
+          : assignment.rubric) : undefined;
+        
+        // Analyze the submission with AI using the new method
+        const feedbackResult = await aiService.analyzeSubmission({
+          studentSubmissionContent: content,
+          assignmentTitle: assignment.title,
+          assignmentDescription: assignment.description || undefined,
+          rubric: rubric
         });
         await job.updateProgress(70);
 
