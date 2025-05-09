@@ -1,5 +1,6 @@
 import { SUBMISSION_STATUS, USER_ROLES } from './constants';
 import * as SharedEnums from '@shared/enums';
+import { Rubric, RubricCriterion, CriteriaScore as SchemaCriteriaScore } from '@shared/schema';
 
 export interface User {
   id: number;
@@ -55,11 +56,7 @@ export interface FeedbackItem {
   content: string;
 }
 
-export interface CriteriaScore {
-  criteriaId: string;
-  score: number;
-  feedback: string;
-}
+// Use SchemaCriteriaScore from shared/schema.ts instead
 
 export interface Feedback {
   id: number;
@@ -70,7 +67,7 @@ export interface Feedback {
   suggestions: string[];
   summary: string;
   score?: number;
-  criteriaScores?: CriteriaScore[];
+  criteriaScores?: SchemaCriteriaScore[];
   processingTime: number;
   createdAt: string;
 }
