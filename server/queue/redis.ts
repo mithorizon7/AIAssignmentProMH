@@ -161,9 +161,13 @@ class MockRedisClient extends EventEmitter {
 
 // Function to create a Redis client with fallback capability
 function createRedisClient() {
-  // Force mock Redis in development unless explicitly configured
-  const useRealRedis = process.env.REDIS_URL || 
-                      (process.env.REDIS_HOST && process.env.NODE_ENV === 'production');
+  // Use real Redis when:
+  // 1. In production environment, OR
+  // 2. ENABLE_REDIS=true is set, OR
+  // 3. REDIS_URL is explicitly provided
+  const useRealRedis = process.env.NODE_ENV === 'production' || 
+                      process.env.ENABLE_REDIS === 'true' ||
+                      !!process.env.REDIS_URL;
   
   if (!useRealRedis) {
     logger.info('Development environment detected, using mock Redis implementation');
