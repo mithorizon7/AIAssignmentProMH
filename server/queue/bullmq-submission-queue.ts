@@ -289,10 +289,17 @@ export const queueApi = {
             // Initialize AI service and process
             const aiService = createAIService();
             
-            // Analyze submission
-            const feedbackResult = await aiService.analyzeProgrammingAssignment({
-              content,
-              assignmentContext: assignment.description || undefined
+            // Parse the rubric if it exists
+            const rubric = assignment.rubric ? (typeof assignment.rubric === 'string' 
+              ? JSON.parse(assignment.rubric) 
+              : assignment.rubric) : undefined;
+              
+            // Analyze submission with the new method
+            const feedbackResult = await aiService.analyzeSubmission({
+              studentSubmissionContent: content,
+              assignmentTitle: assignment.title,
+              assignmentDescription: assignment.description || undefined,
+              rubric: rubric
             });
             
             // Prepare and save feedback
