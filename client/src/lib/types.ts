@@ -1,5 +1,5 @@
 import { SUBMISSION_STATUS, USER_ROLES } from './constants';
-import { FEEDBACK_TYPE, RUBRIC_CRITERIA_TYPE, FeedbackTypeValue, RubricCriteriaTypeValue } from '@shared/enums';
+import * as SharedEnums from '@shared/enums';
 
 export interface User {
   id: number;
@@ -19,7 +19,7 @@ export interface Course {
 
 export interface RubricCriteria {
   id: string;
-  type: typeof RUBRIC_CRITERIA_TYPE[keyof typeof RUBRIC_CRITERIA_TYPE];
+  type: typeof SharedEnums.RUBRIC_CRITERIA_TYPE[keyof typeof SharedEnums.RUBRIC_CRITERIA_TYPE];
   name: string;
   description: string;
   maxScore: number;
@@ -62,7 +62,7 @@ export interface Submission {
 }
 
 export interface FeedbackItem {
-  type: typeof FEEDBACK_TYPE[keyof typeof FEEDBACK_TYPE];
+  type: typeof SharedEnums.FEEDBACK_TYPE[keyof typeof SharedEnums.FEEDBACK_TYPE];
   content: string;
 }
 

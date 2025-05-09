@@ -5,22 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RUBRIC_CRITERIA_TYPE } from "@/lib/constants";
+import * as SharedEnums from '@shared/enums';
 import { v4 as uuidv4 } from 'uuid';
+import { RubricCriterion, Rubric as SchemaRubric } from '@shared/schema';
 
-export interface RubricCriterion {
-  id: string;
-  type: string;
-  name: string;
-  description: string;
-  maxScore: number;
-  weight: number;
-}
-
-export interface Rubric {
-  criteria: RubricCriterion[];
+// Local extension of the Rubric interface
+export interface Rubric extends SchemaRubric {
   totalPoints?: number;
-  passingThreshold?: number;
 }
 
 interface RubricBuilderProps {
@@ -30,7 +21,7 @@ interface RubricBuilderProps {
 
 export function RubricBuilder({ value, onChange }: RubricBuilderProps) {
   const [newCriterionName, setNewCriterionName] = useState('');
-  const [newCriterionType, setNewCriterionType] = useState(RUBRIC_CRITERIA_TYPE.CODE_QUALITY);
+  const [newCriterionType, setNewCriterionType] = useState(SharedEnums.RUBRIC_CRITERIA_TYPE.CODE_QUALITY);
   const [newCriterionDescription, setNewCriterionDescription] = useState('');
   const [newCriterionMaxScore, setNewCriterionMaxScore] = useState(10);
   const [newCriterionWeight, setNewCriterionWeight] = useState(1);
@@ -174,7 +165,7 @@ export function RubricBuilder({ value, onChange }: RubricBuilderProps) {
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(RUBRIC_CRITERIA_TYPE).map(([key, value]) => (
+                    {Object.entries(SharedEnums.RUBRIC_CRITERIA_TYPE).map(([key, value]) => (
                       <SelectItem key={value} value={value}>
                         {key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')}
                       </SelectItem>
