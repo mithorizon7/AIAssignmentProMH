@@ -158,7 +158,7 @@ export default function AnalyticsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Courses</SelectItem>
-              {courses.map((course) => (
+              {courses.map((course: { id: number; name: string }) => (
                 <SelectItem key={course.id} value={course.id.toString()}>
                   {course.name}
                 </SelectItem>
@@ -172,7 +172,7 @@ export default function AnalyticsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Assignments</SelectItem>
-              {assignments.map((assignment) => (
+              {assignments.map((assignment: { id: number; title: string }) => (
                 <SelectItem key={assignment.id} value={assignment.id.toString()}>
                   {assignment.title}
                 </SelectItem>

@@ -17,6 +17,10 @@ import CreateAssignment from "@/pages/instructor/create-assignment";
 import CoursesPage from "@/pages/instructor/courses";
 import CourseDetailPage from "@/pages/instructor/course-detail";
 import CourseStudentsPage from "@/pages/instructor/course-students";
+import StudentsPage from "@/pages/instructor/students";
+import AnalyticsPage from "@/pages/instructor/analytics";
+import SettingsPage from "@/pages/instructor/settings";
+import ProfilePage from "@/pages/instructor/profile";
 import SubmitAssignment from "@/pages/submit";
 import AdminDashboard from "@/pages/admin/dashboard";
 import UsersPage from "@/pages/admin/users";
@@ -85,6 +89,18 @@ function Router() {
       </Route>
       <Route path="/instructor/course/:id/students">
         {(params) => <PrivateRoute component={CourseStudentsPage} requireRole="instructor" id={params.id} />}
+      </Route>
+      <Route path="/instructor/students">
+        {() => <PrivateRoute component={StudentsPage} requireRole="instructor" />}
+      </Route>
+      <Route path="/instructor/analytics">
+        {() => <PrivateRoute component={AnalyticsPage} requireRole="instructor" />}
+      </Route>
+      <Route path="/instructor/settings">
+        {() => <PrivateRoute component={SettingsPage} requireRole="instructor" />}
+      </Route>
+      <Route path="/instructor/profile">
+        {() => <PrivateRoute component={ProfilePage} requireRole="instructor" />}
       </Route>
       
       {/* Admin Routes */}

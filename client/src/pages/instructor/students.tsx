@@ -66,8 +66,17 @@ export default function StudentsPage() {
     retry: false,
   });
 
+  // Define student type
+  interface Student {
+    id: number;
+    name: string;
+    email: string;
+    enrolledCourses: number;
+    progress: number;
+  }
+
   // Filter students based on search query
-  const filteredStudents = students.filter((student) => {
+  const filteredStudents = students.filter((student: Student) => {
     const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                         student.email.toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -119,7 +128,7 @@ export default function StudentsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Courses</SelectItem>
-                {courses.map((course) => (
+                {courses.map((course: { id: number; name: string }) => (
                   <SelectItem key={course.id} value={course.id.toString()}>
                     {course.name}
                   </SelectItem>
