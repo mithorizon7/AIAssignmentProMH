@@ -165,7 +165,7 @@ function MobileNav() {
             <span className="sr-only">Toggle menu</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="flex w-72 flex-col p-0">
+        <SheetContent side="left" className="flex w-80 flex-col p-0">
           <div className="p-4">
             <UserMenu />
           </div>
@@ -189,7 +189,7 @@ export function InstructorShell({ children }: { children: ReactNode }) {
         <MobileNav />
       ) : (
         <div className="flex flex-1">
-          <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r bg-background md:flex">
+          <aside className="fixed inset-y-0 left-0 z-20 hidden w-80 flex-col border-r bg-background md:flex">
             <div className="p-6 text-xl font-semibold">Instructor Panel</div>
             <Separator />
             <div className="flex-1 overflow-auto p-4">
@@ -200,7 +200,7 @@ export function InstructorShell({ children }: { children: ReactNode }) {
               <UserMenu />
             </div>
           </aside>
-          <main className="flex-1 md:pl-64">
+          <main className="flex-1 md:pl-80">
             <div className="container mx-auto p-6">{children}</div>
           </main>
         </div>
