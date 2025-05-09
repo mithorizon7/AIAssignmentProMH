@@ -203,9 +203,14 @@ function createRedisClient() {
 // Create a Redis client (with production mode or mock fallback)
 const redisClient = createRedisClient();
 
+// Function to create connection options for BullMQ
+export function createRedisClientOptions() {
+  return {
+    connection: redisClient
+  };
+}
+
 // Export connection options for BullMQ
-export const connectionOptions = {
-  connection: redisClient
-};
+export const connectionOptions = createRedisClientOptions();
 
 export default redisClient;
