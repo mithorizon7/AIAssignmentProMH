@@ -158,39 +158,46 @@ class MockRedisClient extends EventEmitter {
 
 // Function to create a Redis client with fallback capability
 function createRedisClient() {
-  // Check if Redis URL is available
-  const redisUrl = process.env.REDIS_URL;
+  // Force mock Redis in development unless explicitly configured
+  const useRealRedis = process.env.REDIS_URL || 
+                      (process.env.REDIS_HOST && process.env.NODE_ENV === 'production');
+  
+  if (!useRealRedis) {
+    console.log('Development environment detected, using mock Redis implementation');
+    return new MockRedisClient();
+  }
   
   try {
-    // If we have a Redis URL or explicit configuration, use a real Redis client
-    if (redisUrl || process.env.REDIS_HOST) {
-      const client = redisUrl 
-        ? new Redis(redisUrl) 
-        : new Redis(REDIS_CONFIG);
-      
-      // Add error handling
-      client.on('error', (err) => {
-        console.error('Redis connection error:', err);
-      });
-      
-      client.on('connect', () => {
-        console.log('✅ Connected to Redis server');
-      });
-      
-      client.on('reconnecting', () => {
-        console.log('⚠️ Reconnecting to Redis server...');
-      });
-      
-      // Test the connection
-      return client;
-    }
+    // Configure Redis client
+    const redisUrl = process.env.REDIS_URL;
+    const client = redisUrl 
+      ? new Redis(redisUrl, { 
+          maxRetriesPerRequest: 1, // Minimize retry attempts for faster fallback
+          connectTimeout: 2000,    // Only wait 2 seconds before timing out
+          enableOfflineQueue: false // Don't queue commands when disconnected
+        }) 
+      : new Redis(REDIS_CONFIG);
+    
+    // Add error handling
+    client.on('error', (err) => {
+      console.error('Redis connection error:', err);
+    });
+    
+    client.on('connect', () => {
+      console.log('✅ Connected to Redis server');
+    });
+    
+    client.on('reconnecting', () => {
+      console.log('⚠️ Reconnecting to Redis server...');
+    });
+    
+    // Test connection immediately
+    return client;
   } catch (error) {
     console.error('Failed to connect to Redis:', error);
     console.log('Falling back to mock implementation...');
+    return new MockRedisClient();
   }
-  
-  // Fall back to mock implementation
-  return new MockRedisClient();
 }
 
 // Create a Redis client (with production mode or mock fallback)
