@@ -63,9 +63,8 @@ export function configureAuth(app: any) {
       secure: process.env.NODE_ENV === 'production',
     },
     size: 64,
-    getTokenFromRequest: (req: any) => req.headers['x-csrf-token'] as string,
-    // Adding a simple session identifier based on session ID or IP
-    getSessionId: (req: any) => req.sessionID || req.ip || '',
+    getCsrfTokenFromRequest: (req: any) => req.headers['x-csrf-token'] as string,
+    getSessionIdentifier: (req: any) => req.sessionID || req.ip || '',
   });
   
   // Add CSRF protection to all state-changing routes
@@ -76,16 +75,17 @@ export function configureAuth(app: any) {
       return next();
     }
     
-    // Skip CSRF check for these specific endpoints (login, register)
-    const skipCsrfForRoutes = ['/api/auth/login', '/api/auth/register', '/api/csrf-token'];
+    // Skip CSRF check for these specific endpoints (login, register, logout)
+    const skipCsrfForRoutes = ['/api/auth/login', '/api/auth/register', '/api/auth/logout', '/api/csrf-token'];
     if (skipCsrfForRoutes.includes(req.path)) {
       return next();
     }
     
     // Apply CSRF protection for all other state-changing requests
     try {
+      // The doubleCsrfProtection function will call next() on success
+      // or throw an error on failure
       csrfProtection.doubleCsrfProtection(req, res, next);
-      next();
     } catch (error: any) {
       // If the token is invalid, return 403 Forbidden
       return res.status(403).json({
