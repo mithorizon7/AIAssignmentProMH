@@ -8,13 +8,17 @@ import { AIService } from '../services/ai-service';
 import { StorageService } from '../services/storage-service';
 import { storage } from '../storage';
 import { connectionOptions } from './redis';
+import { queueLogger as logger } from '../lib/logger';
 
 // Queue name
 const SUBMISSION_QUEUE_NAME = 'submission-processing';
 
 // Check if Redis is available
 const queueActive = process.env.NODE_ENV === 'production' || process.env.ENABLE_REDIS === 'true';
-console.log(`BullMQ queue ${queueActive ? 'active' : 'inactive'} (${process.env.NODE_ENV} mode)`);
+logger.info(`BullMQ queue status`, { 
+  active: queueActive, 
+  mode: process.env.NODE_ENV || 'development' 
+});
 
 // Configure queue connection options
 // Using the imported connectionOptions directly
