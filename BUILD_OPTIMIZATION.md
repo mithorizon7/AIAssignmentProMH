@@ -17,6 +17,8 @@ Vite provides excellent production optimizations by default, but here are additi
 - **Tree Shaking**: Eliminates unused code
 - **Chunk Splitting**: Creates optimized asset bundles
 - **Lazy Loading**: Components can be dynamically imported
+- **Content Hashing**: Files are named with content hashes (e.g., main.a2b3c4d5.js) for efficient long-term caching
+- **Cache Optimization**: No nanoid() cache-busting mechanisms in production (unlike development mode)
 
 ### Additional Optimizations to Consider:
 
@@ -92,6 +94,32 @@ chmod +x build.sh
 # Start production server
 NODE_ENV=production node dist/index.js
 ```
+
+### Cache Control Headers
+
+When deploying to production, ensure your server or CDN sets proper cache control headers:
+
+- **For content-hashed files** (JS, CSS with unique filenames):
+  ```
+  Cache-Control: public, max-age=31536000, immutable
+  ```
+
+- **For HTML and non-hashed assets**:
+  ```
+  Cache-Control: no-cache
+  ```
+
+- **For API responses**:
+  ```
+  Cache-Control: private, no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+  ```
+
+This configuration ensures:
+1. Static assets with content hashes are cached for a year (or more)
+2. HTML is always checked for freshness
+3. API responses aren't cached, preventing stale data
 
 ## Monitoring Performance
 
