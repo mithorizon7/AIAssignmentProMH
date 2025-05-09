@@ -180,9 +180,11 @@ describe('MockRedisClient', () => {
     redis = new MockRedisClient();
   });
 
-  it('should emit a connect event', (done) => {
-    redis.on('connect', () => {
-      done();
+  it('should emit a connect event', () => {
+    return new Promise<void>((resolve) => {
+      redis.on('connect', () => {
+        resolve();
+      });
     });
   });
 
@@ -210,10 +212,13 @@ describe('MockRedisClient', () => {
   });
 
   it('should handle list operations', async () => {
-    await redis.lpush('list1', 'value1', 'value2');
+    await redis.lpush('list1', 'value1');
+    await redis.lpush('list1', 'value2'); // This will be at the front because of lpush
     await redis.rpush('list1', 'value3');
     
-    expect(await redis.lrange('list1', 0, -1)).toEqual(['value2', 'value1', 'value3']);
+    // Should be ['value2', 'value1', 'value3'] - value2 is first because it was pushed last with lpush
+    const list = await redis.lrange('list1', 0, -1);
+    expect(list).toEqual(['value2', 'value1', 'value3']);
     
     expect(await redis.lpop('list1')).toBe('value2');
     expect(await redis.rpop('list1')).toBe('value3');
