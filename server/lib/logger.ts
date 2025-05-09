@@ -49,61 +49,116 @@ export class Logger {
 
   /**
    * Log a message at the specified level
+   * With comprehensive error handling to ensure logging never throws exceptions
    */
   private log(level: LogLevel, message: string, context?: Record<string, any>): void {
-    // Skip logs below minimum level
-    if (!this.shouldLog(level)) {
-      return;
-    }
+    try {
+      // Skip logs below minimum level
+      if (!this.shouldLog(level)) {
+        return;
+      }
 
-    const timestamp = new Date().toISOString();
-    const structuredLog: LogMessage = {
-      timestamp,
-      level,
-      message,
-      service: this.config.service,
-      context: context ? this.maskSensitiveData(context) : undefined
-    };
+      const timestamp = new Date().toISOString();
+      let safeContext: any = undefined;
+      
+      // Safely process context if provided
+      if (context) {
+        try {
+          safeContext = this.maskSensitiveData(context);
+        } catch (err) {
+          // If context processing fails, add an error entry instead
+          safeContext = { 
+            logging_error: "Failed to process context object",
+            error_message: err instanceof Error ? err.message : String(err)
+          };
+        }
+      }
+      
+      const structuredLog: LogMessage = {
+        timestamp,
+        level,
+        message,
+        service: this.config.service,
+        context: safeContext
+      };
 
-    // Determine output format based on configuration
-    if (this.config.structured) {
-      // Production: JSON format for log ingestion
-      console[this.getConsoleMethod(level)](this.safeStringify(structuredLog));
-    } else {
-      // Development: Human-readable format
-      const contextStr = context ? ` ${this.formatContext(context)}` : '';
-      console[this.getConsoleMethod(level)](`[${timestamp}] [${level.toUpperCase()}] ${message}${contextStr}`);
+      // Determine output format based on configuration
+      if (this.config.structured) {
+        // Production: JSON format for log ingestion
+        try {
+          console[this.getConsoleMethod(level)](this.safeStringify(structuredLog));
+        } catch (err) {
+          // Fallback in case structured logging fails
+          console.error(`[Logger Error] Failed to output structured log: ${err}`);
+          console[this.getConsoleMethod(level)](`[${timestamp}] [${level.toUpperCase()}] ${message}`);
+        }
+      } else {
+        // Development: Human-readable format
+        try {
+          const contextStr = context ? ` ${this.formatContext(context)}` : '';
+          console[this.getConsoleMethod(level)](`[${timestamp}] [${level.toUpperCase()}] ${message}${contextStr}`);
+        } catch (err) {
+          // Fallback if formatting fails 
+          console[this.getConsoleMethod(level)](`[${timestamp}] [${level.toUpperCase()}] ${message} [Context Error: ${err}]`);
+        }
+      }
+    } catch (err) {
+      // Ultimate fallback - ensure logging never throws
+      try {
+        console.error(`[CRITICAL LOGGER ERROR] ${err}`);
+        console.error(`Original message: ${message}`);
+      } catch {
+        // Nothing more we can do if even this fails
+      }
     }
   }
 
   /**
    * Mask sensitive fields in logs
+   * Safely handles circular references
    */
   private maskSensitiveData(data: Record<string, any>): Record<string, any> {
-    const masked = { ...data };
-    const maskFields = this.config.maskFields || [];
+    try {
+      // Create a shallow copy to avoid modifying the original
+      const masked = { ...data };
+      const maskFields = this.config.maskFields || [];
+      // Use a Set to track objects we've already seen to avoid circular references
+      const seen = new WeakSet();
 
-    const maskValue = (obj: Record<string, any>, path: string[] = []): void => {
-      for (const [key, value] of Object.entries(obj)) {
-        const currentPath = [...path, key];
+      const maskValue = (obj: Record<string, any>, path: string[] = []): void => {
+        // Skip if null, undefined, or not an object
+        if (!obj || typeof obj !== 'object') return;
         
-        // Check if this field should be masked
-        const shouldMask = maskFields.some(field => 
-          key.toLowerCase().includes(field.toLowerCase())
-        );
+        // Detect circular references
+        if (seen.has(obj)) return;
+        
+        // Add to seen objects
+        seen.add(obj);
+        
+        for (const [key, value] of Object.entries(obj)) {
+          const currentPath = [...path, key];
+          
+          // Check if this field should be masked
+          const shouldMask = maskFields.some(field => 
+            key.toLowerCase().includes(field.toLowerCase())
+          );
 
-        if (shouldMask && typeof value === 'string') {
-          // Mask the value
-          obj[key] = value.length > 0 ? '***' : '';
-        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
-          // Recursively process nested objects
-          maskValue(value, currentPath);
+          if (shouldMask && typeof value === 'string') {
+            // Mask the value
+            obj[key] = value.length > 0 ? '***' : '';
+          } else if (value && typeof value === 'object') {
+            // Recursively process nested objects and arrays
+            maskValue(value, currentPath);
+          }
         }
-      }
-    };
+      };
 
-    maskValue(masked);
-    return masked;
+      maskValue(masked);
+      return masked;
+    } catch (error) {
+      // If anything goes wrong, return a safe object
+      return { masked_error: "Error masking sensitive data" };
+    }
   }
 
   /**

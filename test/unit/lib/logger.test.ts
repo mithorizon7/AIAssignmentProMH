@@ -87,7 +87,8 @@ describe('Logger', () => {
   });
 
   it('should handle errors when serializing context', () => {
-    const logger = new Logger();
+    // Use a non-structured format to avoid JSON serialization
+    const logger = new Logger({ structured: false });
     
     // Create a circular reference which can't be serialized
     const circular: any = {};
@@ -96,6 +97,12 @@ describe('Logger', () => {
     // This shouldn't throw an error
     expect(() => {
       logger.info('Message with circular reference', circular);
+    }).not.toThrow();
+    
+    // Also test structured format with try-catch handler
+    const structuredLogger = new Logger({ structured: true });
+    expect(() => {
+      structuredLogger.info('Structured message with circular reference', circular);
     }).not.toThrow();
   });
 });
