@@ -148,46 +148,46 @@ export const feedback = pgTable("feedback", {
 
 // Schema Relationships
 export const usersRelations = {
-  submissions: (users: typeof users) => ({
+  submissions: (users: any) => ({
     one: { submissions, fields: [users.id], references: [submissions.userId] },
   }),
-  enrollments: (users: typeof users) => ({
+  enrollments: (users: any) => ({
     one: { enrollments, fields: [users.id], references: [enrollments.userId] },
   }),
 };
 
 export const coursesRelations = {
-  assignments: (courses: typeof courses) => ({
+  assignments: (courses: any) => ({
     one: { assignments, fields: [courses.id], references: [assignments.courseId] },
   }),
-  enrollments: (courses: typeof courses) => ({
+  enrollments: (courses: any) => ({
     one: { enrollments, fields: [courses.id], references: [enrollments.courseId] },
   }),
 };
 
 export const assignmentsRelations = {
-  submissions: (assignments: typeof assignments) => ({
+  submissions: (assignments: any) => ({
     one: { submissions, fields: [assignments.id], references: [submissions.assignmentId] },
   }),
-  course: (assignments: typeof assignments) => ({
+  course: (assignments: any) => ({
     many: { courses, fields: [assignments.courseId], references: [courses.id] },
   }),
 };
 
 export const submissionsRelations = {
-  feedback: (submissions: typeof submissions) => ({
+  feedback: (submissions: any) => ({
     one: { feedback, fields: [submissions.id], references: [feedback.submissionId] },
   }),
-  assignment: (submissions: typeof submissions) => ({
+  assignment: (submissions: any) => ({
     many: { assignments, fields: [submissions.assignmentId], references: [assignments.id] },
   }),
-  user: (submissions: typeof submissions) => ({
+  user: (submissions: any) => ({
     many: { users, fields: [submissions.userId], references: [users.id] },
   }),
 };
 
 export const feedbackRelations = {
-  submission: (feedback: typeof feedback) => ({
+  submission: (feedback: any) => ({
     many: { submissions, fields: [feedback.submissionId], references: [submissions.id] },
   }),
 };

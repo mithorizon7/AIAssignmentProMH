@@ -58,6 +58,7 @@ export class GeminiAdapter implements AIAdapter {
         suggestions: parsedContent.suggestions || [],
         summary: parsedContent.summary || "",
         score: parsedContent.score,
+        criteriaScores: parsedContent.criteriaScores || [],
         rawResponse: parsedContent,
         modelName: this.modelName,
         tokenCount: estimatedTokens

@@ -39,6 +39,7 @@ export class OpenAIAdapter implements AIAdapter {
         suggestions: parsedContent.suggestions || [],
         summary: parsedContent.summary || "",
         score: parsedContent.score,
+        criteriaScores: parsedContent.criteriaScores || [],
         rawResponse: parsedContent,
         modelName: this.model,
         tokenCount
