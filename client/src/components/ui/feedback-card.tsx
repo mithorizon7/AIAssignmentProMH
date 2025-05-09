@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { formatProcessingTime } from "@/lib/utils/format";
-import { Feedback } from "@/lib/types";
+import { Feedback } from "@/lib/types"; // Still using client-side Feedback interface which imports types from shared
 
 interface FeedbackCardProps {
   feedback: Feedback;
