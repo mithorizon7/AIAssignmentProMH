@@ -68,7 +68,7 @@ export class Logger {
     // Determine output format based on configuration
     if (this.config.structured) {
       // Production: JSON format for log ingestion
-      console[this.getConsoleMethod(level)](JSON.stringify(structuredLog));
+      console[this.getConsoleMethod(level)](this.safeStringify(structuredLog));
     } else {
       // Development: Human-readable format
       const contextStr = context ? ` ${this.formatContext(context)}` : '';
@@ -108,14 +108,54 @@ export class Logger {
 
   /**
    * Format context for human-readable logs
+   * Handles circular references safely
    */
   private formatContext(context: Record<string, any>): string {
     try {
+      // First mask sensitive data
       const masked = this.maskSensitiveData(context);
-      return JSON.stringify(masked, null, process.env.NODE_ENV === 'production' ? 0 : 2);
+      
+      // Use a safe stringify implementation that handles circular references
+      return this.safeStringify(masked, process.env.NODE_ENV === 'production' ? 0 : 2);
     } catch (error) {
       return `[Context serialization error: ${error}]`;
     }
+  }
+  
+  /**
+   * Safe JSON stringify that handles circular references
+   */
+  private safeStringify(obj: any, indent: number = 0): string {
+    const cache = new Set();
+    
+    return JSON.stringify(obj, (key, value) => {
+      // Handle null and undefined
+      if (value === null || value === undefined) {
+        return value;
+      }
+      
+      // Handle non-objects
+      if (typeof value !== 'object') {
+        return value;
+      }
+      
+      // Handle Date objects
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+      
+      // Handle circular references
+      if (cache.has(value)) {
+        return '[Circular Reference]';
+      }
+      
+      // Add object to cache if it's an object type
+      if (typeof value === 'object') {
+        cache.add(value);
+      }
+      
+      return value;
+    }, indent);
   }
 
   /**

@@ -5,7 +5,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: [], // No global setup files
-    include: ['test/unit/**/*.test.ts'],
+    include: ['test/**/*.test.ts'],
     typecheck: {
       enabled: false,
     },
