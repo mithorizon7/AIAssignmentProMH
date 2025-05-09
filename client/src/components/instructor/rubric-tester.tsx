@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { apiRequest } from "@/lib/queryClient";
 import { API_ROUTES } from "@/lib/constants";
-import { Rubric } from "./rubric-builder";
+import { Rubric } from '@shared/schema';
 
 interface RubricTesterProps {
   rubric: Rubric;
