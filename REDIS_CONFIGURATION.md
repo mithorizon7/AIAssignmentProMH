@@ -1,158 +1,103 @@
 # Redis Configuration Guide
 
-This guide explains how to set up and configure Redis for the AI Feedback Platform, which is critical for reliable queue functionality.
+This document explains how to configure Redis for the AI Feedback Platform, which is used for queuing and processing submissions.
 
-## Why Redis Is Needed
+## Development Environment
 
-The platform uses Redis via BullMQ for several critical functions:
+In development mode, the application uses a mock Redis implementation that doesn't require an actual Redis server. This allows for easy local development without external dependencies.
 
-1. **Durable Job Queueing**: Ensures submissions aren't lost, even if the server restarts
-2. **Work Distribution**: Allows processing to be distributed across multiple workers/servers
-3. **Retry Handling**: Provides robust retry mechanisms with exponential backoff
-4. **Job Monitoring**: Enables monitoring and management through the admin dashboard
-5. **Rate Limiting**: Helps control processing throughput and prevent system overload
+However, you might see warning messages like:
 
-Without Redis, the system falls back to an in-memory implementation which is **not suitable for production** as jobs are lost on server restart.
-
-## Production Options
-
-### Option 1: Self-Hosted Redis
-
-For full control but more maintenance:
-
-```bash
-# Install Redis on Ubuntu
-sudo apt update
-sudo apt install redis-server
-
-# Configure Redis to start on boot
-sudo systemctl enable redis-server
-
-# Edit configuration
-sudo nano /etc/redis/redis.conf
-
-# Set password
-# Find the line: # requirepass foobared
-# Uncomment and change to: requirepass your_secure_password
-
-# Restart Redis
-sudo systemctl restart redis-server
+```
+[WARN] Using mock Redis client - NOT SUITABLE FOR PRODUCTION
 ```
 
-### Option 2: Managed Redis Services
+These warnings are expected and can be safely ignored during development.
 
-For easier maintenance but less control:
+## Production Configuration
 
-- **Redis Cloud**: Offers a free tier with 30MB RAM
-- **Amazon ElastiCache**: AWS managed Redis service
-- **Azure Cache for Redis**: Microsoft's managed Redis service
-- **DigitalOcean Managed Redis**: Simple managed Redis option
-- **Redis Enterprise Cloud**: High-performance option
+For production environments, you'll need to configure an actual Redis server. Here are the available configuration options:
 
-## Environment Configuration
+### Option 1: Using REDIS_URL (Recommended)
 
-Set these environment variables for the application:
+Set the `REDIS_URL` environment variable to your Redis connection string:
 
-```bash
-# Option 1: Full URL (simplest)
-REDIS_URL=redis://username:password@host:port/db
+```
+REDIS_URL=redis://username:password@host:port
+```
 
-# Option 2: Individual components
+### Option 2: Using Individual Redis Configuration Variables
+
+Alternatively, you can configure individual parameters:
+
+```
 REDIS_HOST=your-redis-host
 REDIS_PORT=6379
 REDIS_PASSWORD=your-redis-password
-REDIS_USERNAME=default  # Usually only needed for Redis 6.0+
+REDIS_USERNAME=your-redis-username (optional)
 REDIS_DB=0
 ```
 
-## Redis Memory Management
+## Redis Role in the Application
 
-Redis primarily stores data in memory. For queue usage, configure:
+Redis is used for the following purposes:
 
-1. **maxmemory**: Set to about 75% of available RAM
-2. **maxmemory-policy**: Use `volatile-lru` (removes least recently used keys with expiration)
+1. **Submission Processing Queue**: Manages the queue of assignments waiting to be processed by the AI service
+2. **Job Monitoring**: Tracks job status, progress, and results
+3. **Worker Coordination**: Ensures jobs are distributed efficiently among multiple workers
 
-Example redis.conf settings:
+## Fallback Mechanism
 
-```
-maxmemory 2gb
-maxmemory-policy volatile-lru
-```
+The application includes a robust fallback mechanism:
 
-## Security Recommendations
+- If Redis connection fails in production, it will log detailed errors but continue operating
+- In development, it automatically falls back to an in-memory implementation that processes jobs directly
+- All operations are logged with appropriate context for debugging
 
-1. **Strong Password**: Use a complex password (16+ characters)
-2. **Network Security**: 
-   - Never expose Redis directly to the internet
-   - Use firewalls to restrict access by IP
-   - Consider using a VPN or SSH tunnel for remote access
-3. **TLS/SSL**: Enable encryption for production (Redis 6.0+)
-4. **Regular Updates**: Keep Redis updated for security patches
+## Monitoring Redis Status
 
-## Monitoring
-
-Monitor these metrics for health:
-
-- **Memory usage**: Watch for approaching limits
-- **CPU usage**: High CPU might indicate inefficient commands
-- **Keyspace hits/misses**: Tracks cache efficiency
-- **Connected clients**: Unexpected connections could suggest issues
-
-## Backup Strategy
-
-Redis offers two backup mechanisms:
-
-1. **RDB Snapshots**: Point-in-time snapshots of the dataset
-2. **AOF (Append Only File)**: Logs every write operation 
-
-Recommended configuration:
+You can check the Redis queue status via the administration dashboard or the API endpoint:
 
 ```
-save 900 1      # Save if at least 1 change in 15 minutes
-save 300 10     # Save if at least 10 changes in 5 minutes
-save 60 10000   # Save if at least 10000 changes in 1 minute
-appendonly yes  # Enable AOF
+GET /api/admin/queue/stats
 ```
 
-## Redis Health Check API
-
-The application provides an API to check Redis health:
-
-```
-GET /api/admin/system/redis-health
-```
-
-Response format:
-```json
-{
-  "status": "healthy",
-  "connected": true,
-  "version": "6.2.6",
-  "memoryUsage": {
-    "used": "1.2GB",
-    "total": "2.0GB",
-    "percentUsed": 60
-  },
-  "queueStats": {
-    "waiting": 5,
-    "active": 2,
-    "completed": 1000,
-    "failed": 10
-  }
-}
-```
+This will return stats including waiting, active, completed, and failed jobs.
 
 ## Troubleshooting
 
-Common issues and solutions:
+If you encounter Redis-related issues:
 
-1. **Connection Refused**: Check firewall settings and that Redis is running
-2. **Authentication Failed**: Verify password/username configuration
-3. **Out of Memory**: Increase Redis memory or implement better key expiration
-4. **High Latency**: Check network issues or high CPU usage
+1. Check Redis connection settings in your environment variables
+2. Ensure firewall rules allow connection to the Redis port
+3. Verify Redis server is running and accepting connections
+4. Review application logs for detailed error messages (they include connection details and failure reasons)
 
-## Further Reading
+For Redis connection errors, the application will automatically retry with an exponential backoff strategy.
 
-- [Redis Documentation](https://redis.io/documentation)
-- [BullMQ Documentation](https://docs.bullmq.io/)
-- [Redis Best Practices](https://redis.io/topics/optimization)
+## Managing Queue Workers
+
+The application automatically manages worker processes. No manual intervention is typically needed.
+
+If you need to restart the worker process:
+
+```
+POST /api/admin/queue/restart
+```
+
+## Performance Considerations
+
+For high-volume environments, consider:
+
+- Using a Redis cluster for better performance and reliability
+- Increasing the number of worker processes (set environment variable `QUEUE_CONCURRENCY=10`)
+- Setting up Redis with persistence enabled to prevent job loss during restarts
+
+The default configuration should handle moderate workloads efficiently, processing up to 5 submissions concurrently.
+
+## Security Notes
+
+- Always use authentication for Redis in production
+- Place Redis behind a firewall that only allows access from your application servers
+- Regularly update your Redis instance to the latest version
+- Consider using TLS encryption for Redis connections in sensitive environments

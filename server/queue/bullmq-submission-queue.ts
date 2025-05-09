@@ -58,11 +58,17 @@ const queueEvents = queueActive
 // Log queue events if active
 if (queueEvents) {
   queueEvents.on('completed', ({ jobId, returnvalue }) => {
-    console.log(`Job ${jobId} completed successfully`);
+    logger.info(`Job completed successfully`, { 
+      jobId, 
+      result: returnvalue 
+    });
   });
 
   queueEvents.on('failed', ({ jobId, failedReason }) => {
-    console.error(`Job ${jobId} failed: ${failedReason}`);
+    logger.error(`Job failed`, { 
+      jobId, 
+      reason: failedReason 
+    });
   });
 }
 
@@ -71,13 +77,16 @@ function createAIService() {
   // Select the appropriate AI adapter based on available API keys
   let aiAdapter;
   if (process.env.GEMINI_API_KEY) {
-    console.log('Using Gemini AI adapter');
+    logger.info('AI adapter selected', { adapter: 'Gemini' });
     aiAdapter = new GeminiAdapter();
   } else if (process.env.OPENAI_API_KEY) {
-    console.log('Using OpenAI adapter');
+    logger.info('AI adapter selected', { adapter: 'OpenAI' });
     aiAdapter = new OpenAIAdapter();
   } else {
-    console.warn('No AI API key found - Gemini will be used by default but may not work properly');
+    logger.warn('No AI API key found - Gemini will be used by default', {
+      adapter: 'Gemini',
+      warning: 'Missing API key - functionality may be limited'
+    });
     aiAdapter = new GeminiAdapter();
   }
     
@@ -94,7 +103,11 @@ if (queueActive) {
     SUBMISSION_QUEUE_NAME,
     async (job: Job) => {
       // Log job progress
-      console.log(`Processing submission job ${job.id}, attempt ${job.attemptsMade + 1}`);
+      logger.info(`Processing submission job`, { 
+        jobId: job.id, 
+        attempt: job.attemptsMade + 1,
+        submissionId: job.data.submissionId
+      });
       await job.updateProgress(10);
 
       // Get submission data
@@ -152,23 +165,38 @@ if (queueActive) {
         await storage.updateSubmissionStatus(submission.id, 'completed');
         await job.updateProgress(100);
         
-        console.log(`Successfully processed submission ${submissionId}`);
+        const processingTime = Date.now() - job.timestamp;
+        logger.info(`Successfully processed submission`, { 
+          submissionId,
+          processingTime,
+          status: 'completed'
+        });
         
         return { 
           submissionId, 
           status: 'completed',
-          processingTime: Date.now() - job.timestamp
+          processingTime
         };
       } catch (error: any) {
-        console.error(`Error processing submission ${submissionId}:`, error);
+        logger.error(`Error processing submission`, { 
+          submissionId,
+          error: error.message,
+          stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined,
+          attempt: job.attemptsMade + 1,
+          maxAttempts: job.opts.attempts || 1
+        });
         
         // Mark submission as failed if this is the final attempt
         const maxAttempts = job.opts.attempts || 1;
         if (job.attemptsMade >= maxAttempts - 1) {
           try {
             await storage.updateSubmissionStatus(submissionId, 'failed');
-          } catch (updateError) {
-            console.error(`Failed to update submission status:`, updateError);
+            logger.info(`Marked submission as failed (final attempt)`, { submissionId });
+          } catch (updateError: any) {
+            logger.error(`Failed to update submission status`, { 
+              submissionId,
+              error: updateError.message 
+            });
           }
         }
         
@@ -185,15 +213,27 @@ if (queueActive) {
 
   // Handle worker events
   submissionWorker.on('completed', (job: Job) => {
-    console.log(`Worker completed job ${job.id} successfully`);
+    logger.info(`Worker completed job successfully`, { 
+      jobId: job.id,
+      name: job.name,
+      timestamp: new Date().toISOString()
+    });
   });
 
   submissionWorker.on('failed', (job: Job | undefined, error: Error) => {
-    console.error(`Worker failed job ${job?.id}:`, error);
+    logger.error(`Worker job failed`, { 
+      jobId: job?.id || 'unknown',
+      name: job?.name,
+      error: error.message,
+      stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+    });
   });
 
   submissionWorker.on('error', (error: Error) => {
-    console.error('Worker error:', error);
+    logger.error('Worker error occurred', { 
+      error: error.message,
+      stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+    });
   });
 }
 
@@ -373,27 +413,42 @@ export const queueApi = {
    * Graceful shutdown of queue and worker
    */
   async shutdown(): Promise<void> {
-    console.log('Shutting down queue and worker...');
+    logger.info('Initiating graceful shutdown of queue and worker');
+    
     if (submissionWorker) {
-      await submissionWorker.close();
+      try {
+        await submissionWorker.close();
+        logger.info('Worker shutdown successful');
+      } catch (error: any) {
+        logger.error('Error shutting down worker', { error: error.message });
+      }
     }
+    
     if (queueActive && 'close' in submissionQueue) {
-      await submissionQueue.close();
+      try {
+        await submissionQueue.close();
+        logger.info('Queue shutdown successful');
+      } catch (error: any) {
+        logger.error('Error shutting down queue', { error: error.message });
+      }
     }
-    console.log('Queue and worker shut down successfully');
+    
+    logger.info('Queue system shutdown complete');
   }
 };
 
 // Make sure workers and queues are cleaned up on process exit
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully');
+  logger.info('SIGTERM received, initiating graceful shutdown');
   await queueApi.shutdown();
+  logger.info('Process exit initiated due to SIGTERM');
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully');
+  logger.info('SIGINT received, initiating graceful shutdown');
   await queueApi.shutdown();
+  logger.info('Process exit initiated due to SIGINT');
   process.exit(0);
 });
 
