@@ -1,135 +1,92 @@
-# Build Optimization Strategy
+# Build Optimization Guide
 
-This document outlines the optimization strategies for production builds of both client and server-side code.
+This document outlines the build optimization strategies implemented in the AI-Powered Assignment Feedback Platform.
 
-## Build Process Overview
+## Production Optimizations
 
-The project uses a dual build approach:
-- **Client**: Built with Vite
-- **Server**: Built with ESBuild
+When running in production mode (`NODE_ENV=production`), the following optimizations are automatically applied:
 
-## Client-Side Optimizations (Vite)
+### Server-Side Optimizations
 
-Vite provides excellent production optimizations by default, but here are additional considerations:
+- **Compression**: HTTP response compression using `compression` middleware
+- **Helmet**: Security headers for Express using `helmet`
+- **Cache Control**: Proper cache headers for static assets
+- **Error Handling**: Minimized error details in responses
+- **Rate Limiting**: API rate limiting to prevent abuse
+- **Logging**: Production-appropriate logging levels
 
-### Enabled by Default in Production Mode:
-- **Code Minification**: Both JavaScript and CSS
-- **Tree Shaking**: Eliminates unused code
-- **Chunk Splitting**: Creates optimized asset bundles
-- **Lazy Loading**: Components can be dynamically imported
-- **Content Hashing**: Files are named with content hashes (e.g., main.a2b3c4d5.js) for efficient long-term caching
-- **Cache Optimization**: No nanoid() cache-busting mechanisms in production (unlike development mode)
+### Client-Side Optimizations
 
-### Additional Optimizations to Consider:
+- **Bundle Size**: Code splitting and tree shaking for minimal bundle size
+- **Caching**: Content-hashed filenames for proper cache invalidation
+- **Minification**: JavaScript and CSS minification
+- **Image Optimization**: Automatic image optimization
+- **CSS Optimization**: CSS purging to remove unused styles
+- **Font Optimization**: Font display optimization and preloading
+- **Code Splitting**: Component-level code splitting for faster initial load
 
-1. **Preload Critical Assets**:
-   ```jsx
-   import { preload } from 'vite';
-   
-   // Preload critical components
-   preload('/src/critical-component.js');
-   ```
+## Development vs. Production Mode
 
-2. **Route-Based Code Splitting**:
-   ```jsx
-   // Dynamically import page components
-   const HomePage = React.lazy(() => import('./pages/home-page'));
-   ```
+The application uses different strategies in development vs. production:
 
-3. **Image Optimization**:
-   - Use appropriate image formats (WebP where supported)
-   - Lazy load images below the fold
-   - Use responsive images with `srcset` attribute
+| Feature | Development | Production |
+|---------|-------------|------------|
+| Error Stack Traces | Full stack traces | Minimized for security |
+| Hot Module Replacement | Enabled | Disabled |
+| Source Maps | Full source maps | External source maps |
+| Cache Busting | Using URL parameters | Using content hashing |
+| Bundling | Minimal bundling | Optimized bundling |
+| Queue Processing | In-memory mock | Redis-backed queue |
+| Database Logging | Verbose SQL logging | Minimal logging |
 
-4. **State Management Optimization**:
-   - Use React Query's caching capabilities effectively
-   - Implement proper data invalidation strategies
+## Environment Variables
 
-## Server-Side Optimizations (ESBuild)
+The following environment variables affect the build and optimization process:
 
-The optimized build script `build.sh` enhances the ESBuild process with:
+- `NODE_ENV`: Set to 'production' to enable all production optimizations
+- `VITE_ENABLE_DEVTOOLS`: Set to 'true' to enable development tools even in production (not recommended)
+- `VITE_API_URL`: Override the API URL for the frontend (useful for deployments)
 
-### Applied Optimizations:
+## Build Process
 
-1. **Minification**: `--minify` flag reduces file size
-2. **Tree Shaking**: `--tree-shaking=true` removes unused code
-3. **ES2020 Target**: `--target=es2020` provides good balance of features and compatibility
-4. **Production Source Maps**: `--sourcemap=production` creates separate source maps for debugging
+The application uses the following build process:
 
-### Environment Configuration:
+1. Server: Compiled using ESBuild for optimal performance
+2. Client: Built using Vite with optimizations
 
-Always set `NODE_ENV=production` for server runtime which:
-- Disables development-only code paths
-- May enable performance optimizations in dependencies
-- Reduces error verbosity
-
-## Performance Optimization Checklist
-
-### Client-Side:
-- [ ] Implement code splitting for routes
-- [ ] Lazy-load below-the-fold components
-- [ ] Use proper image optimization
-- [ ] Audit and remove unused dependencies
-- [ ] Implement React.memo for expensive components
-- [ ] Use web workers for CPU-intensive tasks
-
-### Server-Side:
-- [ ] Optimize database queries and add indices
-- [ ] Implement proper caching strategies
-- [ ] Use connection pooling
-- [ ] Configure appropriate timeouts
-- [ ] Implement rate limiting for APIs
-
-## Build and Deployment
-
-To build for production:
+To build the application for production:
 
 ```bash
-# Make build script executable
-chmod +x build.sh
-
-# Run optimized build
-./build.sh
-
-# Start production server
-NODE_ENV=production node dist/index.js
+npm run build
 ```
 
-### Cache Control Headers
+This will create optimized builds in the `dist` directory:
+- `dist/client`: Static assets for the frontend
+- `dist/server`: Compiled server code
 
-When deploying to production, ensure your server or CDN sets proper cache control headers:
+## Serving the Application
 
-- **For content-hashed files** (JS, CSS with unique filenames):
-  ```
-  Cache-Control: public, max-age=31536000, immutable
-  ```
+In production, the application server handles both API requests and serving the frontend assets. No separate static file server is needed.
 
-- **For HTML and non-hashed assets**:
-  ```
-  Cache-Control: no-cache
-  ```
+To start the production server:
 
-- **For API responses**:
-  ```
-  Cache-Control: private, no-cache, no-store, must-revalidate
-  Pragma: no-cache
-  Expires: 0
-  ```
+```bash
+npm start
+```
 
-This configuration ensures:
-1. Static assets with content hashes are cached for a year (or more)
-2. HTML is always checked for freshness
-3. API responses aren't cached, preventing stale data
+## Performance Monitoring
 
-## Monitoring Performance
+In production, you can monitor the application's performance using:
 
-After deployment, monitor these metrics:
-- **Client-Side**: First Contentful Paint, Time to Interactive, Total Bundle Size
-- **Server-Side**: Response Time, Error Rate, Memory Usage, CPU Usage
+- Server logs for backend performance metrics
+- Client-side performance monitoring through the browser's performance API
+- Redis monitoring for queue performance
 
-## Additional Resources
+## Troubleshooting
 
-- [Vite Production Build Documentation](https://vitejs.dev/guide/build.html)
-- [ESBuild Documentation](https://esbuild.github.io/)
-- [React Performance Optimization](https://reactjs.org/docs/optimizing-performance.html)
-- [Web Vitals](https://web.dev/vitals/)
+If you encounter performance issues in production:
+
+1. Check server logs for slow API endpoints
+2. Monitor Redis queue for bottlenecks
+3. Review client network requests for slow resources
+4. Consider scaling horizontally for high traffic

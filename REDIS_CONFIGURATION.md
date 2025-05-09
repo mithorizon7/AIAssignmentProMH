@@ -1,103 +1,97 @@
 # Redis Configuration Guide
 
-This document explains how to configure Redis for the AI Feedback Platform, which is used for queuing and processing submissions.
+This document provides detailed information on configuring and using Redis with the AI-Powered Assignment Feedback Platform.
 
-## Development Environment
+## Overview
 
-In development mode, the application uses a mock Redis implementation that doesn't require an actual Redis server. This allows for easy local development without external dependencies.
+The platform uses Redis through BullMQ for reliable queue processing. This enables:
 
-However, you might see warning messages like:
+- Asynchronous processing of submission feedback
+- Reliable job retries on failure
+- Persistence of jobs during restarts
+- Distribution of work across multiple processes
 
-```
-[WARN] Using mock Redis client - NOT SUITABLE FOR PRODUCTION
-```
+## Configuration Options
 
-These warnings are expected and can be safely ignored during development.
+### Environment Variables
 
-## Production Configuration
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NODE_ENV` | When set to 'production', activates Redis/BullMQ by default | 'development' |
+| `ENABLE_REDIS` | Force enable Redis even in non-production environments | 'false' |
+| `REDIS_URL` | Complete Redis connection string (e.g., redis://username:password@host:port) | - |
+| `REDIS_HOST` | Redis server hostname (used if REDIS_URL is not provided) | 'localhost' |
+| `REDIS_PORT` | Redis server port (used if REDIS_URL is not provided) | 6379 |
+| `REDIS_PASSWORD` | Redis password (used if REDIS_URL is not provided) | - |
+| `REDIS_USERNAME` | Redis username (used if REDIS_URL is not provided) | - |
+| `REDIS_DB` | Redis database number (used if REDIS_URL is not provided) | 0 |
 
-For production environments, you'll need to configure an actual Redis server. Here are the available configuration options:
+### Connection Logic
 
-### Option 1: Using REDIS_URL (Recommended)
+The system uses the following logic to determine whether to use Redis:
 
-Set the `REDIS_URL` environment variable to your Redis connection string:
+1. If `NODE_ENV=production`, Redis is enabled by default
+2. If `ENABLE_REDIS=true`, Redis is enabled regardless of environment
+3. If `REDIS_URL` is provided, Redis is enabled regardless of other settings
 
-```
-REDIS_URL=redis://username:password@host:port
-```
+When Redis is enabled, the system connects using:
+1. The `REDIS_URL` if provided
+2. Individual connection parameters (`REDIS_HOST`, `REDIS_PORT`, etc.) if `REDIS_URL` is not provided
 
-### Option 2: Using Individual Redis Configuration Variables
+## Development Mode
 
-Alternatively, you can configure individual parameters:
+In development mode without Redis, the system uses a mock implementation that:
 
-```
-REDIS_HOST=your-redis-host
-REDIS_PORT=6379
-REDIS_PASSWORD=your-redis-password
-REDIS_USERNAME=your-redis-username (optional)
-REDIS_DB=0
-```
+- Processes jobs immediately in the same process
+- Simulates queue behavior without actual Redis dependencies
+- Provides similar API but with in-memory storage
 
-## Redis Role in the Application
+This allows development without a Redis installation, but limits some features:
 
-Redis is used for the following purposes:
+- No persistence between restarts
+- No distributed processing
+- No dashboard monitoring
 
-1. **Submission Processing Queue**: Manages the queue of assignments waiting to be processed by the AI service
-2. **Job Monitoring**: Tracks job status, progress, and results
-3. **Worker Coordination**: Ensures jobs are distributed efficiently among multiple workers
+## Production Requirements
 
-## Fallback Mechanism
+In production, a real Redis instance is **required**. The application will:
 
-The application includes a robust fallback mechanism:
+1. Attempt to connect to Redis using the provided credentials
+2. Log connection errors with detailed information
+3. Retry connection with exponential backoff
+4. Use proper Redis clients for BullMQ compatibility
 
-- If Redis connection fails in production, it will log detailed errors but continue operating
-- In development, it automatically falls back to an in-memory implementation that processes jobs directly
-- All operations are logged with appropriate context for debugging
+## Redis Hosting Options
 
-## Monitoring Redis Status
+For production use, you can:
 
-You can check the Redis queue status via the administration dashboard or the API endpoint:
+1. **Self-host Redis**: Run your own Redis server
+2. **Use Redis Cloud**: Services like Redis Labs, Upstash, etc.
+3. **Platform Redis**: Many platforms like Heroku, Render, etc. offer Redis add-ons
 
-```
-GET /api/admin/queue/stats
-```
+## Minimal Redis Requirements
 
-This will return stats including waiting, active, completed, and failed jobs.
+- Redis version: 5.0 or higher
+- Memory: At least 100MB dedicated to Redis
+- Persistence: AOF recommended for job reliability
+
+## Testing Redis Connection
+
+To test if Redis is properly configured:
+
+1. Set `ENABLE_REDIS=true` in your development environment
+2. Configure Redis connection parameters
+3. Start the application
+4. Check logs for successful connection messages
+5. Submit an assignment to test queue processing
 
 ## Troubleshooting
 
-If you encounter Redis-related issues:
+- **Connection Errors**: Verify credentials and network access
+- **Authentication Errors**: Ensure password/username are correct
+- **Performance Issues**: Consider increasing Redis memory or connection pool
+- **Lost Jobs**: Enable AOF persistence in Redis configuration
 
-1. Check Redis connection settings in your environment variables
-2. Ensure firewall rules allow connection to the Redis port
-3. Verify Redis server is running and accepting connections
-4. Review application logs for detailed error messages (they include connection details and failure reasons)
-
-For Redis connection errors, the application will automatically retry with an exponential backoff strategy.
-
-## Managing Queue Workers
-
-The application automatically manages worker processes. No manual intervention is typically needed.
-
-If you need to restart the worker process:
-
-```
-POST /api/admin/queue/restart
-```
-
-## Performance Considerations
-
-For high-volume environments, consider:
-
-- Using a Redis cluster for better performance and reliability
-- Increasing the number of worker processes (set environment variable `QUEUE_CONCURRENCY=10`)
-- Setting up Redis with persistence enabled to prevent job loss during restarts
-
-The default configuration should handle moderate workloads efficiently, processing up to 5 submissions concurrently.
-
-## Security Notes
-
-- Always use authentication for Redis in production
-- Place Redis behind a firewall that only allows access from your application servers
-- Regularly update your Redis instance to the latest version
-- Consider using TLS encryption for Redis connections in sensitive environments
+For more information, refer to:
+- [BullMQ Documentation](https://docs.bullmq.io/)
+- [Redis Documentation](https://redis.io/docs/)

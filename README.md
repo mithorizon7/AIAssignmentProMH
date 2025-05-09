@@ -1,0 +1,98 @@
+# AI-Powered Assignment Feedback Platform
+
+An AI-powered assignment feedback platform that enhances educational workflows through intelligent error handling and robust parsing mechanisms.
+
+## Key Features
+
+- **AI-Driven Feedback**: Analyze student submissions and provide constructive feedback using Google's Gemini model
+- **Multi-User Roles**: Support for students, instructors, and administrators
+- **Course Management**: Organize assignments by courses
+- **Rubric Creation**: Create rubrics to guide the AI assessment
+- **Submissions Management**: Track student submissions and progress
+- **Batch Processing**: Handle large volumes of submissions through a robust queue system
+
+## Technology Stack
+
+- **Frontend**: React.js with TypeScript and Tailwind CSS
+- **Backend**: Express.js with PostgreSQL database
+- **ORM**: Drizzle ORM for type-safe database interactions
+- **Authentication**: Secure authentication with bcrypt password hashing
+- **Queue**: BullMQ for reliable background processing
+- **AI Integration**: Modular AI service with adapters for different models
+
+## Environment Variables
+
+The application relies on several environment variables for configuration. Copy the `.env.example` file to `.env` and modify it as needed.
+
+### Critical Configuration Variables
+
+| Variable | Description |
+|----------|-------------|
+| `NODE_ENV` | When set to 'production', enables production optimizations and activates Redis/BullMQ by default |
+| `ENABLE_REDIS` | Set to 'true' to enable Redis and BullMQ even in non-production environments |
+| `REDIS_URL` | Complete Redis connection string (e.g., redis://username:password@host:port). Takes precedence over individual Redis parameters |
+| `REDIS_HOST`, `REDIS_PORT`, etc. | Individual Redis connection parameters used if REDIS_URL is not provided |
+| `GEMINI_API_KEY` | API key for Google's Gemini AI model |
+| `OPENAI_API_KEY` | Alternative API key for OpenAI models (Gemini is used by default if both are provided) |
+| `DATABASE_URL` | PostgreSQL connection string |
+
+See `.env.example` for a complete list of environment variables and their descriptions.
+
+## Redis and Queue Configuration
+
+The application uses BullMQ with Redis for robust queue processing:
+
+- In **production** mode (`NODE_ENV=production`), a Redis connection is required
+- In **development** mode, a mock implementation is used by default
+- Set `ENABLE_REDIS=true` in development to test with a real Redis instance
+- Ensure proper Redis credentials are configured when using a real Redis instance
+
+## Database Setup
+
+The project uses PostgreSQL with Drizzle ORM:
+
+1. Ensure PostgreSQL is installed and running
+2. Set up the database connection in the `.env` file
+3. Run migrations: `npm run db:push`
+
+## Installation and Setup
+
+```bash
+# Clone the repository
+git clone <repository-url>
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your configuration
+
+# Run database migrations
+npm run db:push
+
+# Start the development server
+npm run dev
+```
+
+## Development
+
+The development server runs the Express backend and the React frontend in a single process, with automatic hot reloading.
+
+```bash
+npm run dev
+```
+
+## Production Deployment
+
+For production deployment:
+
+1. Set `NODE_ENV=production` in your environment
+2. Ensure Redis is configured with proper credentials
+3. Set up a PostgreSQL database and configure the connection
+4. Build the application: `npm run build`
+5. Start the server: `npm start`
+
+## License
+
+[MIT License](LICENSE)
