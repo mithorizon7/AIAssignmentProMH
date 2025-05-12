@@ -86,6 +86,21 @@ export class GeminiAdapter implements AIAdapter {
    * @param mimeType MIME type of the file
    * @returns A FileData object that can be used in a content part
    */
+  /**
+   * Get the file URI from a FileData object, handling different API versions
+   * @param fileData The FileData object from the Gemini API
+   * @returns The file URI string
+   */
+  private getFileUri(fileData: FileData): string {
+    // The FileData object might have different property names in different API versions
+    // Handle all possible variants based on Gemini API documentation changes
+    return (fileData as any).uri || 
+           (fileData as any).fileUri || 
+           (fileData as any).url || 
+           (fileData as any).fileUrl || 
+           '';
+  }
+  
   private async createFileData(content: Buffer, mimeType: string): Promise<FileData> {
     try {
       // Check if the GenerativeAI instance has the createFile method (latest API version)

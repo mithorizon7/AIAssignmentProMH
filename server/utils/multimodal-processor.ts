@@ -2,6 +2,7 @@
  * Utility for processing different types of content for multimodal AI processing
  */
 import fs from 'fs';
+import path from 'path';
 import { promisify } from 'util';
 import { MultimodalPromptPart } from '../adapters/ai-adapter';
 import { 
