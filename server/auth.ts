@@ -3,6 +3,7 @@ import session from 'express-session';
 import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
 import { Strategy as Auth0Strategy } from 'passport-auth0';
+import { Strategy as OIDCStrategy } from 'passport-openidconnect';
 import { storage } from './storage';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';

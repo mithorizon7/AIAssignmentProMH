@@ -37,10 +37,11 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   username: text("username").notNull().unique(),
-  password: text("password"), // No notNull() - Password is nullable for Auth0 users
+  password: text("password"), // No notNull() - Password is nullable for Auth0 users and MIT Horizon users
   email: text("email").notNull().unique(),
   role: userRoleEnum("role").notNull().default('student'),
-  auth0Sub: text("auth0_sub").unique(), // Auth0 subject identifier - nullable by default
+  auth0Sub: text("auth0_sub").unique(), // Auth0 subject identifier for our Auth0 tenant - nullable by default
+  mitHorizonSub: text("mit_horizon_sub").unique(), // MIT Horizon Auth0 subject identifier - nullable by default
   emailVerified: boolean("email_verified").default(false).notNull(), // Email verification status
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => {
@@ -48,7 +49,8 @@ export const users = pgTable("users", {
     usernameIdx: index("idx_users_username").on(table.username),
     emailIdx: index("idx_users_email").on(table.email),
     roleIdx: index("idx_users_role").on(table.role),
-    auth0SubIdx: index("idx_users_auth0_sub").on(table.auth0Sub) // Index for Auth0 subject lookups
+    auth0SubIdx: index("idx_users_auth0_sub").on(table.auth0Sub), // Index for our Auth0 tenant subject lookups
+    mitHorizonSubIdx: index("idx_users_mit_horizon_sub").on(table.mitHorizonSub) // Index for MIT Horizon Auth0 subject lookups
   };
 });
 
