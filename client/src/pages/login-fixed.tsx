@@ -126,7 +126,28 @@ export default function Login() {
           </Form>
           
           <div className="mt-4">
-            <Separator />
+            <Separator className="my-4" />
+            
+            <div className="text-center mb-4">
+              <p className="text-sm text-neutral-500 mb-2">Or sign in with</p>
+              <Button 
+                variant="outline" 
+                className="w-full border-2 border-mit-red hover:bg-mit-red/10"
+                onClick={() => window.location.href = '/api/auth-sso/login'}
+              >
+                <svg 
+                  className="h-5 w-5 mr-2" 
+                  fill="none" 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  viewBox="0 0 512 512"
+                >
+                  <rect width="512" height="512" fill="#A31F34" rx="15%"/>
+                  <path fill="#fff" d="M157 291v-70h-35v-28h106v28h-36v70h-35m24-119V76h32l18 66 17-66h33v96h-30v-69l-19 69h-21l-18-69v69h-12"/>
+                </svg>
+                Sign in with MIT Horizon
+              </Button>
+            </div>
+            
             <p className="text-center text-sm text-neutral-500 mt-4">
               This is a secure login for authorized university personnel and students.
             </p>
