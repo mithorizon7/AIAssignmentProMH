@@ -1,3 +1,4 @@
+/* Optimized font loading - only required weights */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Serif:opsz,wght@8..144,400;8..144,500;8..144,600&display=swap');
 
@@ -46,6 +47,13 @@
   /* Other System Colors */
   --ring: 347 100% 23%;             /* MIT Red */
   --radius: 0.25rem;                /* 4px border radius for buttons per spec */
+  
+  /* Typography Line Heights - MIT Design Brief */
+  --line-height-display: 1.05;      /* For large display text (72px, 56px) */
+  --line-height-heading: 1.1;       /* For headings (48px, 40px, 32px) */
+  --line-height-title: 1.2;         /* For titles (24px, 20px) */
+  --line-height-body: 1.5;          /* For body copy (16px) */
+  --line-height-small: 1.5;         /* For small text (14px, 12px) */
 }
 
 .dark {
@@ -79,55 +87,65 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
   
-  /* MIT Typography System - 8pt Grid */
+  /* MIT Typography System - Based on MIT Design Brief with precise line heights */
   h1, .h1, .text-mit-h1 {
-    @apply text-5xl font-bold tracking-tight leading-tight;
-    /* 48px with 44px line height (0.92x ratio) */
+    @apply text-5xl font-bold tracking-tight;
+    /* 48px with 53px line height (1.1x ratio from MIT spec) */
+    line-height: var(--line-height-heading);
   }
   
   h2, .h2, .text-mit-h2 {
-    @apply text-3xl font-bold tracking-tight leading-tight;
-    /* 32px with 30px line height (0.94x ratio) */
+    @apply text-3xl font-bold tracking-tight;
+    /* 32px with 35px line height (1.1x ratio from MIT spec) */
+    line-height: var(--line-height-heading);
   }
   
   h3, .h3, .text-mit-h3 {
-    @apply text-2xl font-semibold leading-normal;
-    /* 24px with 24px line height (1x ratio) */
+    @apply text-2xl font-semibold;
+    /* 24px with 29px line height (1.2x ratio) */
+    line-height: var(--line-height-title);
   }
   
   h4, .h4, .text-mit-h4 {
-    @apply text-xl font-semibold leading-normal;
+    @apply text-xl font-semibold;
     /* 20px with 24px line height (1.2x ratio) */
+    line-height: var(--line-height-title);
   }
   
   p, .text-mit-body {
-    @apply text-base leading-normal;
+    @apply text-base;
     /* 16px with 24px line height (1.5x ratio) */
+    line-height: var(--line-height-body);
   }
   
   small, .small, .text-mit-small {
-    @apply text-sm leading-relaxed;
+    @apply text-sm;
     /* 14px with 21px line height (1.5x ratio) */
+    line-height: var(--line-height-small);
   }
   
   .text-mit-tiny {
-    @apply text-xs leading-relaxed;
+    @apply text-xs;
     /* 12px with 18px line height (1.5x ratio) */
+    line-height: var(--line-height-small);
   }
   
   .text-mit-large {
-    @apply text-4xl font-bold tracking-tight leading-tight;
-    /* 40px with 44px line height */
+    @apply text-4xl font-bold tracking-tight;
+    /* 40px with 44px line height (1.1x ratio) */
+    line-height: var(--line-height-heading);
   }
   
   .text-mit-display {
-    @apply text-6xl font-bold tracking-tight leading-tight;
-    /* 56px with 60px line height */
+    @apply text-6xl font-bold tracking-tight;
+    /* 56px with 59px line height (1.05x ratio) */
+    line-height: var(--line-height-display);
   }
   
   .text-mit-display-large {
-    @apply text-7xl font-bold tracking-tight leading-tight;
-    /* 72px with 76px line height */
+    @apply text-7xl font-bold tracking-tight;
+    /* 72px with 76px line height (1.05x ratio) */
+    line-height: var(--line-height-display);
   }
 }
 
@@ -152,9 +170,17 @@
            active:transform active:scale-[0.98] transition-all duration-200;
   }
   
-  /* Card styling with subtle shadow and precise spacing */
+  /* Card styling with subtle shadow, precise spacing and microinteractions */
   .mit-card {
-    @apply bg-white rounded shadow-soft border-0 overflow-hidden transition-shadow duration-200 hover:shadow-card;
+    @apply bg-white rounded shadow-soft border-0 overflow-hidden 
+           transition-all duration-200 hover:shadow-card;
+  }
+  
+  .mit-card-interactive {
+    @apply bg-white rounded shadow-soft border-0 overflow-hidden 
+           transition-all duration-200 hover:shadow-card hover:translate-y-[-2px]
+           focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+           active:translate-y-0 active:shadow-soft;
   }
   
   .mit-card-header {
@@ -167,6 +193,23 @@
   
   .mit-card-footer {
     @apply px-6 py-4 border-t border-muted;
+  }
+  
+  /* Animated element wrappers */
+  .animate-on-appear {
+    @apply animate-fade-in motion-reduce:animate-none;
+  }
+  
+  .slide-in-bottom {
+    @apply animate-slide-up motion-reduce:animate-none;
+  }
+  
+  .zoom-in {
+    @apply animate-scale-in motion-reduce:animate-none;
+  }
+  
+  .zoom-out {
+    @apply animate-scale-out motion-reduce:animate-none;
   }
   
   /* Layout spacing system based on 8px grid */
@@ -220,5 +263,38 @@
   
   .mit-tag {
     @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-accent text-accent-foreground;
+  }
+  
+  /* Enhanced state feedback (loading, empty, success) */
+  .mit-loading-container {
+    @apply flex flex-col items-center justify-center py-8 px-4 text-center space-y-4;
+  }
+  
+  .mit-loading-indicator {
+    @apply animate-spin text-primary h-8 w-8;
+  }
+  
+  .mit-skeleton {
+    @apply bg-muted animate-pulse rounded;
+  }
+  
+  .mit-empty-state {
+    @apply flex flex-col items-center justify-center py-12 px-4 text-center space-y-4;
+  }
+  
+  .mit-empty-icon {
+    @apply text-muted-foreground h-12 w-12 mb-2;
+  }
+  
+  .mit-empty-text {
+    @apply text-muted-foreground;
+  }
+  
+  .mit-success-indicator {
+    @apply text-green-600 animate-scale-in h-16 w-16 mb-4;
+  }
+  
+  .mit-error-indicator {
+    @apply text-destructive animate-scale-in h-16 w-16 mb-4;
   }
 }
