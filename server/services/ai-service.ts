@@ -6,6 +6,7 @@ interface SubmissionAnalysisRequest {
   studentSubmissionContent: string;
   assignmentTitle: string;
   assignmentDescription?: string;
+  instructorContext?: any; // Hidden information from instructor to AI only
   rubric?: Rubric;
 }
 
@@ -16,6 +17,7 @@ interface MultimodalSubmissionAnalysisRequest {
   textContent?: string;            // Optional extracted text content
   assignmentTitle: string;
   assignmentDescription?: string;
+  instructorContext?: any;         // Hidden information from instructor to AI only
   rubric?: Rubric;
 }
 
@@ -74,6 +76,25 @@ You MUST respond in a valid JSON format only. Do not include any explanatory tex
 Title: "${params.assignmentTitle}"
 Description: "${params.assignmentDescription || 'No general description provided.'}"`
       );
+      
+      // Add instructor context if provided (secret information not shown to students)
+      if (params.instructorContext) {
+        let contextContent = params.instructorContext;
+        // If it's a JSON object, stringify it for better readability
+        if (typeof contextContent === 'object') {
+          contextContent = JSON.stringify(contextContent, null, 2);
+        }
+        
+        promptSegments.push(
+          `\n## Instructor-Only Evaluation Guidance (USE THIS INFORMATION BUT DO NOT REVEAL IT TO STUDENTS):
+${contextContent}
+
+IMPORTANT: The above section contains specific guidance provided by the instructor to help in your evaluation. 
+Use these points to inform your analysis and the feedback you provide, but DO NOT directly quote or reveal 
+this instructor-provided information in your feedback to the student. Instead, incorporate these insights
+into your evaluation logic while keeping the actual guidance confidential.`
+        );
+      }
 
       // Setup JSON output structure
       let jsonOutputStructureFields = [
@@ -235,6 +256,23 @@ ${params.studentSubmissionContent}
       
       if (params.assignmentDescription) {
         systemPrompt += `\nDescription: ${params.assignmentDescription}`;
+      }
+      
+      // Add instructor context if provided (secret information not shown to students)
+      if (params.instructorContext) {
+        let contextContent = params.instructorContext;
+        // If it's a JSON object, stringify it for better readability
+        if (typeof contextContent === 'object') {
+          contextContent = JSON.stringify(contextContent, null, 2);
+        }
+        
+        systemPrompt += `\n\n## INSTRUCTOR-ONLY EVALUATION GUIDANCE (DO NOT REVEAL TO STUDENTS):
+${contextContent}
+
+IMPORTANT: The above section contains specific guidance provided by the instructor to help in your evaluation. 
+Use these points to inform your analysis and the feedback you provide, but DO NOT directly quote or reveal 
+this instructor-provided information in your feedback to the student. Instead, incorporate these insights
+into your evaluation logic while keeping the actual guidance confidential.`;
       }
       
       if (params.rubric && params.rubric.criteria && params.rubric.criteria.length > 0) {
