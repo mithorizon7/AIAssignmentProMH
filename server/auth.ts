@@ -183,13 +183,14 @@ export function configureAuth(app: any) {
       return next();
     }
     
-    // Skip CSRF check for these specific endpoints (login, register, logout, Auth0 callback)
+    // Skip CSRF check for these specific endpoints (login, register, logout, Auth0 callback, MIT Horizon callback)
     const skipCsrfForRoutes = [
       '/api/auth/login', 
       '/api/auth/register', 
       '/api/auth/logout', 
       '/api/csrf-token',
-      '/api/auth-sso/callback' // Skip for Auth0 callback
+      '/api/auth-sso/callback', // Skip for Auth0 callback
+      '/api/auth/horizon/callback' // Skip for MIT Horizon OIDC callback
     ];
     if (skipCsrfForRoutes.includes(req.path)) {
       return next();
