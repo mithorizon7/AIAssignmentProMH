@@ -25,6 +25,7 @@ import { RubricBuilder } from "@/components/instructor/rubric-builder";
 import { RubricTester } from "@/components/instructor/rubric-tester";
 import { ShareableLink } from "@/components/instructor/shareable-link";
 import { TooltipInfo } from "@/components/ui/tooltip-info";
+import { RichTextEditor } from "@/components/rich-text-editor";
 
 // Create a schema for assignment creation
 const assignmentSchema = z.object({
@@ -256,10 +257,11 @@ export default function CreateAssignment() {
                           } />
                         </div>
                         <FormControl>
-                          <Textarea 
+                          <RichTextEditor
+                            value={field.value}
+                            onChange={field.onChange}
                             placeholder="Enter detailed assignment instructions"
                             className="min-h-32"
-                            {...field} 
                           />
                         </FormControl>
                         <FormDescription>

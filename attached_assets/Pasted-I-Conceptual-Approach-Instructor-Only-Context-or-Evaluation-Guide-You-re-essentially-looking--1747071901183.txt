@@ -1,0 +1,55 @@
+I. Conceptual Approach: "Instructor-Only Context" or "Evaluation Guide"
+
+You're essentially looking to add a new type of input for the AI that's distinct from the student-visible description and rubric. Let's call this instructorContext or evaluationGuide.
+
+II. Implementation Steps and Guidance for AI Coder:
+
+Database Schema Modification (shared/schema.ts):
+
+You'll need a new field in the assignments table to store this instructor-only information.
+Instruction: "In shared/schema.ts, add a new field to the assignments table, for example, instructorContext: json('instructor_context') or evaluationGuide: json('evaluation_guide'). This field will store instructor-provided information (like correct answers, specific examples of A+ work, common pitfalls not for student view, or key things the AI should look for) that is only passed to the AI and not displayed to students with the assignment details."
+Make this field nullable, as not all assignments might require it.
+Update Assignment Creation/Editing (Frontend & Backend):
+
+Frontend (Client):
+The instructor's assignment creation/editing form (likely in client/src/components/instructor/ or client/src/pages/instructor/) needs a new input area (e.g., a rich text editor or a series of structured fields) for this instructorContext.
+This UI should clearly label that this information is "For AI Evaluation Only - Not Shown to Students."
+Instruction: "Update the client-side assignment creation/editing form used by instructors. Add a new section/field (e.g., 'AI Evaluation Guidance' or 'Instructor-Only Notes for AI'). Make it clear in the UI that content entered here will not be visible to students when they view the assignment, but will be used to guide the AI's feedback generation. This field should accept rich text or structured input."
+Backend (server/routes.ts):
+The POST /api/assignments endpoint (and any PUT endpoint for updating assignments) needs to accept this new field in the request body.
+The Zod validation schema (assignmentSchema) for creating/updating assignments must be updated to include this new optional field.
+This data should then be saved to the new database column.
+Instruction: "Modify the POST /api/assignments and any assignment update endpoints in server/routes.ts. Update the Zod assignmentSchema to include the new optional instructorContext (or evaluationGuide) field. Ensure this data is saved to the corresponding new column in the assignments table."
+Modify AI Service Prompt Construction (server/services/ai-service.ts):
+
+This is the core of the change. The AIService.analyzeSubmission method needs to fetch this new instructorContext for the given assignment and incorporate it into the prompt sent to the AI.
+It should be clearly demarcated in the prompt so the AI understands its purpose.
+Instruction: "In server/services/ai-service.ts, within the analyzeSubmission method (or wherever the AI prompt is constructed):
+When fetching the assignment details, ensure you also retrieve the new instructorContext (or evaluationGuide) field from the database.
+If instructorContext is present and not empty, add a new, clearly labeled section to the promptSegments that includes this information. For example:
+TypeScript
+if (params.assignment.instructorContext) { // Assuming instructorContext is part of params.assignment
+  let contextContent = params.assignment.instructorContext;
+  // If it's a JSON object, you might want to stringify it or format it nicely
+  if (typeof contextContent === 'object') {
+    contextContent = JSON.stringify(contextContent, null, 2); // Or a more readable format
+  }
+  promptSegments.push(
+    `\n## Instructor-Only Evaluation Guidance (Use this to inform your feedback but do not directly quote or reveal this section to the student):
+    ${contextContent}`
+  );
+}
+Place this new section strategically in the prompt, likely after the assignment details and rubric (if any) but before the student's submission content. This allows the AI to understand the public task first, then the private guidance, before seeing the student's work.
+Crucially, add a directive in the prompt instructing the AI to use this information for its evaluation logic but NOT to reveal or directly quote from this instructorContext section in the feedback it generates for the student. Example: 'The following section contains specific guidance for you, the AI Teaching Assistant, to help in your evaluation. Use these points to inform your analysis and the feedback you provide on strengths, improvements, and criteria scores. However, do NOT directly quote from this section or explicitly state that you are using instructor-only notes in your feedback to the student. The feedback to the student should appear as your own expert analysis guided by the public assignment description and rubric.'"
+Ensure Student Views Do NOT Expose This Data:
+
+When the client fetches assignment details for a student view (e.g., GET /api/assignments/:id), the API response should not include the instructorContext field.
+Instruction: "Review the API endpoints that serve assignment data to students (e.g., GET /api/assignments, GET /api/assignments/:id, GET /api/assignments/code/:code). Ensure that the instructorContext (or evaluationGuide) field is explicitly excluded from the data sent to student clients. The Assignment type in client/src/lib/types.ts should also not include this field, or if it's part of a shared type from shared/schema.ts (like Assignment from Drizzle), ensure it's omitted or marked as optional and never populated for student-facing API responses."
+Consider Data Format for instructorContext:
+
+Storing it as json in the database is flexible. It could be:
+Simple Markdown text.
+A structured JSON object (e.g., { "key_concepts_to_check": ["...", "..."], "common_errors_to_watch_for": ["...", "..."], "example_good_answer_snippet": "..." }).
+If it's structured JSON, the instructor UI for inputting this would ideally be more than a simple textarea (perhaps dynamic key-value fields, or specific sections for "model answer," "key points," etc.).
+How it's formatted in the AI prompt (JSON.stringify or just as text) will depend on what you expect the AI to do with it. For general guidance, well-formatted text/Markdown is usually fine.
+Instruction: "For now, assume the instructorContext will be a text/Markdown field that instructors can fill. If we later decide on a more structured JSON format for this field, the instructor UI and the prompt injection logic in AIService will need further refinement."
