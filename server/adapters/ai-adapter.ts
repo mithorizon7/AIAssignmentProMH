@@ -5,6 +5,7 @@ export interface MultimodalPromptPart {
   type: 'text' | 'image' | 'audio' | 'video' | 'document';
   content: string | Buffer;
   mimeType?: string;
+  textContent?: string; // Optional extracted text content from non-text files
 }
 
 export interface AIAdapter {
