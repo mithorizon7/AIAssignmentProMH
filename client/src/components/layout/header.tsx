@@ -28,11 +28,11 @@ export function Header() {
       </div>
       
       <div className="flex items-center space-x-4">
-        <button className="p-2 rounded-full hover:bg-neutral-100">
+        <button className="p-2 rounded-full hover:bg-neutral-100" aria-label="Notifications">
           <span className="material-icons">notifications</span>
         </button>
-        <button className="p-2 rounded-full hover:bg-neutral-100">
-          <span className="material-icons">help_outline</span>
+        <button className="p-2 rounded-full hover:bg-neutral-100" aria-label="Help">
+          <span className="material-icons">help</span>
         </button>
         <div className="md:hidden flex items-center">
           <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center">
