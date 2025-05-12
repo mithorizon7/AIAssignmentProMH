@@ -32,6 +32,7 @@ const assignmentSchema = z.object({
   description: z.string().min(10, { message: "Description must be at least 10 characters" }),
   courseId: z.string({ required_error: "Please select a course" }).transform(val => parseInt(val)),
   dueDate: z.date({ required_error: "Please select a due date" }),
+  instructorContext: z.string().optional(),
 });
 
 type AssignmentFormValues = z.infer<typeof assignmentSchema>;
@@ -51,6 +52,7 @@ export default function CreateAssignment() {
       title: "",
       description: "",
       dueDate: new Date(new Date().setDate(new Date().getDate() + 14)), // Default to 2 weeks from now
+      instructorContext: "",
     },
   });
   
@@ -68,6 +70,8 @@ export default function CreateAssignment() {
       const payload = {
         ...values,
         dueDate: values.dueDate.toISOString(),
+        // Only include instructorContext if it's not empty
+        instructorContext: values.instructorContext?.trim() ? values.instructorContext : undefined,
         rubric: rubric.criteria.length > 0 ? {
           criteria: rubric.criteria,
           totalPoints: rubric.criteria.reduce((sum, c) => sum + c.maxScore * c.weight, 0),
@@ -149,6 +153,13 @@ export default function CreateAssignment() {
                     <p className="text-sm capitalize">{createdAssignment.status}</p>
                   </div>
                 </div>
+                
+                {createdAssignment.instructorContext && (
+                  <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                    <h3 className="font-medium text-amber-800">Instructor-Only Context (Hidden from Students)</h3>
+                    <p className="text-sm text-amber-700 whitespace-pre-wrap">{createdAssignment.instructorContext}</p>
+                  </div>
+                )}
                 
                 <Separator />
                 
@@ -253,6 +264,43 @@ export default function CreateAssignment() {
                         </FormControl>
                         <FormDescription>
                           Provide detailed instructions, requirements, and expectations
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="instructorContext"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center space-x-2">
+                          <FormLabel>Instructor-Only Context (Hidden from Students)</FormLabel>
+                          <TooltipInfo content={
+                            <>
+                              <p className="font-medium">How this is used:</p>
+                              <p>This information is only provided to the AI for evaluation and is <strong>never shown to students</strong>. It helps the AI provide more accurate feedback by giving it private context that instructors want to keep hidden.</p>
+                              <p className="mt-1 font-medium">Tips:</p>
+                              <ul className="list-disc pl-4 space-y-1">
+                                <li>Include correct solutions, implementation approaches, or specific criteria</li>
+                                <li>Mention common pitfalls or mistakes students might make</li>
+                                <li>Provide examples of excellent, average, and poor implementations</li>
+                                <li>Include special considerations the AI should account for when providing feedback</li>
+                                <li>The AI will use this guidance but will not reveal it directly to students</li>
+                              </ul>
+                            </>
+                          } />
+                        </div>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Enter private guidance for the AI (not visible to students)"
+                            className="min-h-32 bg-amber-50 border-amber-200"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          This information is used to guide AI feedback but is never revealed to students
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
