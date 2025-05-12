@@ -1,4 +1,3 @@
-/* Optimized font loading - only required weights */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Serif:opsz,wght@8..144,400;8..144,500;8..144,600&display=swap');
 
@@ -47,13 +46,6 @@
   /* Other System Colors */
   --ring: 347 100% 23%;             /* MIT Red */
   --radius: 0.25rem;                /* 4px border radius for buttons per spec */
-  
-  /* Typography Line Heights - MIT Design Brief */
-  --line-height-display: 1.05;      /* For large display text (72px, 56px) */
-  --line-height-heading: 1.1;       /* For headings (48px, 40px, 32px) */
-  --line-height-title: 1.2;         /* For titles (24px, 20px) */
-  --line-height-body: 1.5;          /* For body copy (16px) */
-  --line-height-small: 1.5;         /* For small text (14px, 12px) */
 }
 
 .dark {
@@ -87,290 +79,63 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
   
-  /* MIT Typography System - Based on MIT Design Brief with precise line heights */
-  h1, .h1, .text-mit-h1 {
-    @apply text-5xl font-bold tracking-tight;
-    /* 48px with 53px line height (1.1x ratio from MIT spec) */
-    line-height: var(--line-height-heading);
+  /* Typography scale based on MIT guidelines */
+  h1, .h1 {
+    @apply text-5xl font-bold tracking-tight leading-tight;
+    /* 48px with 44px line height */
   }
   
-  h2, .h2, .text-mit-h2 {
-    @apply text-3xl font-bold tracking-tight;
-    /* 32px with 35px line height (1.1x ratio from MIT spec) */
-    line-height: var(--line-height-heading);
+  h2, .h2 {
+    @apply text-3xl font-bold tracking-tight leading-tight;
+    /* 32px with 30px line height */
   }
   
-  h3, .h3, .text-mit-h3 {
-    @apply text-2xl font-semibold;
-    /* 24px with 29px line height (1.2x ratio) */
-    line-height: var(--line-height-title);
+  h3, .h3 {
+    @apply text-2xl font-semibold leading-normal;
+    /* 24px with 24px line height */
   }
   
-  h4, .h4, .text-mit-h4 {
-    @apply text-xl font-semibold;
-    /* 20px with 24px line height (1.2x ratio) */
-    line-height: var(--line-height-title);
+  p {
+    @apply text-base leading-relaxed;
+    /* 16px with 20px line height */
   }
   
-  p, .text-mit-body {
-    @apply text-base;
-    /* 16px with 24px line height (1.5x ratio) */
-    line-height: var(--line-height-body);
-  }
-  
-  small, .small, .text-mit-small {
-    @apply text-sm;
-    /* 14px with 21px line height (1.5x ratio) */
-    line-height: var(--line-height-small);
-  }
-  
-  .text-mit-tiny {
-    @apply text-xs;
-    /* 12px with 18px line height (1.5x ratio) */
-    line-height: var(--line-height-small);
-  }
-  
-  .text-mit-large {
-    @apply text-4xl font-bold tracking-tight;
-    /* 40px with 44px line height (1.1x ratio) */
-    line-height: var(--line-height-heading);
-  }
-  
-  .text-mit-display {
-    @apply text-6xl font-bold tracking-tight;
-    /* 56px with 59px line height (1.05x ratio) */
-    line-height: var(--line-height-display);
-  }
-  
-  .text-mit-display-large {
-    @apply text-7xl font-bold tracking-tight;
-    /* 72px with 76px line height (1.05x ratio) */
-    line-height: var(--line-height-display);
+  small, .small {
+    @apply text-sm leading-relaxed;
+    /* 14px with 18px line height */
   }
 }
 
-/* MIT-style UI Components */
+/* MIT-style button styling */
 @layer components {
-  /* Button styling precisely following MIT design guidelines */
   .btn-primary {
-    @apply bg-primary text-primary-foreground rounded px-5 py-2.5 font-semibold text-base 
-           hover:bg-[#5A0010] focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:outline-none
-           active:transform active:scale-[0.98] transition-all duration-200;
-    border-radius: var(--radius);
+    @apply bg-primary text-primary-foreground rounded px-5 py-2.5 font-semibold text-base hover:bg-[#5A0010] transition-colors duration-200;
   }
   
   .btn-secondary {
-    @apply bg-transparent border-2 border-primary text-primary rounded px-5 py-2.5 font-semibold text-base 
-           hover:bg-primary hover:text-primary-foreground focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:outline-none
-           active:transform active:scale-[0.98] transition-all duration-200;
-    border-radius: var(--radius);
+    @apply bg-transparent border-2 border-primary text-primary rounded px-5 py-2.5 font-semibold text-base hover:bg-primary hover:text-primary-foreground transition-colors duration-200;
   }
   
-  .btn-tertiary {
-    @apply bg-transparent text-primary rounded px-5 py-2.5 font-semibold text-base 
-           hover:bg-accent focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:outline-none
-           active:transform active:scale-[0.98] transition-all duration-200;
-    border-radius: var(--radius);
-  }
-  
-  /* Standard button sizes following 8pt grid */
-  .btn-sm {
-    @apply px-3 py-1.5 text-sm;
-  }
-  
-  .btn-lg {
-    @apply px-6 py-3 text-lg;
-  }
-  
-  /* Card styling with subtle shadow, precise spacing and microinteractions */
+  /* MIT-style card styling */
   .mit-card {
-    @apply bg-white shadow-soft border-0 overflow-hidden 
-           transition-all duration-200 hover:shadow-card;
-    border-radius: var(--radius);
-  }
-  
-  .mit-card-interactive {
-    @apply bg-white shadow-soft border-0 overflow-hidden 
-           transition-all duration-200 hover:shadow-card hover:translate-y-[-2px]
-           focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
-           active:translate-y-0 active:shadow-soft cursor-pointer;
-    border-radius: var(--radius);
+    @apply bg-white rounded shadow-sm border-0 overflow-hidden;
   }
   
   .mit-card-header {
-    @apply p-6;
+    @apply p-4;
   }
   
   .mit-card-body {
-    @apply px-6 py-4;
+    @apply p-4;
   }
   
-  .mit-card-footer {
-    @apply px-6 py-4 border-t border-muted;
-  }
-  
-  /* Animated element wrappers */
-  .animate-on-appear {
-    @apply animate-fade-in motion-reduce:animate-none;
-  }
-  
-  .slide-in-bottom {
-    @apply animate-slide-up motion-reduce:animate-none;
-  }
-  
-  .zoom-in {
-    @apply animate-scale-in motion-reduce:animate-none;
-  }
-  
-  .zoom-out {
-    @apply animate-scale-out motion-reduce:animate-none;
-  }
-  
-  /* Layout spacing system based on 8px grid */
+  /* Layout spacing based on 8px grid */
   .mit-section {
-    @apply py-16 px-4 md:px-8 lg:px-12;
+    @apply py-16 px-4 md:px-6 lg:px-8;
   }
   
-  .mit-section-sm {
-    @apply py-8 px-4 md:px-6 lg:px-8;
-  }
-  
-  .mit-container {
-    @apply max-w-7xl mx-auto px-4 md:px-8;
-  }
-  
-  /* Component spacing for consistent 8pt grid */
-  .space-stack-xs {
-    @apply mb-2; /* 8px */
-  }
-  
-  .space-stack-sm {
-    @apply mb-4; /* 16px */
-  }
-  
-  .space-stack-md {
-    @apply mb-8; /* 32px */
-  }
-  
-  .space-stack-lg {
-    @apply mb-12; /* 48px */
-  }
-  
-  .space-stack-xl {
-    @apply mb-16; /* 64px */
-  }
-  
-  /* Input styling with consistent border and hover states */
-  .mit-input {
-    @apply px-4 py-2 border border-muted-foreground focus:ring-2 
-           focus:ring-primary focus:border-transparent focus:outline-none
-           transition-colors duration-200;
-    border-radius: var(--radius);
-  }
-  
-  .mit-input:hover:not(:focus):not(:disabled) {
-    @apply border-primary;
-  }
-  
-  .mit-input:disabled {
-    @apply bg-muted cursor-not-allowed opacity-70;
-  }
-  
-  /* Label styling */
-  .mit-label {
-    @apply text-sm font-medium text-foreground mb-2 block;
-  }
-  
-  /* Form group spacing */
-  .mit-form-group {
-    @apply mb-6;
-  }
-  
-  /* Category and tag styling - Enhanced for clarity and visual appeal */
+  /* Category label styling */
   .category-label {
-    @apply text-primary text-sm font-semibold tracking-wide uppercase;
-  }
-  
-  .mit-tag {
-    @apply inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-accent text-accent-foreground;
-    border-radius: 9999px; /* Ensuring perfect pill shape */
-    transition: all 0.2s ease;
-  }
-  
-  .mit-tag:hover {
-    @apply bg-primary text-primary-foreground;
-    transform: translateY(-1px);
-  }
-  
-  .mit-tag-primary {
-    @apply bg-primary text-primary-foreground;
-  }
-  
-  .mit-tag-secondary {
-    @apply bg-secondary text-secondary-foreground;
-  }
-  
-  .mit-tag-outline {
-    @apply bg-transparent border border-accent-foreground text-foreground;
-  }
-  
-  /* Enhanced state feedback (loading, empty, success) - MIT Design Brief aligned */
-  .mit-loading-container {
-    @apply flex flex-col items-center justify-center py-12 px-6 text-center space-y-6;
-  }
-  
-  .mit-loading-indicator {
-    @apply animate-spin text-primary h-10 w-10;
-    animation-duration: 1.2s;
-  }
-  
-  .mit-loading-text {
-    @apply text-base text-muted-foreground font-medium;
-  }
-  
-  .mit-skeleton {
-    @apply bg-muted animate-pulse;
-    border-radius: var(--radius);
-    animation-duration: 1.5s;
-  }
-  
-  .mit-skeleton-text {
-    @apply h-4 w-full mb-2;
-  }
-  
-  .mit-skeleton-text-sm {
-    @apply h-3 w-4/5 mb-2;
-  }
-  
-  .mit-skeleton-circle {
-    @apply h-10 w-10 rounded-full;
-  }
-  
-  .mit-empty-state {
-    @apply flex flex-col items-center justify-center py-16 px-6 text-center space-y-6;
-  }
-  
-  .mit-empty-icon {
-    @apply text-muted-foreground h-16 w-16 mb-4 opacity-60;
-  }
-  
-  .mit-empty-title {
-    @apply text-xl font-semibold;
-  }
-  
-  .mit-empty-description {
-    @apply text-muted-foreground max-w-md mx-auto;
-  }
-  
-  .mit-empty-text {
-    @apply text-muted-foreground;
-  }
-  
-  .mit-success-indicator {
-    @apply text-green-600 animate-scale-in h-16 w-16 mb-4;
-  }
-  
-  .mit-error-indicator {
-    @apply text-destructive animate-scale-in h-16 w-16 mb-4;
+    @apply text-primary text-sm font-semibold;
   }
 }
