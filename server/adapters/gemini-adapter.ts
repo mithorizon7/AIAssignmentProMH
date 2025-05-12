@@ -273,7 +273,7 @@ export class GeminiAdapter implements AIAdapter {
                   // The FileData object might have different properties depending on API version
                   contentParts.push({
                     fileData: {
-                      fileUri: (fileData as any).uri || (fileData as any).fileUri || (fileData as any).url,
+                      fileUri: this.getFileUri(fileData),
                       mimeType: mimeType
                     }
                   });
@@ -317,7 +317,7 @@ export class GeminiAdapter implements AIAdapter {
                 // Add the file part with fileData 
                 contentParts.push({
                   fileData: {
-                    fileUri: fileData.uri,
+                    fileUri: this.getFileUri(fileData),
                     mimeType: mimeType
                   }
                 });
@@ -365,7 +365,7 @@ export class GeminiAdapter implements AIAdapter {
                 // Add the file part with fileData
                 contentParts.push({
                   fileData: {
-                    fileUri: fileData.uri,
+                    fileUri: this.getFileUri(fileData),
                     mimeType: mimeType
                   }
                 });
@@ -413,7 +413,7 @@ export class GeminiAdapter implements AIAdapter {
                 // Add the file part with fileData
                 contentParts.push({
                   fileData: {
-                    fileUri: fileData.uri,
+                    fileUri: this.getFileUri(fileData),
                     mimeType: mimeType
                   }
                 });
