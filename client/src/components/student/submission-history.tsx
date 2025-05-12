@@ -46,7 +46,7 @@ export function SubmissionHistory({ submissions, loading = false }: SubmissionHi
         <CardContent className="p-10 text-center">
           <span className="material-icons text-4xl text-neutral-400 mb-2">history</span>
           <h3 className="text-lg font-medium text-neutral-700 mb-1">No submissions yet</h3>
-          <p className="text-neutral-600">Submit your assignment to receive AI feedback</p>
+          <p className="text-neutral-600">Select an active assignment from above to submit your work and receive AI feedback</p>
         </CardContent>
       </Card>
     );

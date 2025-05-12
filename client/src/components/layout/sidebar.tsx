@@ -21,7 +21,7 @@ const SidebarLink = ({ href, icon, label, active }: SidebarLinkProps) => (
             : "text-neutral-700 hover:bg-neutral-100"
         }`}
       >
-        <span className="material-icons mr-3">{icon}</span>
+        <span className="material-icons mr-3" aria-hidden="true">{icon}</span>
         <span>{label}</span>
       </a>
     </Link>

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { API_ROUTES, USER_ROLES } from "@/lib/constants";
-import { AssignmentWithSubmissions } from "@/lib/types";
+import { AssignmentWithSubmissions, SubmissionWithFeedback } from "@/lib/types";
 import { AppShell } from "@/components/layout/app-shell";
 import { AssignmentCard } from "@/components/student/assignment-card";
 import { SubmissionHistory } from "@/components/student/submission-history";
@@ -24,7 +24,7 @@ export default function Dashboard() {
     queryKey: [API_ROUTES.ASSIGNMENTS],
   });
   
-  const { data: recentSubmissions, isLoading: submissionsLoading } = useQuery({
+  const { data: recentSubmissions = [], isLoading: submissionsLoading } = useQuery<SubmissionWithFeedback[]>({
     queryKey: [API_ROUTES.SUBMISSIONS, 'recent'],
   });
   
@@ -51,7 +51,7 @@ export default function Dashboard() {
             <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-8 text-center">
               <span className="material-icons text-4xl text-neutral-400 mb-2">assignment</span>
               <h3 className="text-lg font-medium text-neutral-700 mb-1">No active assignments</h3>
-              <p className="text-neutral-600">There are no assignments currently available for you</p>
+              <p className="text-neutral-600">No assignments are currently active. Check the 'My Assignments' page for all your assignments or contact your instructor.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -68,7 +68,7 @@ export default function Dashboard() {
         
         <div className="mb-8">
           <SubmissionHistory 
-            submissions={recentSubmissions || []} 
+            submissions={recentSubmissions} 
             loading={submissionsLoading} 
           />
         </div>
