@@ -420,6 +420,150 @@ export function configureAuth(app: any) {
   } else {
     console.log('[INFO] Auth0 SSO not configured, skipping Auth0 strategy setup');
   }
+  
+  // Configure MIT Horizon OIDC strategy if environment variables are set
+  const mitHorizonEnabled = process.env.MIT_HORIZON_OIDC_ISSUER_URL && 
+                          process.env.MIT_HORIZON_OIDC_CLIENT_ID && 
+                          process.env.MIT_HORIZON_OIDC_CLIENT_SECRET &&
+                          process.env.MIT_HORIZON_OIDC_CALLBACK_URL;
+  
+  if (mitHorizonEnabled) {
+    console.log('[INFO] Configuring MIT Horizon OIDC strategy');
+    
+    passport.use('horizon-oidc', new OIDCStrategy({
+      issuer: process.env.MIT_HORIZON_OIDC_ISSUER_URL!,
+      authorizationURL: `${process.env.MIT_HORIZON_OIDC_ISSUER_URL}authorize`,
+      tokenURL: `${process.env.MIT_HORIZON_OIDC_ISSUER_URL}oauth/token`,
+      userInfoURL: `${process.env.MIT_HORIZON_OIDC_ISSUER_URL}userinfo`,
+      clientID: process.env.MIT_HORIZON_OIDC_CLIENT_ID!,
+      clientSecret: process.env.MIT_HORIZON_OIDC_CLIENT_SECRET!,
+      callbackURL: process.env.MIT_HORIZON_OIDC_CALLBACK_URL!,
+      scope: 'openid email profile',
+      passReqToCallback: false,
+      skipUserProfile: false
+    },
+    async (issuer, profile, idProfile, context, idToken, accessToken, refreshToken, params, done) => {
+      try {
+        // Log profile information during development to help with integration
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[DEBUG] MIT Horizon OIDC profile:', JSON.stringify(profile, null, 2));
+          console.log('[DEBUG] MIT Horizon OIDC idProfile:', JSON.stringify(idProfile, null, 2));
+        }
+        
+        // Extract user information from MIT Horizon profile
+        const mitHorizonUserId = idProfile.sub;
+        const email = profile.emails?.[0]?.value;
+        const name = profile.displayName || (profile.name ? `${profile.name.givenName} ${profile.name.familyName}` : 'Unknown');
+        const emailVerified = profile._json?.email_verified || false;
+        
+        if (!email) {
+          return done(new Error('Email is required from MIT Horizon OIDC profile'));
+        }
+        
+        // Try to find user by MIT Horizon ID first
+        let user = await storage.getUserByMitHorizonSub(mitHorizonUserId);
+        
+        // If not found, try to find by email for existing users
+        if (!user) {
+          const existingUser = await storage.getUserByEmail(email);
+          
+          if (existingUser) {
+            // Update existing user with MIT Horizon ID
+            user = await storage.updateUserMitHorizonSub(existingUser.id, mitHorizonUserId);
+            console.log(`[INFO] Linked MIT Horizon ID to existing user: ${existingUser.username}`);
+            
+            // Update email verification status
+            if (user) {
+              await storage.updateUserEmailVerifiedStatus(user.id, emailVerified);
+            }
+          } else {
+            // Create new user with MIT Horizon information
+            // Generate username from email
+            const username = email.split('@')[0] + '_' + Math.floor(Math.random() * 10000);
+            
+            // Create new user with default role of student and null password (MIT Horizon-only user)
+            user = await storage.createUser({
+              username,
+              email,
+              name,
+              password: null, // No password for SSO users
+              role: 'student',
+              mitHorizonSub: mitHorizonUserId,
+              emailVerified
+            });
+            
+            console.log(`[INFO] Created new user from MIT Horizon login: ${username}`);
+            
+            // Log the user creation event for audit purposes
+            if (user) {
+              logUserCreation(
+                user.id,
+                user.username,
+                undefined, // No creator user ID for SSO registration
+                undefined, // No creator username for SSO registration
+                'MIT Horizon SSO' // Use a descriptive string instead of IP
+              );
+            }
+          }
+        } else {
+          // We found the user by MIT Horizon ID, update email verification status
+          await storage.updateUserEmailVerifiedStatus(user.id, emailVerified);
+        }
+        
+        if (!user) {
+          return done(new Error('Failed to retrieve or create user account'));
+        }
+        
+        // Log successful authentication
+        logSuccessfulAuth(
+          user.id,
+          user.username,
+          'MIT Horizon SSO', // Indicate SSO authentication method
+          'MIT Horizon' // Provider information
+        );
+        
+        // Create a new object without the password property
+        const { password, ...userWithoutPassword } = user;
+        
+        return done(null, userWithoutPassword as User);
+      } catch (error) {
+        console.error('[ERROR] MIT Horizon OIDC authentication error:', error);
+        return done(error);
+      }
+    }));
+    
+    // MIT Horizon login route
+    app.get('/api/auth/horizon/login', passport.authenticate('horizon-oidc', { 
+      scope: 'openid email profile' 
+    }));
+    
+    // MIT Horizon callback route
+    app.get('/api/auth/horizon/callback', (req: Request, res: Response, next: NextFunction) => {
+      passport.authenticate('horizon-oidc', (err: Error | null, user: User | undefined, info: any) => {
+        if (err) {
+          console.error('[ERROR] MIT Horizon OIDC callback error:', err);
+          return res.redirect('/login?error=horizon_failed&reason=' + encodeURIComponent(err.message));
+        }
+        
+        if (!user) {
+          console.error('[ERROR] MIT Horizon OIDC callback did not return a user');
+          return res.redirect('/login?error=horizon_failed&reason=no_user_returned');
+        }
+        
+        req.login(user, (err) => {
+          if (err) {
+            console.error('[ERROR] Session login error:', err);
+            return res.redirect('/login?error=horizon_failed&reason=session_error');
+          }
+          
+          // Successful login
+          return res.redirect('/');
+        });
+      })(req, res, next);
+    });
+  } else {
+    console.log('[INFO] MIT Horizon OIDC not configured, skipping MIT Horizon OIDC strategy setup');
+  }
 
   // Configure passport serialization
   passport.serializeUser((user: any, done) => {
@@ -559,8 +703,9 @@ export function configureAuth(app: any) {
     const username = user?.username;
     const ipAddress = req.ip || 'unknown';
     
-    // Determine if this user authenticated via Auth0 SSO
+    // Determine if this user authenticated via Auth0 or MIT Horizon
     const isAuth0User = user?.auth0Sub || false;
+    const isMitHorizonUser = user?.mitHorizonSub || false;
 
     req.logout(() => {
       // Log the logout event if the user was authenticated
@@ -585,7 +730,24 @@ export function configureAuth(app: any) {
         });
       }
       
-      // Standard logout for non-Auth0 users
+      // If user was authenticated via MIT Horizon and MIT Horizon is configured,
+      // redirect to MIT Horizon logout URL to complete SSO logout
+      if (isMitHorizonUser && process.env.MIT_HORIZON_OIDC_ISSUER_URL && process.env.MIT_HORIZON_OIDC_CLIENT_ID) {
+        const loginPageUrl = getLoginPageUrl();
+        console.log(`[INFO] Redirecting to MIT Horizon logout URL with returnTo: ${loginPageUrl}`);
+        
+        const mitHorizonLogoutUrl = `${process.env.MIT_HORIZON_OIDC_ISSUER_URL}v2/logout?client_id=${
+          process.env.MIT_HORIZON_OIDC_CLIENT_ID
+        }&returnTo=${encodeURIComponent(loginPageUrl)}`;
+        
+        return res.status(200).json({ 
+          message: 'Logged out successfully',
+          redirect: true,
+          redirectUrl: mitHorizonLogoutUrl
+        });
+      }
+      
+      // Standard logout for non-SSO users
       res.status(200).json({ 
         message: 'Logged out successfully',
         redirect: false
