@@ -79,63 +79,146 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
   
-  /* Typography scale based on MIT guidelines */
-  h1, .h1 {
+  /* MIT Typography System - 8pt Grid */
+  h1, .h1, .text-mit-h1 {
     @apply text-5xl font-bold tracking-tight leading-tight;
-    /* 48px with 44px line height */
+    /* 48px with 44px line height (0.92x ratio) */
   }
   
-  h2, .h2 {
+  h2, .h2, .text-mit-h2 {
     @apply text-3xl font-bold tracking-tight leading-tight;
-    /* 32px with 30px line height */
+    /* 32px with 30px line height (0.94x ratio) */
   }
   
-  h3, .h3 {
+  h3, .h3, .text-mit-h3 {
     @apply text-2xl font-semibold leading-normal;
-    /* 24px with 24px line height */
+    /* 24px with 24px line height (1x ratio) */
   }
   
-  p {
-    @apply text-base leading-relaxed;
-    /* 16px with 20px line height */
+  h4, .h4, .text-mit-h4 {
+    @apply text-xl font-semibold leading-normal;
+    /* 20px with 24px line height (1.2x ratio) */
   }
   
-  small, .small {
+  p, .text-mit-body {
+    @apply text-base leading-normal;
+    /* 16px with 24px line height (1.5x ratio) */
+  }
+  
+  small, .small, .text-mit-small {
     @apply text-sm leading-relaxed;
-    /* 14px with 18px line height */
+    /* 14px with 21px line height (1.5x ratio) */
+  }
+  
+  .text-mit-tiny {
+    @apply text-xs leading-relaxed;
+    /* 12px with 18px line height (1.5x ratio) */
+  }
+  
+  .text-mit-large {
+    @apply text-4xl font-bold tracking-tight leading-tight;
+    /* 40px with 44px line height */
+  }
+  
+  .text-mit-display {
+    @apply text-6xl font-bold tracking-tight leading-tight;
+    /* 56px with 60px line height */
+  }
+  
+  .text-mit-display-large {
+    @apply text-7xl font-bold tracking-tight leading-tight;
+    /* 72px with 76px line height */
   }
 }
 
-/* MIT-style button styling */
+/* MIT-style UI Components */
 @layer components {
+  /* Button styling consistent with MIT design guidelines */
   .btn-primary {
-    @apply bg-primary text-primary-foreground rounded px-5 py-2.5 font-semibold text-base hover:bg-[#5A0010] transition-colors duration-200;
+    @apply bg-primary text-primary-foreground rounded px-5 py-2.5 font-semibold text-base 
+           hover:bg-[#5A0010] focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:outline-none
+           active:transform active:scale-[0.98] transition-all duration-200;
   }
   
   .btn-secondary {
-    @apply bg-transparent border-2 border-primary text-primary rounded px-5 py-2.5 font-semibold text-base hover:bg-primary hover:text-primary-foreground transition-colors duration-200;
+    @apply bg-transparent border-2 border-primary text-primary rounded px-5 py-2.5 font-semibold text-base 
+           hover:bg-primary hover:text-primary-foreground focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:outline-none
+           active:transform active:scale-[0.98] transition-all duration-200;
   }
   
-  /* MIT-style card styling */
+  .btn-tertiary {
+    @apply bg-transparent text-primary rounded px-5 py-2.5 font-semibold text-base 
+           hover:bg-accent focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:outline-none
+           active:transform active:scale-[0.98] transition-all duration-200;
+  }
+  
+  /* Card styling with subtle shadow and precise spacing */
   .mit-card {
-    @apply bg-white rounded shadow-sm border-0 overflow-hidden;
+    @apply bg-white rounded shadow-soft border-0 overflow-hidden transition-shadow duration-200 hover:shadow-card;
   }
   
   .mit-card-header {
-    @apply p-4;
+    @apply p-6;
   }
   
   .mit-card-body {
-    @apply p-4;
+    @apply px-6 py-4;
   }
   
-  /* Layout spacing based on 8px grid */
+  .mit-card-footer {
+    @apply px-6 py-4 border-t border-muted;
+  }
+  
+  /* Layout spacing system based on 8px grid */
   .mit-section {
-    @apply py-16 px-4 md:px-6 lg:px-8;
+    @apply py-16 px-4 md:px-8 lg:px-12;
   }
   
-  /* Category label styling */
+  .mit-section-sm {
+    @apply py-8 px-4 md:px-6 lg:px-8;
+  }
+  
+  .mit-container {
+    @apply max-w-7xl mx-auto px-4 md:px-8;
+  }
+  
+  /* Component spacing for consistent 8pt grid */
+  .space-stack-xs {
+    @apply mb-2; /* 8px */
+  }
+  
+  .space-stack-sm {
+    @apply mb-4; /* 16px */
+  }
+  
+  .space-stack-md {
+    @apply mb-8; /* 32px */
+  }
+  
+  .space-stack-lg {
+    @apply mb-12; /* 48px */
+  }
+  
+  .space-stack-xl {
+    @apply mb-16; /* 64px */
+  }
+  
+  /* Input styling with consistent border and hover states */
+  .mit-input {
+    @apply px-4 py-2 border border-muted-foreground rounded focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none;
+  }
+  
+  /* Label styling */
+  .mit-label {
+    @apply text-sm font-medium text-foreground mb-2 block;
+  }
+  
+  /* Category and tag styling */
   .category-label {
     @apply text-primary text-sm font-semibold;
+  }
+  
+  .mit-tag {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-accent text-accent-foreground;
   }
 }

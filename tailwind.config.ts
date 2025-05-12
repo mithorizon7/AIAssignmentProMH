@@ -9,13 +9,40 @@ export default {
       serif: ['Roboto Serif', 'Sabon', 'serif'],
       display: ['Inter', 'Helvetica', 'Arial', 'sans-serif'],
     },
+    fontSize: {
+      'xs': '0.75rem',     // 12px
+      'sm': '0.875rem',    // 14px
+      'base': '1rem',      // 16px
+      'lg': '1.125rem',    // 18px
+      'xl': '1.25rem',     // 20px
+      '2xl': '1.5rem',     // 24px
+      '3xl': '2rem',       // 32px
+      '4xl': '2.5rem',     // 40px
+      '5xl': '3rem',       // 48px
+      '6xl': '3.5rem',     // 56px
+      '7xl': '4.5rem',     // 72px
+    },
+    lineHeight: {
+      'none': '1',
+      'tight': '1.1',      // For display headings (≈1.1×)
+      'snug': '1.25',      // For large headings (≈1.25×)
+      'normal': '1.5',     // For body text (≈1.5×)
+      'relaxed': '1.625',  // For small text (≈1.625×)
+    },
     extend: {
       spacing: {
+        '4': '0.25rem',    // 4px (half unit)
         '8': '0.5rem',     // 8px (base unit)
+        '12': '0.75rem',   // 12px (1.5 units)
         '16': '1rem',      // 16px (2 units)
+        '20': '1.25rem',   // 20px (2.5 units)
         '24': '1.5rem',    // 24px (3 units)
         '32': '2rem',      // 32px (4 units)
+        '40': '2.5rem',    // 40px (5 units)
+        '48': '3rem',      // 48px (6 units)
         '64': '4rem',      // 64px (8 units)
+        '80': '5rem',      // 80px (10 units)
+        '96': '6rem',      // 96px (12 units)
       },
       borderRadius: {
         lg: "var(--radius)",
