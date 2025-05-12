@@ -516,14 +516,16 @@ export function configureAuth(app: any) {
 
   // Helper function to determine login page URL
   const getLoginPageUrl = () => {
-    // Use BASE_URL if available, or construct from app's host
+    // For Auth0 compatibility, only use the base URL without any additional path
+    // and ensure it's whitelisted in Auth0 allowed logout URLs
     if (process.env.BASE_URL) {
-      return `${process.env.BASE_URL.replace(/\/$/, '')}/auth`;
+      return process.env.BASE_URL.replace(/\/$/, '');
     }
     
+    // Fallback for local development
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
     const host = app.get('host') || 'localhost:5000';
-    return `${protocol}://${host}/auth`;
+    return `${protocol}://${host}`;
   };
 
   // Logout endpoint

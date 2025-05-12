@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -154,6 +155,8 @@ function App() {
     // In production, you would send this to an error monitoring service
     console.error('Error caught by error boundary:', error, errorInfo);
   };
+  
+  // Auth0 logout redirect is handled in AuthProvider
   
   return (
     <QueryClientProvider client={queryClient}>

@@ -22,8 +22,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Handle Auth0 logout redirect if returning from Auth0 logout page
+    const handleAuth0LogoutRedirect = () => {
+      try {
+        if (typeof sessionStorage !== 'undefined' && 
+            sessionStorage.getItem('auth0LogoutRedirect') === 'true') {
+          console.log('Detected return from Auth0 logout, redirecting to login page');
+          sessionStorage.removeItem('auth0LogoutRedirect');
+          navigate(APP_ROUTES.LOGIN);
+        }
+      } catch (error) {
+        console.error('Error handling Auth0 logout redirect:', error);
+      }
+    };
+    
     async function loadUser() {
       try {
+        // Check for Auth0 logout redirect first
+        handleAuth0LogoutRedirect();
+        
         const response = await fetch(API_ROUTES.USER, {
           credentials: 'include',
         });
@@ -40,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     loadUser();
-  }, []);
+  }, [navigate]);
 
   const login = async (username: string, password: string) => {
     setIsLoading(true);
@@ -88,6 +105,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // If the server indicates we need to redirect to Auth0 logout
       if (data.redirect && data.redirectUrl) {
         console.log('Redirecting to Auth0 logout URL:', data.redirectUrl);
+        
+        // Set a flag in sessionStorage to handle the redirect back
+        sessionStorage.setItem('auth0LogoutRedirect', 'true');
+        
         // Use window.location for full page redirect to Auth0
         window.location.href = data.redirectUrl;
         return; // Exit early since we're redirecting

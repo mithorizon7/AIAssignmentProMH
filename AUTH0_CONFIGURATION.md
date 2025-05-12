@@ -18,7 +18,9 @@ When setting up your Auth0 application, you must configure the following:
 
 1. **Application Type**: Regular Web Application
 2. **Allowed Callback URLs**: This must include your callback URL (`${BASE_URL}/api/auth-sso/callback`)
-3. **Allowed Logout URLs**: This must include your login page URL (`${BASE_URL}/auth`)
+3. **Allowed Logout URLs**: This must include your base domain URL WITHOUT any path (`${BASE_URL}`) 
+   - IMPORTANT: Auth0 has strict requirements for logout URLs. Only use the root domain.
+   - Example: Use `https://aigrader.replit.app` NOT `https://aigrader.replit.app/auth`
 4. **Allowed Web Origins**: Include your base URL without path (`${BASE_URL}`)
 5. **Token Endpoint Authentication Method**: Set to "Post"
 6. **ID Token Expiration**: Recommended setting of 86400 seconds (24 hours)
@@ -43,9 +45,37 @@ The SSO login and logout flow in AIGrader works as follows:
 3. Server ends the local session and prepares Auth0 logout URL
 4. Server returns the Auth0 logout URL in the response
 5. Frontend redirects the browser to Auth0 logout URL
-6. Auth0 ends the SSO session and redirects back to our login page
+6. Auth0 ends the SSO session and redirects back to our application root URL
+7. Our application detects the return from Auth0 and redirects to the login page
+
+#### Auth0 Logout URL Format
+
+The Auth0 logout URL must include two parameters:
+- `client_id`: Your Auth0 client ID
+- `returnTo`: Your application's root domain URL (must be whitelisted in Auth0 settings)
+
+Example:
+```
+https://YOUR_AUTH0_DOMAIN/v2/logout?client_id=YOUR_CLIENT_ID&returnTo=https://aigrader.replit.app
+```
+
+IMPORTANT: The `returnTo` URL must be:
+- Exactly as registered in Auth0's "Allowed Logout URLs"
+- Use your application's root domain with NO path parameters
+- Fully URL-encoded
 
 ## Common Issues and Troubleshooting
+
+### "Oops, something went wrong" Error on Logout
+
+If you see the Auth0 error page with "Oops, something went wrong" after logout:
+
+1. The `returnTo` URL isn't properly whitelisted in Auth0's "Allowed Logout URLs"
+2. Ensure you're using the root domain without any path segments 
+   - Correct: `https://aigrader.replit.app`
+   - Incorrect: `https://aigrader.replit.app/auth` or `https://aigrader.replit.app/login`
+3. Check Auth0 logs for specific error messages about invalid logout URLs
+4. Verify the URL is properly URL-encoded in your code
 
 ### Callback URL Mismatch
 
@@ -60,7 +90,7 @@ If you receive a "callback URL mismatch" error from Auth0, ensure:
 If you experience CORS issues:
 
 1. Ensure "Allowed Web Origins" in Auth0 includes your base URL
-2. Verify that your application's "trust token origin" setting is enabled  
+2. Verify that your application's "trust token origin" setting is enabled
 
 ### SSO Session Management
 
