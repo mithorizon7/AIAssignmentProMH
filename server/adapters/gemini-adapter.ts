@@ -351,13 +351,32 @@ Please analyze the above submission and provide feedback in the following JSON f
       });
       
       // Generate content with the parts
+      const generationConfig: any = {
+        temperature: 0.7, 
+        maxOutputTokens: 2048
+      };
+      
+      // Add responseFormat if available in this version of the API
+      // This is added in newer versions of the Gemini API
+      if (this.modelName.includes('gemini-2')) {  // For Gemini 2 models
+        generationConfig.responseFormat = { type: "json" };
+      }
+      
       const result = await this.model.generateContent({
         contents: [{ role: 'user', parts: contentParts }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2048
-        }
+        generationConfig
       });
+      
+      // Cleanup file resources
+      for (const fileObject of fileObjects) {
+        try {
+          if (fileObject && typeof fileObject.delete === 'function') {
+            await fileObject.delete();
+          }
+        } catch (cleanupError) {
+          console.warn('Error cleaning up file resource:', cleanupError);
+        }
+      }
       
       const response = result.response;
       const text = response.text();
@@ -385,8 +404,20 @@ Please analyze the above submission and provide feedback in the following JSON f
         };
       }
       
-      // Estimate tokens
-      const estimatedTokens = Math.ceil(text.length / 4);
+      // Get actual token usage if available, otherwise estimate
+      let tokenCount = 0;
+      
+      // Different versions of the API have different ways to access token usage
+      try {
+        // Try different paths to token usage information based on API version
+        tokenCount = (response as any).candidates?.[0]?.usageMetadata?.totalTokens ||
+                    (response as any).usageMetadata?.totalTokens ||
+                    (response as any).usage?.totalTokens ||
+                    Math.ceil(text.length / 4); // Fallback to estimation
+      } catch (e) {
+        // Fallback to estimation if access fails
+        tokenCount = Math.ceil(text.length / 4);
+      }
       
       return {
         strengths: parsedContent.strengths || [],
@@ -397,7 +428,7 @@ Please analyze the above submission and provide feedback in the following JSON f
         criteriaScores: parsedContent.criteriaScores || [],
         rawResponse: parsedContent,
         modelName: this.modelName,
-        tokenCount: estimatedTokens
+        tokenCount: tokenCount
       };
     } catch (error: any) {
       console.error("Gemini multimodal API error:", error);
