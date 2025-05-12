@@ -151,36 +151,50 @@
 
 /* MIT-style UI Components */
 @layer components {
-  /* Button styling consistent with MIT design guidelines */
+  /* Button styling precisely following MIT design guidelines */
   .btn-primary {
     @apply bg-primary text-primary-foreground rounded px-5 py-2.5 font-semibold text-base 
            hover:bg-[#5A0010] focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:outline-none
            active:transform active:scale-[0.98] transition-all duration-200;
+    border-radius: var(--radius);
   }
   
   .btn-secondary {
     @apply bg-transparent border-2 border-primary text-primary rounded px-5 py-2.5 font-semibold text-base 
            hover:bg-primary hover:text-primary-foreground focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:outline-none
            active:transform active:scale-[0.98] transition-all duration-200;
+    border-radius: var(--radius);
   }
   
   .btn-tertiary {
     @apply bg-transparent text-primary rounded px-5 py-2.5 font-semibold text-base 
            hover:bg-accent focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:outline-none
            active:transform active:scale-[0.98] transition-all duration-200;
+    border-radius: var(--radius);
+  }
+  
+  /* Standard button sizes following 8pt grid */
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+  
+  .btn-lg {
+    @apply px-6 py-3 text-lg;
   }
   
   /* Card styling with subtle shadow, precise spacing and microinteractions */
   .mit-card {
-    @apply bg-white rounded shadow-soft border-0 overflow-hidden 
+    @apply bg-white shadow-soft border-0 overflow-hidden 
            transition-all duration-200 hover:shadow-card;
+    border-radius: var(--radius);
   }
   
   .mit-card-interactive {
-    @apply bg-white rounded shadow-soft border-0 overflow-hidden 
+    @apply bg-white shadow-soft border-0 overflow-hidden 
            transition-all duration-200 hover:shadow-card hover:translate-y-[-2px]
            focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
-           active:translate-y-0 active:shadow-soft;
+           active:translate-y-0 active:shadow-soft cursor-pointer;
+    border-radius: var(--radius);
   }
   
   .mit-card-header {
@@ -248,7 +262,18 @@
   
   /* Input styling with consistent border and hover states */
   .mit-input {
-    @apply px-4 py-2 border border-muted-foreground rounded focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none;
+    @apply px-4 py-2 border border-muted-foreground focus:ring-2 
+           focus:ring-primary focus:border-transparent focus:outline-none
+           transition-colors duration-200;
+    border-radius: var(--radius);
+  }
+  
+  .mit-input:hover:not(:focus):not(:disabled) {
+    @apply border-primary;
+  }
+  
+  .mit-input:disabled {
+    @apply bg-muted cursor-not-allowed opacity-70;
   }
   
   /* Label styling */
@@ -256,34 +281,85 @@
     @apply text-sm font-medium text-foreground mb-2 block;
   }
   
-  /* Category and tag styling */
+  /* Form group spacing */
+  .mit-form-group {
+    @apply mb-6;
+  }
+  
+  /* Category and tag styling - Enhanced for clarity and visual appeal */
   .category-label {
-    @apply text-primary text-sm font-semibold;
+    @apply text-primary text-sm font-semibold tracking-wide uppercase;
   }
   
   .mit-tag {
-    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-accent text-accent-foreground;
+    @apply inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-accent text-accent-foreground;
+    border-radius: 9999px; /* Ensuring perfect pill shape */
+    transition: all 0.2s ease;
   }
   
-  /* Enhanced state feedback (loading, empty, success) */
+  .mit-tag:hover {
+    @apply bg-primary text-primary-foreground;
+    transform: translateY(-1px);
+  }
+  
+  .mit-tag-primary {
+    @apply bg-primary text-primary-foreground;
+  }
+  
+  .mit-tag-secondary {
+    @apply bg-secondary text-secondary-foreground;
+  }
+  
+  .mit-tag-outline {
+    @apply bg-transparent border border-accent-foreground text-foreground;
+  }
+  
+  /* Enhanced state feedback (loading, empty, success) - MIT Design Brief aligned */
   .mit-loading-container {
-    @apply flex flex-col items-center justify-center py-8 px-4 text-center space-y-4;
+    @apply flex flex-col items-center justify-center py-12 px-6 text-center space-y-6;
   }
   
   .mit-loading-indicator {
-    @apply animate-spin text-primary h-8 w-8;
+    @apply animate-spin text-primary h-10 w-10;
+    animation-duration: 1.2s;
+  }
+  
+  .mit-loading-text {
+    @apply text-base text-muted-foreground font-medium;
   }
   
   .mit-skeleton {
-    @apply bg-muted animate-pulse rounded;
+    @apply bg-muted animate-pulse;
+    border-radius: var(--radius);
+    animation-duration: 1.5s;
+  }
+  
+  .mit-skeleton-text {
+    @apply h-4 w-full mb-2;
+  }
+  
+  .mit-skeleton-text-sm {
+    @apply h-3 w-4/5 mb-2;
+  }
+  
+  .mit-skeleton-circle {
+    @apply h-10 w-10 rounded-full;
   }
   
   .mit-empty-state {
-    @apply flex flex-col items-center justify-center py-12 px-4 text-center space-y-4;
+    @apply flex flex-col items-center justify-center py-16 px-6 text-center space-y-6;
   }
   
   .mit-empty-icon {
-    @apply text-muted-foreground h-12 w-12 mb-2;
+    @apply text-muted-foreground h-16 w-16 mb-4 opacity-60;
+  }
+  
+  .mit-empty-title {
+    @apply text-xl font-semibold;
+  }
+  
+  .mit-empty-description {
+    @apply text-muted-foreground max-w-md mx-auto;
   }
   
   .mit-empty-text {
