@@ -92,21 +92,22 @@ describe('Rate Limiter Middleware', () => {
     }));
   });
   
-  it('should skip rate limiting in development environment', () => {
+  it('should skip rate limiting in development environment', async () => {
     // Set development environment
     process.env.NODE_ENV = 'development';
     
     // Get a fresh instance of middleware
     vi.resetModules();
-    vi.isolateModules(() => {
-      const { defaultRateLimiter } = require('../../server/middleware/rate-limiter');
-      
-      // Call the middleware
-      defaultRateLimiter(mockRequest as Request, mockResponse as Response, nextFunction);
-      
-      // Expect next to be called without rate limiting
-      expect(nextFunction).toHaveBeenCalled();
-    });
+    
+    // Re-import the rate limiters
+    const importedModule = await import('../../server/middleware/rate-limiter');
+    const developmentLimiter = importedModule.defaultRateLimiter;
+    
+    // Call the middleware
+    developmentLimiter(mockRequest as Request, mockResponse as Response, nextFunction);
+    
+    // Expect next to be called without rate limiting
+    expect(nextFunction).toHaveBeenCalled();
   });
   
   it('should apply rate limiting in production environment', () => {
@@ -128,7 +129,7 @@ describe('Rate Limiter Middleware', () => {
     expect(nextFunction).not.toHaveBeenCalled();
   });
   
-  it('should handle proxy IPs when configured', () => {
+  it('should handle proxy IPs when configured', async () => {
     // Set production environment and trust proxy
     process.env.NODE_ENV = 'production';
     process.env.TRUST_PROXY = 'true';
@@ -140,14 +141,15 @@ describe('Rate Limiter Middleware', () => {
     
     // Get a fresh instance of middleware with trust proxy
     vi.resetModules();
-    vi.isolateModules(() => {
-      const { defaultRateLimiter } = require('../../server/middleware/rate-limiter');
-      
-      // Call the middleware
-      defaultRateLimiter(mockRequest as Request, mockResponse as Response, nextFunction);
-      
-      // Expect next to be called as we haven't exceeded limit yet
-      expect(nextFunction).toHaveBeenCalled();
-    });
+    
+    // Re-import the rate limiters
+    const importedModule = await import('../../server/middleware/rate-limiter');
+    const proxyAwareLimiter = importedModule.defaultRateLimiter;
+    
+    // Call the middleware
+    proxyAwareLimiter(mockRequest as Request, mockResponse as Response, nextFunction);
+    
+    // Expect next to be called as we haven't exceeded limit yet
+    expect(nextFunction).toHaveBeenCalled();
   });
 });

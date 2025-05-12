@@ -77,26 +77,22 @@ describe('Auth Security Validation', () => {
     vi.resetModules();
   });
 
-  it('should throw an error if SESSION_SECRET is not set in production', () => {
+  it('should throw an error if SESSION_SECRET is not set in production', async () => {
     // Set production environment
     process.env.NODE_ENV = 'production';
     
     // Import auth module should trigger validation
-    expect(() => {
-      vi.isolateModules(() => {
-        require('../../server/auth');
-      });
-    }).toThrow(/SESSION_SECRET.*not set/);
+    await expect(async () => {
+      await import('../../server/auth');
+    }).rejects.toThrow(/SESSION_SECRET.*not set/);
   });
   
-  it('should exit process if SESSION_SECRET is not set in development', () => {
+  it('should exit process if SESSION_SECRET is not set in development', async () => {
     // Set development environment
     process.env.NODE_ENV = 'development';
     
     // Import auth module
-    vi.isolateModules(() => {
-      require('../../server/auth');
-    });
+    await import('../../server/auth');
     
     // Check console error and process exit
     expect(mockConsoleError).toHaveBeenCalledWith(
@@ -106,15 +102,13 @@ describe('Auth Security Validation', () => {
     expect(mockProcessExit).toHaveBeenCalledWith(1);
   });
   
-  it('should warn if SESSION_SECRET is too short', () => {
+  it('should warn if SESSION_SECRET is too short', async () => {
     // Set a short secret
     process.env.SESSION_SECRET = 'short';
     process.env.CSRF_SECRET = 'a'.repeat(32); // valid CSRF_SECRET to avoid that error
     
     // Import auth module
-    vi.isolateModules(() => {
-      require('../../server/auth');
-    });
+    await import('../../server/auth');
     
     // Check for warning
     expect(mockConsoleWarn).toHaveBeenCalledWith(
@@ -123,29 +117,24 @@ describe('Auth Security Validation', () => {
     );
   });
   
-  it('should throw an error if CSRF_SECRET is not set in production', () => {
+  it('should throw an error if CSRF_SECRET is not set in production', async () => {
     // Set production environment and SESSION_SECRET
     process.env.NODE_ENV = 'production';
     process.env.SESSION_SECRET = 'a'.repeat(32);
     
     // Import auth module should trigger validation
-    expect(() => {
-      vi.isolateModules(() => {
-        require('../../server/auth');
-      });
-    }).toThrow(/CSRF_SECRET.*not set/);
+    await expect(async () => {
+      await import('../../server/auth');
+    }).rejects.toThrow(/CSRF_SECRET.*not set/);
   });
   
-  it('should pass validation with proper secrets', () => {
+  it('should pass validation with proper secrets', async () => {
     // Set proper secrets
     process.env.SESSION_SECRET = 'a'.repeat(32);
     process.env.CSRF_SECRET = 'b'.repeat(32);
     
     // Import auth module
-    let authModule: any;
-    vi.isolateModules(() => {
-      authModule = require('../../server/auth');
-    });
+    const authModule = await import('../../server/auth');
     
     // Expect the module to export configureAuth
     expect(authModule).toHaveProperty('configureAuth');
