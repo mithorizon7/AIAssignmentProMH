@@ -37,15 +37,18 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"), // No notNull() - Password is nullable for Auth0 users
   email: text("email").notNull().unique(),
   role: userRoleEnum("role").notNull().default('student'),
+  auth0Sub: text("auth0_sub").unique(), // Auth0 subject identifier - nullable by default
+  emailVerified: boolean("email_verified").default(false).notNull(), // Email verification status
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => {
   return {
     usernameIdx: index("idx_users_username").on(table.username),
     emailIdx: index("idx_users_email").on(table.email),
-    roleIdx: index("idx_users_role").on(table.role)
+    roleIdx: index("idx_users_role").on(table.role),
+    auth0SubIdx: index("idx_users_auth0_sub").on(table.auth0Sub) // Index for Auth0 subject lookups
   };
 });
 

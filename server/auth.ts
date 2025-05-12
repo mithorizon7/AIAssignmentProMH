@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
+import { Strategy as Auth0Strategy } from 'passport-auth0';
 import { storage } from './storage';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
@@ -63,6 +64,27 @@ function validateSecurityEnvVars() {
       throw new Error('FATAL ERROR: CSRF_SECRET is too weak. It should be at least 32 characters long.');
     } else {
       console.warn('\x1b[33m%s\x1b[0m', 'WARNING: CSRF_SECRET is too weak. It should be at least 32 characters long.');
+    }
+  }
+  
+  // Check Auth0 environment variables if SSO is enabled
+  const auth0Enabled = process.env.AUTH0_DOMAIN && process.env.AUTH0_CLIENT_ID && process.env.AUTH0_CLIENT_SECRET;
+  
+  if (auth0Enabled) {
+    console.log('[INFO] Auth0 SSO configuration detected');
+    
+    // Validate Auth0 callback URL
+    if (!process.env.AUTH0_CALLBACK_URL) {
+      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: AUTH0_CALLBACK_URL is not set. This is required for Auth0 SSO to work correctly.');
+    } else if (!process.env.AUTH0_CALLBACK_URL.startsWith('http')) {
+      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: AUTH0_CALLBACK_URL should be a full URL including http/https protocol.');
+    }
+  } else {
+    // Only warn in development mode to allow local development without Auth0
+    if (!isProduction) {
+      console.log('[INFO] Auth0 SSO is not configured. Local authentication will be used.');
+    } else {
+      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: Auth0 SSO environment variables (AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET) are not fully set in production. SSO functionality will be disabled.');
     }
   }
 }
@@ -128,8 +150,14 @@ export function configureAuth(app: any) {
       return next();
     }
     
-    // Skip CSRF check for these specific endpoints (login, register, logout)
-    const skipCsrfForRoutes = ['/api/auth/login', '/api/auth/register', '/api/auth/logout', '/api/csrf-token'];
+    // Skip CSRF check for these specific endpoints (login, register, logout, Auth0 callback)
+    const skipCsrfForRoutes = [
+      '/api/auth/login', 
+      '/api/auth/register', 
+      '/api/auth/logout', 
+      '/api/csrf-token',
+      '/api/auth-sso/callback' // Skip for Auth0 callback
+    ];
     if (skipCsrfForRoutes.includes(req.path)) {
       return next();
     }
@@ -185,7 +213,7 @@ export function configureAuth(app: any) {
         }
         
         // Verify password with bcrypt
-        const isPasswordValid = await bcrypt.compare(password, user.password);
+        const isPasswordValid = await bcrypt.compare(password, user.password || '');
         if (!isPasswordValid) {
           return done(null, false, { message: 'Incorrect username or password' });
         }
@@ -198,6 +226,137 @@ export function configureAuth(app: any) {
       }
     })
   );
+  
+  // Configure Auth0 strategy if Auth0 environment variables are set
+  const auth0Enabled = process.env.AUTH0_DOMAIN && process.env.AUTH0_CLIENT_ID && process.env.AUTH0_CLIENT_SECRET;
+  
+  if (auth0Enabled) {
+    console.log('[INFO] Configuring Auth0 strategy for SSO');
+    
+    passport.use(
+      new Auth0Strategy(
+        {
+          domain: process.env.AUTH0_DOMAIN!,
+          clientID: process.env.AUTH0_CLIENT_ID!,
+          clientSecret: process.env.AUTH0_CLIENT_SECRET!,
+          callbackURL: process.env.AUTH0_CALLBACK_URL || `${process.env.NODE_ENV === 'production' ? 'https' : 'http'}://${app.get('host') || 'localhost:5000'}/api/auth-sso/callback`,
+          state: true
+        },
+        async (accessToken, refreshToken, extraParams, profile, done) => {
+          try {
+            // Log profile information during development to help with integration
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[DEBUG] Auth0 profile:', JSON.stringify(profile, null, 2));
+            }
+            
+            // Extract user information from Auth0 profile
+            const auth0UserId = profile.id;
+            const email = profile.emails?.[0]?.value;
+            const name = profile.displayName || (profile.name ? `${profile.name.givenName} ${profile.name.familyName}` : 'Unknown');
+            const emailVerified = profile._json?.email_verified || false;
+            
+            if (!email) {
+              return done(new Error('Email is required from Auth0 profile'));
+            }
+            
+            // Try to find user by Auth0 ID first
+            let user = await storage.getUserByAuth0Sub(auth0UserId);
+            
+            // If not found, try to find by email for existing users
+            if (!user) {
+              const existingUser = await storage.getUserByEmail(email);
+              
+              if (existingUser) {
+                // Update existing user with Auth0 ID
+                user = await storage.updateUserAuth0Sub(existingUser.id, auth0UserId);
+                console.log(`[INFO] Linked Auth0 ID to existing user: ${existingUser.username}`);
+                
+                // Update email verification status
+                await storage.updateUserEmailVerifiedStatus(existingUser.id, emailVerified);
+              } else {
+                // Create new user with Auth0 information
+                // Generate username from email
+                const username = email.split('@')[0] + '_' + Math.floor(Math.random() * 10000);
+                
+                // Create new user with default role of student and null password (Auth0-only user)
+                user = await storage.createUser({
+                  username,
+                  email,
+                  name,
+                  password: null, // No password for SSO users
+                  role: 'student',
+                  auth0Sub: auth0UserId,
+                  emailVerified
+                });
+                
+                console.log(`[INFO] Created new user from Auth0 login: ${username}`);
+                
+                // Log the user creation event for audit purposes
+                logUserCreation(
+                  user.id,
+                  user.username,
+                  'auth0',
+                  auth0UserId,
+                  'SSO login'
+                );
+              }
+            } else {
+              // We found the user by Auth0 ID, update email verification status
+              await storage.updateUserEmailVerifiedStatus(user.id, emailVerified);
+            }
+            
+            // Remove password from the user object before returning
+            const { password: _, ...userWithoutPassword } = user;
+            
+            // Log successful authentication
+            logSuccessfulAuth(
+              user.id,
+              user.username,
+              'auth0',
+              profile.id
+            );
+            
+            return done(null, userWithoutPassword);
+          } catch (error) {
+            console.error('[ERROR] Auth0 authentication error:', error);
+            return done(error);
+          }
+        }
+      )
+    );
+    
+    // Auth0 login route
+    app.get('/api/auth-sso/login', passport.authenticate('auth0', { 
+      scope: 'openid email profile' 
+    }));
+    
+    // Auth0 callback route
+    app.get('/api/auth-sso/callback', (req, res, next) => {
+      passport.authenticate('auth0', (err, user, info) => {
+        if (err) {
+          console.error('[ERROR] Auth0 callback error:', err);
+          return res.redirect('/auth?error=sso_failed&reason=' + encodeURIComponent(err.message));
+        }
+        
+        if (!user) {
+          console.error('[ERROR] Auth0 callback did not return a user');
+          return res.redirect('/auth?error=sso_failed&reason=no_user_returned');
+        }
+        
+        req.login(user, (err) => {
+          if (err) {
+            console.error('[ERROR] Session login error:', err);
+            return res.redirect('/auth?error=sso_failed&reason=session_error');
+          }
+          
+          // Successful login
+          return res.redirect('/');
+        });
+      })(req, res, next);
+    });
+  } else {
+    console.log('[INFO] Auth0 SSO not configured, skipping Auth0 strategy setup');
+  }
 
   // Configure passport serialization
   passport.serializeUser((user: any, done) => {

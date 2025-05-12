@@ -32,7 +32,11 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByAuth0Sub(auth0Sub: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserAuth0Sub(userId: number, auth0Sub: string): Promise<User | undefined>;
+  updateUserEmailVerifiedStatus(userId: number, isVerified: boolean): Promise<User | undefined>;
+  updateUserRole(userId: number, newRole: string): Promise<User | undefined>;
   
   // Course operations
   getCourse(id: number): Promise<Course | undefined>;
@@ -93,10 +97,39 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
   }
+  
+  async getUserByAuth0Sub(auth0Sub: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.auth0Sub, auth0Sub));
+    return user;
+  }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+  
+  async updateUserAuth0Sub(userId: number, auth0Sub: string): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ auth0Sub })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+  
+  async updateUserEmailVerifiedStatus(userId: number, isVerified: boolean): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ emailVerified: isVerified })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+  
+  async updateUserRole(userId: number, newRole: string): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ role: newRole as any }) // Cast to any for enum conversion
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
   }
 
   // Course operations
