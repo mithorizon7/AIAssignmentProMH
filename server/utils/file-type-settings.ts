@@ -156,9 +156,14 @@ export function determineContentType(extension: string, mimeType: string): Conte
   extension = extension.toLowerCase().replace(/^\./, '');
   mimeType = mimeType.toLowerCase();
   
+  // Special case for CSV files - classify as documents
+  if (extension === 'csv' || mimeType === 'text/csv') {
+    return 'document';
+  }
+  
   // Text files
   if (['txt', 'md', 'py', 'js', 'ts', 'java', 'c', 'cpp', 'cs', 'html', 'css', 'json', 'xml'].includes(extension) ||
-      mimeType.startsWith('text/') || 
+      (mimeType.startsWith('text/') && mimeType !== 'text/csv') || 
       ['application/javascript', 'application/typescript', 'application/json', 'application/xml'].includes(mimeType)) {
     return 'text';
   }

@@ -21,7 +21,7 @@ describe('Multimodal Processor Utils', () => {
       const textContent = 'This is a sample text content';
       (fs.promises.readFile as any).mockResolvedValue(Buffer.from(textContent));
 
-      const result = await processFileForMultimodal('text', '/path/to/file.txt', 'text/plain', 100);
+      const result = await processFileForMultimodal('/path/to/file.txt', 'file.txt', 'text/plain');
       
       expect(result).toBeDefined();
       expect(result.contentType).toBe('text');
@@ -36,7 +36,7 @@ describe('Multimodal Processor Utils', () => {
       const imageBuffer = Buffer.from('mock-image-data');
       (fs.promises.readFile as any).mockResolvedValue(imageBuffer);
 
-      const result = await processFileForMultimodal('image', '/path/to/image.jpg', 'image/jpeg', 200);
+      const result = await processFileForMultimodal('/path/to/image.jpg', 'image.jpg', 'image/jpeg');
       
       expect(result).toBeDefined();
       expect(result.contentType).toBe('image');
@@ -51,7 +51,7 @@ describe('Multimodal Processor Utils', () => {
       const docBuffer = Buffer.from('mock-document-data');
       (fs.promises.readFile as any).mockResolvedValue(docBuffer);
 
-      const result = await processFileForMultimodal('document', '/path/to/doc.pdf', 'application/pdf', 300);
+      const result = await processFileForMultimodal('/path/to/doc.pdf', 'doc.pdf', 'application/pdf');
       
       expect(result).toBeDefined();
       expect(result.contentType).toBe('document');
