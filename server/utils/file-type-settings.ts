@@ -1,6 +1,9 @@
-import { insertFileTypeSettingsSchema, FileTypeSetting } from '@shared/schema';
+import { insertFileTypeSettingsSchema, FileTypeSetting, contentTypeEnum } from '@shared/schema';
 import { storage } from '../storage';
 import { z } from 'zod';
+
+// Define ContentType type based on the enum values
+export type ContentType = typeof contentTypeEnum.enumValues[number];
 
 // Default enabled file type settings
 const DEFAULT_FILE_TYPE_SETTINGS = [
@@ -138,17 +141,18 @@ export async function getAllowedFileTypes(contentType: string): Promise<{
  * Check if a file is allowed based on its extension and MIME type
  */
 export async function isFileTypeAllowed(
-  contentType: string,
+  contentType: ContentType | null,
   extension: string,
   mimeType: string
 ): Promise<boolean> {
+  if (!contentType) return false;
   return storage.checkFileTypeEnabled(contentType, extension, mimeType);
 }
 
 /**
  * Determine the content type based on file extension and MIME type
  */
-export function determineContentType(extension: string, mimeType: string): string {
+export function determineContentType(extension: string, mimeType: string): ContentType {
   extension = extension.toLowerCase().replace(/^\./, '');
   mimeType = mimeType.toLowerCase();
   

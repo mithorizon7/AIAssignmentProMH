@@ -17,7 +17,7 @@ import { v4 as uuidv4 } from "uuid";
 import { defaultRateLimiter, submissionRateLimiter } from "./middleware/rate-limiter";
 import adminRoutes from "./routes/admin";
 import instructorRoutes from "./routes/instructor";
-import { determineContentType, isFileTypeAllowed } from "./utils/file-type-settings";
+import { determineContentType, isFileTypeAllowed, ContentType } from "./utils/file-type-settings";
 import { processFileForMultimodal } from "./utils/multimodal-processor";
 
 // Helper function to generate a unique shareable code for assignments
@@ -441,7 +441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let content = '';
       let mimeType = null;
       let fileSize = null;
-      let contentType: "text" | "image" | "audio" | "video" | "document" | null = null;
+      let contentType: ContentType | null = null;
       
       if (submissionType === 'file' && req.file) {
         // Get file metadata
