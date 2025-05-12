@@ -9,6 +9,14 @@ import connectPgSimple from 'connect-pg-simple';
 import { doubleCsrf } from 'csrf-csrf';
 import { pool } from './db';
 import { authRateLimiter, csrfRateLimiter } from './middleware/rate-limiter';
+import { 
+  logSuccessfulAuth, 
+  logFailedAuth, 
+  logLogout, 
+  logUserCreation,
+  logSecurityEvent,
+  AuditEventType
+} from './lib/audit-logger';
 
 // Create PostgreSQL session store
 const PgStore = connectPgSimple(session);
@@ -132,6 +140,19 @@ export function configureAuth(app: any) {
       // or throw an error on failure
       csrfProtection.doubleCsrfProtection(req, res, next);
     } catch (error: any) {
+      // Log CSRF failure for security monitoring
+      logSecurityEvent(
+        AuditEventType.CSRF_FAILURE,
+        req.ip || 'unknown',
+        (req.user as any)?.id,
+        (req.user as any)?.username,
+        { 
+          path: req.path,
+          method: req.method,
+          userAgent: req.headers['user-agent']
+        }
+      );
+      
       // If the token is invalid, return 403 Forbidden
       return res.status(403).json({
         message: 'CSRF token validation failed',
