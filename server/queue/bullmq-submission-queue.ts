@@ -25,7 +25,7 @@ logger.info(`BullMQ queue status`, {
 
 // Create queue configuration
 const queueConfig = {
-  connection: connectionOptions.connection,
+  connection: connectionOptions.connection as unknown as ConnectionOptions,
   // Additional queue settings for production
   ...(queueActive ? {
     defaultJobOptions: {

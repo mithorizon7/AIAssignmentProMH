@@ -1,0 +1,90 @@
+This deployment error points to a few related issues with your Redis and BullMQ configuration, especially when deploying to a production-like environment.
+
+Here's a breakdown of the errors and how to address them:
+
+Error 1: BullMQ Redis configuration error: maxRetriesPerRequest must be null in Redis connection options
+
+Context: This error comes directly from BullMQ or the underlying ioredis client it uses. Some Redis hosting providers or specific Redis configurations are stricter about the options passed when establishing a connection. maxRetriesPerRequest is an ioredis option that BullMQ might be inheriting or setting. If it's not set to null (which often means use the Redis default or rely on a different retry strategy), some managed Redis services might reject the connection or log errors.
+
+Relevant Code:
+
+server/queue/redis.ts: This file defines REDIS_CONFIG and createRedisClient(). The REDIS_CONFIG currently sets maxRetriesPerRequest: 3.
+
+TypeScript
+// In server/queue/redis.ts
+const REDIS_CONFIG = {
+  // ... other options ...
+  maxRetriesPerRequest: 3, // THIS IS THE LIKELY CULPRIT for this specific error message
+  // ...
+};
+
+// and also when creating client via REDIS_URL
+const client = redisUrl
+  ? new Redis(redisUrl, {
+      maxRetriesPerRequest: 1, // Also set here, might conflict or be overridden
+      // ...
+    })
+  : new Redis(REDIS_CONFIG);
+ server/queue/bullmq-submission-queue.ts: This file uses connectionOptions from redis.ts to configure BullMQ.
+
+TypeScript
+// In server/queue/bullmq-submission-queue.ts
+import { connectionOptions } from './redis';
+// ...
+const queueConfig = {
+  connection: connectionOptions.connection, // This connection carries the ioredis options
+  // ...
+};
+ Solution:
+
+Modify server/queue/redis.ts:
+Change maxRetriesPerRequest: 3 in REDIS_CONFIG to maxRetriesPerRequest: null.
+Change maxRetriesPerRequest: 1 in the new Redis(redisUrl, { ... }) options to maxRetriesPerRequest: null.
+Instruction for AI Coder: "In server/queue/redis.ts, find all instances where maxRetriesPerRequest is set in the ioredis connection options (both within REDIS_CONFIG and when REDIS_URL is used). Change these values from a number (e.g., 3 or 1) to null. This is required by some Redis providers or BullMQ configurations for production."
+Error 2: Missing Redis URL or connection parameters in environment variables
+Error 3: Application requires Redis in production environment
+
+Context: These errors indicate that your deployment environment is being treated as "production" (or Redis is being explicitly enabled), but the necessary Redis connection environment variables (REDIS_URL or individual REDIS_HOST, REDIS_PORT, etc.) are not correctly set or accessible in that deployment environment.
+
+Relevant Code:
+
+server/queue/redis.ts: The createRedisClient function checks process.env.NODE_ENV === 'production' or process.env.ENABLE_REDIS === 'true' or !!process.env.REDIS_URL to decide whether to use a real Redis client or the mock client.
+
+TypeScript
+// In server/queue/redis.ts
+const useRealRedis = process.env.NODE_ENV === 'production' ||
+                      process.env.ENABLE_REDIS === 'true' ||
+                      !!process.env.REDIS_URL;
+
+if (!useRealRedis) {
+  logger.info('Development environment detected, using mock Redis implementation');
+  return new MockRedisClient();
+}
+// ... attempts to connect to real Redis ...
+ server/queue/bullmq-submission-queue.ts: Similarly checks queueActive which is based on these environment variables.
+
+TypeScript
+// In server/queue/bullmq-submission-queue.ts
+const queueActive = process.env.NODE_ENV === 'production' || process.env.ENABLE_REDIS === 'true';
+ Your deployment environment's configuration.
+
+README.md and REDIS_CONFIGURATION.md specify these variables.
+
+Solution:
+
+Verify Deployment Environment Variables:
+Ensure that in your deployment environment (wherever you are deploying this – Heroku, AWS, Docker, etc.), you have correctly set the environment variables for your Redis instance.
+The easiest is usually to set REDIS_URL to the full connection string provided by your Redis host (e.g., redis://username:password@your-redis-host.com:6379).
+Alternatively, set individual parameters: REDIS_HOST, REDIS_PORT, REDIS_PASSWORD (if any), REDIS_USERNAME (if any), REDIS_DB (if not 0).
+Verify NODE_ENV:
+Confirm that NODE_ENV is set to production in your deployment environment as intended. Your build.sh script does export it, but ensure the runtime environment also has it. If it's not production and you still want Redis, you must set ENABLE_REDIS="true".
+Check createRedisClient Logic (Minor check): The logic in server/queue/redis.ts for useRealRedis seems correct. The issue is almost certainly that the environment variables it relies on are missing or incorrect in the deployment context.
+Instruction for AI Coder (mostly a deployment/ops issue, but good for them to be aware):
+
+"The deployment errors indicate that either NODE_ENV is set to production or ENABLE_REDIS is true, but the required Redis connection environment variables (REDIS_URL or individual REDIS_HOST/PORT/etc.) are not correctly configured in the deployment environment.
+Please double-check the REDIS_CONFIGURATION.md and ensure that your deployment platform has these environment variables set with valid values for the production Redis instance.
+Confirm that the logic in server/queue/redis.ts correctly prioritizes REDIS_URL if present, and otherwise falls back to the individual REDIS_HOST, REDIS_PORT, etc. variables."
+In summary:
+
+Fix maxRetriesPerRequest: Instruct your AI coder to change maxRetriesPerRequest to null in server/queue/redis.ts.
+Fix Environment Variables: This is likely an operational/deployment issue. You need to ensure your production Redis connection details are correctly set as environment variables in the environment where you are deploying AIGrader.

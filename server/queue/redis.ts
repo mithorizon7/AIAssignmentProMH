@@ -14,7 +14,7 @@ const REDIS_CONFIG = {
   password: process.env.REDIS_PASSWORD,
   username: process.env.REDIS_USERNAME,
   db: parseInt(process.env.REDIS_DB || '0', 10),
-  maxRetriesPerRequest: 3,
+  maxRetriesPerRequest: null,
   enableReadyCheck: true,
   retryStrategy: (times: number) => {
     // Exponential backoff with a maximum of 10 seconds
@@ -179,7 +179,7 @@ function createRedisClient() {
     const redisUrl = process.env.REDIS_URL;
     const client = redisUrl 
       ? new Redis(redisUrl, { 
-          maxRetriesPerRequest: 1, // Minimize retry attempts for faster fallback
+          maxRetriesPerRequest: null, // Required by some Redis providers for production
           connectTimeout: 2000,    // Only wait 2 seconds before timing out
           enableOfflineQueue: false // Don't queue commands when disconnected
         }) 
