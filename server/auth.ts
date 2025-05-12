@@ -17,11 +17,55 @@ const sessionStore = new PgStore({
   tableName: 'session'
 });
 
+// Function to validate critical security environment variables
+function validateSecurityEnvVars() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  // Check SESSION_SECRET
+  if (!process.env.SESSION_SECRET) {
+    if (isProduction) {
+      throw new Error('FATAL ERROR: SESSION_SECRET environment variable is not set. This is required for production deployments.');
+    } else {
+      console.error('\x1b[31m%s\x1b[0m', 'WARNING: SESSION_SECRET environment variable is not set. ' + 
+                   'This is a security risk. Never deploy to production without setting SESSION_SECRET ' +
+                   'to a strong, random value.');
+      process.exit(1); // Exit even in development to ensure proper configuration
+    }
+  } else if (process.env.SESSION_SECRET.length < 32) {
+    if (isProduction) {
+      throw new Error('FATAL ERROR: SESSION_SECRET is too weak. It should be at least 32 characters long.');
+    } else {
+      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: SESSION_SECRET is too weak. It should be at least 32 characters long.');
+    }
+  }
+  
+  // Check CSRF_SECRET
+  if (!process.env.CSRF_SECRET) {
+    if (isProduction) {
+      throw new Error('FATAL ERROR: CSRF_SECRET environment variable is not set. This is required for production deployments.');
+    } else {
+      console.error('\x1b[31m%s\x1b[0m', 'WARNING: CSRF_SECRET environment variable is not set. ' +
+                   'This is a security risk. Never deploy to production without setting CSRF_SECRET ' +
+                   'to a strong, random value.');
+      process.exit(1); // Exit even in development to ensure proper configuration
+    }
+  } else if (process.env.CSRF_SECRET.length < 32) {
+    if (isProduction) {
+      throw new Error('FATAL ERROR: CSRF_SECRET is too weak. It should be at least 32 characters long.');
+    } else {
+      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: CSRF_SECRET is too weak. It should be at least 32 characters long.');
+    }
+  }
+}
+
 export function configureAuth(app: any) {
+  // Validate security environment variables before configuring authentication
+  validateSecurityEnvVars();
+  
   // Configure express-session with enhanced security
   app.use(
     session({
-      secret: process.env.SESSION_SECRET || 'your-secret-key',
+      secret: process.env.SESSION_SECRET!, // No fallback - we've already validated this exists
       resave: false,
       saveUninitialized: false,
       store: sessionStore,
@@ -54,11 +98,11 @@ export function configureAuth(app: any) {
   
   // Initialize CSRF protection
   const csrfProtection = doubleCsrf({
-    getSecret: () => process.env.CSRF_SECRET || 'csrf-secret-key',
+    getSecret: () => process.env.CSRF_SECRET!, // No fallback - we've already validated this exists
     cookieName: process.env.NODE_ENV === 'production' ? '__Host-csrf' : 'csrf',
     cookieOptions: {
       httpOnly: true,
-      sameSite: 'lax', // Recommend 'strict' in production
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // Use strict in production for enhanced security
       path: '/',
       secure: process.env.NODE_ENV === 'production',
     },
