@@ -109,11 +109,11 @@ function validateSecurityEnvVars() {
     console.log('[INFO] MIT Horizon OIDC configuration detected');
     
     // Validate the issuer URL and callback URL
-    if (!process.env.MIT_HORIZON_OIDC_ISSUER_URL.startsWith('https://')) {
+    if (!process.env.MIT_HORIZON_OIDC_ISSUER_URL!.startsWith('https://')) {
       console.warn('\x1b[33m%s\x1b[0m', 'WARNING: MIT_HORIZON_OIDC_ISSUER_URL should be a full URL starting with https://');
     }
     
-    if (!process.env.MIT_HORIZON_OIDC_CALLBACK_URL.startsWith('http')) {
+    if (!process.env.MIT_HORIZON_OIDC_CALLBACK_URL!.startsWith('http')) {
       console.warn('\x1b[33m%s\x1b[0m', 'WARNING: MIT_HORIZON_OIDC_CALLBACK_URL should be a full URL including http/https protocol.');
     }
   } else {
