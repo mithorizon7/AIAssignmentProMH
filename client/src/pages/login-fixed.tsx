@@ -144,7 +144,7 @@ export default function Login() {
                   <rect width="512" height="512" fill="#A31F34" rx="15%"/>
                   <path fill="#fff" d="M157 291v-70h-35v-28h106v28h-36v70h-35m24-119V76h32l18 66 17-66h33v96h-30v-69l-19 69h-21l-18-69v69h-12"/>
                 </svg>
-                Sign in with MIT Horizon
+                Log in with institutional account
               </Button>
             </div>
             
