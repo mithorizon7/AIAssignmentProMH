@@ -2,6 +2,7 @@
 import 'dotenv/config';
 
 import express, { type Request, Response, NextFunction } from "express";
+import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { errorHandler, notFoundHandler, logger } from "./lib/error-handler";
@@ -9,6 +10,40 @@ import { errorHandler, notFoundHandler, logger } from "./lib/error-handler";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Configure helmet security headers based on environment
+const isProduction = app.get("env") === "production";
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // For development tools
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'", isProduction ? "" : "ws:"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
+    },
+    strictTransportSecurity: isProduction
+      ? {
+          maxAge: 63072000, // 2 years in seconds
+          includeSubDomains: true,
+          preload: true,
+        }
+      : false, // Disable HSTS in development
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    // Set X-XSS-Protection header
+    xssFilter: true,
+    // Set X-Frame-Options header to prevent clickjacking
+    frameguard: { action: "deny" },
+    // Prevent MIME type sniffing
+    noSniff: true,
+  })
+);
 
 app.use((req, res, next) => {
   const start = Date.now();

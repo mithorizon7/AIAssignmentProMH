@@ -39,11 +39,14 @@ This prevents unauthorized submissions to assignments by simply guessing assignm
 ## Additional Security Measures
 
 - CSRF protection with double-submit technique
-- Security headers set to prevent common web vulnerabilities:
-  - X-Frame-Options: Prevents clickjacking
+- Comprehensive security headers via Helmet middleware:
+  - Content-Security-Policy: Restricts resource loading to trusted sources
+  - X-Frame-Options: Prevents clickjacking with 'DENY' setting
   - X-XSS-Protection: Enables browser XSS filters
   - X-Content-Type-Options: Prevents MIME-sniffing
-  - Strict-Transport-Security: (In production) Enforces HTTPS
+  - Strict-Transport-Security: (In production) Enforces HTTPS with long-term caching
+  - Referrer-Policy: Controls information in the Referer header
+  - Feature-Policy/Permissions-Policy: Restricts browser features
   
 ## Rate Limiting
 
@@ -104,6 +107,32 @@ Our security features have been extensively tested to ensure they function corre
    - Tests checking that same password produces different hashes
 
 All security tests can be found in the `test/unit/` directory.
+
+## Dependency Management and Auditing
+
+The application relies on various open-source dependencies, and it's crucial to manage them securely:
+
+1. **Regular Dependency Auditing**
+   - Run `npm audit` regularly to identify packages with known vulnerabilities
+   - Apply fixes with `npm audit fix` when safe to do so
+   - Update packages to their latest secure versions
+
+2. **Key Dependencies**
+   - Express 4.x: Core web framework with regular security updates
+   - Helmet: Comprehensive HTTP security headers
+   - BcryptJS: Secure password hashing
+   - CSRF-CSRF: Advanced CSRF protection
+   - Express-Rate-Limit: Protection against brute force attacks
+
+3. **Dependency Update Policy**
+   - Review security bulletins for critical dependencies weekly
+   - Schedule monthly dependency updates for non-critical fixes
+   - Test application thoroughly after any dependency updates
+
+Run the following command before deployments to verify dependency security:
+```bash
+npm audit --production
+```
 
 ## Security Bug Reporting
 
