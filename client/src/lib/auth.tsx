@@ -79,8 +79,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await apiRequest('POST', API_ROUTES.LOGOUT, {});
+      const response = await apiRequest('POST', API_ROUTES.LOGOUT, {});
+      const data = await response.json();
+      
+      // Clear user from state
       setUser(null);
+      
+      // If the server indicates we need to redirect to Auth0 logout
+      if (data.redirect && data.redirectUrl) {
+        console.log('Redirecting to Auth0 logout URL:', data.redirectUrl);
+        // Use window.location for full page redirect to Auth0
+        window.location.href = data.redirectUrl;
+        return; // Exit early since we're redirecting
+      }
+      
+      // Normal logout flow (no SSO)
       navigate(APP_ROUTES.LOGIN);
       toast({
         title: 'Logged out',
@@ -93,6 +106,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: 'Logout failed',
         description: 'An error occurred during logout',
       });
+      
+      // Even if logout fails on server, clear local state
+      setUser(null);
+      navigate(APP_ROUTES.LOGIN);
     }
   };
 

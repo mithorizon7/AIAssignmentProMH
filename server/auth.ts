@@ -514,6 +514,18 @@ export function configureAuth(app: any) {
     }
   });
 
+  // Helper function to determine login page URL
+  const getLoginPageUrl = () => {
+    // Use BASE_URL if available, or construct from app's host
+    if (process.env.BASE_URL) {
+      return `${process.env.BASE_URL.replace(/\/$/, '')}/auth`;
+    }
+    
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const host = app.get('host') || 'localhost:5000';
+    return `${protocol}://${host}/auth`;
+  };
+
   // Logout endpoint
   app.post('/api/auth/logout', (req: Request, res: Response) => {
     // Store user info before logout for logging
@@ -521,6 +533,9 @@ export function configureAuth(app: any) {
     const userId = user?.id;
     const username = user?.username;
     const ipAddress = req.ip || 'unknown';
+    
+    // Determine if this user authenticated via Auth0 SSO
+    const isAuth0User = user?.auth0Sub || false;
 
     req.logout(() => {
       // Log the logout event if the user was authenticated
@@ -528,7 +543,28 @@ export function configureAuth(app: any) {
         logLogout(userId, username, ipAddress);
       }
       
-      res.status(200).json({ message: 'Logged out successfully' });
+      // If user was authenticated via Auth0 and Auth0 is configured,
+      // redirect to Auth0 logout URL to complete SSO logout
+      if (isAuth0User && process.env.AUTH0_DOMAIN && process.env.AUTH0_CLIENT_ID) {
+        const loginPageUrl = getLoginPageUrl();
+        console.log(`[INFO] Redirecting to Auth0 logout URL with returnTo: ${loginPageUrl}`);
+        
+        const auth0LogoutUrl = `https://${process.env.AUTH0_DOMAIN}/v2/logout?client_id=${
+          process.env.AUTH0_CLIENT_ID
+        }&returnTo=${encodeURIComponent(loginPageUrl)}`;
+        
+        return res.status(200).json({ 
+          message: 'Logged out successfully',
+          redirect: true,
+          redirectUrl: auth0LogoutUrl
+        });
+      }
+      
+      // Standard logout for non-Auth0 users
+      res.status(200).json({ 
+        message: 'Logged out successfully',
+        redirect: false
+      });
     });
   });
 
