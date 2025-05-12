@@ -1,185 +1,90 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Request, Response, NextFunction } from 'express';
+import { rateLimit } from 'express-rate-limit';
+import { authRateLimiter, csrfRateLimiter, defaultRateLimiter, submissionRateLimiter } from '../../server/middleware/rate-limiter';
+import { 
+  logSecurityEvent,
+  AuditEventType
+} from '../../server/lib/audit-logger';
 
-describe('Rate Limiter Configuration', () => {
-  const originalEnv = { ...process.env };
-  let mockRequest: Partial<Request>;
-  let mockResponse: Partial<Response>;
-  let nextFunction: NextFunction;
-  let rateLimitMock: any;
-  
+// Mock the logger module
+vi.mock('../../server/lib/audit-logger', () => ({
+  logSecurityEvent: vi.fn(),
+  AuditEventType: {
+    RATE_LIMIT_EXCEEDED: 'rate_limit_exceeded'
+  }
+}));
+
+// Mock express-rate-limit
+vi.mock('express-rate-limit', () => ({
+  rateLimit: vi.fn().mockImplementation((config) => {
+    // Store the handler function so we can access it in tests
+    return {
+      _handler: config.handler,
+      _windowMs: config.windowMs,
+      _max: config.max
+    };
+  })
+}));
+
+describe('Rate Limiters', () => {
   beforeEach(() => {
-    // Reset environment
-    process.env = { ...originalEnv };
-    process.env.NODE_ENV = 'test';
-    
-    // Create mock request and response
-    mockRequest = {
-      ip: '127.0.0.1',
-      path: '/test-path',
-      headers: {}
-    };
-    
-    mockResponse = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
-      sendStatus: vi.fn()
-    };
-    
-    nextFunction = vi.fn();
-    
-    // Create a mock for express-rate-limit
-    rateLimitMock = vi.fn().mockImplementation((options) => {
-      // Return middleware function
-      return (req: Request, res: Response, next: NextFunction) => {
-        // Skip rate limiting if the skip function returns true
-        if (options.skip && options.skip(req)) {
-          return next();
-        }
-        
-        // For testing, simulate rate limiting based on a special header
-        if (req.headers['x-test-rate-limit-exceeded'] === 'true') {
-          return options.handler(req, res, next);
-        }
-        
-        // Otherwise, proceed normally
-        next();
-      };
-    });
+    vi.resetAllMocks();
+    // Mock environment variables
+    process.env.NODE_ENV = 'production'; // Test stricter limits in production
   });
   
   afterEach(() => {
-    // Restore environment
-    process.env = { ...originalEnv };
-    vi.resetAllMocks();
+    vi.clearAllMocks();
+    process.env.NODE_ENV = 'development'; // Reset back to development
   });
   
-  it('should configure different rate limiters with appropriate limits', () => {
-    // Define rate limiter creator function
-    const createRateLimiter = (options = {}) => {
-      const defaultOptions = {
-        windowMs: 15 * 60 * 1000, // 15 minutes
-        limit: 100, // default limit
-        standardHeaders: true,
-        legacyHeaders: false,
-        message: 'Too many requests from this IP, please try again later.',
-        handler: (req: Request, res: Response) => {
-          res.status(429).json({
-            status: 'error',
-            message: 'Rate limit exceeded. Please try again later.'
-          });
-        }
-      };
-      
-      return rateLimitMock({ ...defaultOptions, ...options });
-    };
+  it('should configure auth rate limiter with correct limits', () => {
+    expect(rateLimit).toHaveBeenCalled();
+    expect(authRateLimiter).toBeDefined();
     
-    // Create specialized rate limiters
-    const defaultLimiter = createRateLimiter();
-    const authLimiter = createRateLimiter({ 
-      windowMs: 60 * 1000, // 1 minute
-      limit: 10 
-    });
-    const submissionLimiter = createRateLimiter({ 
-      windowMs: 60 * 1000, // 1 minute
-      limit: 5 
-    });
-    const csrfLimiter = createRateLimiter({ 
-      windowMs: 60 * 1000, // 1 minute
-      limit: 20 
-    });
-    
-    // Verify rate limiters were created with appropriate parameters
-    expect(rateLimitMock).toHaveBeenCalledTimes(4);
-    
-    // Check the first call (default limiter)
-    expect(rateLimitMock.mock.calls[0][0]).toMatchObject({
-      windowMs: 15 * 60 * 1000,
-      limit: 100
-    });
-    
-    // Check the second call (auth limiter)
-    expect(rateLimitMock.mock.calls[1][0]).toMatchObject({
-      windowMs: 60 * 1000,
-      limit: 10
-    });
-    
-    // Check the third call (submission limiter)
-    expect(rateLimitMock.mock.calls[2][0]).toMatchObject({
-      windowMs: 60 * 1000,
-      limit: 5
-    });
-    
-    // Check the fourth call (csrf limiter)
-    expect(rateLimitMock.mock.calls[3][0]).toMatchObject({
-      windowMs: 60 * 1000,
-      limit: 20
-    });
-    
-    // Verify the limiters are functions
-    expect(typeof defaultLimiter).toBe('function');
-    expect(typeof authLimiter).toBe('function');
-    expect(typeof submissionLimiter).toBe('function');
-    expect(typeof csrfLimiter).toBe('function');
+    // Verify the limits are production-appropriate for auth
+    if (process.env.NODE_ENV === 'production') {
+      expect(authRateLimiter._windowMs).toBeLessThanOrEqual(15 * 60 * 1000); // 15 minutes or less
+      expect(authRateLimiter._max).toBeLessThanOrEqual(10); // No more than 10 attempts 
+    }
   });
   
-  it('should skip rate limiting in development environment', () => {
-    // Set development environment
-    process.env.NODE_ENV = 'development';
+  it('should configure submission rate limiter with correct limits', () => {
+    expect(submissionRateLimiter).toBeDefined();
     
-    // Create rate limiter with development detection
-    const createRateLimiter = () => {
-      return rateLimitMock({
-        windowMs: 15 * 60 * 1000,
-        limit: 100,
-        skip: (req: Request) => process.env.NODE_ENV === 'development'
-      });
-    };
-    
-    const limiter = createRateLimiter();
-    
-    // Call the rate limiter
-    limiter(mockRequest as Request, mockResponse as Response, nextFunction);
-    
-    // Expect next to have been called without rate limiting
-    expect(nextFunction).toHaveBeenCalled();
+    // Verify the limits are production-appropriate for submissions
+    if (process.env.NODE_ENV === 'production') {
+      expect(submissionRateLimiter._windowMs).toBeLessThanOrEqual(60 * 60 * 1000); // 1 hour or less
+      expect(submissionRateLimiter._max).toBeLessThanOrEqual(30); // No more than 30 submissions
+    }
   });
   
-  it('should apply rate limiting in production environment', () => {
-    // Set production environment
-    process.env.NODE_ENV = 'production';
-    
-    // Create rate limiter and specify to apply rate limiting
-    const createRateLimiter = () => {
-      return rateLimitMock({
-        windowMs: 15 * 60 * 1000,
-        limit: 100,
-        skip: (req: Request) => process.env.NODE_ENV === 'development',
-        handler: (req: Request, res: Response) => {
-          res.status(429).json({
-            status: 'error',
-            message: 'Rate limit exceeded. Please try again later.'
-          });
-        }
-      });
+  it('should log rate limit exceeded events and audit them', () => {
+    // Create a mock request and response
+    const req = { ip: '192.168.1.1', method: 'POST', path: '/api/auth/login' };
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn()
     };
     
-    const limiter = createRateLimiter();
+    // Call the handler directly with mock request and response
+    authRateLimiter._handler(req, res);
     
-    // Set header to simulate reaching rate limit
-    mockRequest.headers = {
-      'x-test-rate-limit-exceeded': 'true'
-    };
-    
-    // Call the rate limiter
-    limiter(mockRequest as Request, mockResponse as Response, nextFunction);
-    
-    // Expect rate limiting to have been applied
-    expect(mockResponse.status).toHaveBeenCalledWith(429);
-    expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'error',
-      message: 'Rate limit exceeded. Please try again later.'
+    // Verify response was set correctly
+    expect(res.status).toHaveBeenCalledWith(429);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ 
+      message: expect.stringContaining('Too many requests')
     }));
-    expect(nextFunction).not.toHaveBeenCalled();
+    
+    // Verify audit logging was called
+    expect(logSecurityEvent).toHaveBeenCalledWith(
+      AuditEventType.RATE_LIMIT_EXCEEDED,
+      req.ip,
+      undefined,
+      undefined,
+      expect.objectContaining({
+        path: req.path
+      })
+    );
   });
 });

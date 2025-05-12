@@ -232,6 +232,20 @@ export function configureAuth(app: any) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
     if ((req.user as any).role !== role) {
+      // Log permission denied event for security auditing
+      logSecurityEvent(
+        AuditEventType.PERMISSION_DENIED,
+        req.ip || 'unknown',
+        (req.user as any).id,
+        (req.user as any).username,
+        {
+          requiredRole: role,
+          actualRole: (req.user as any).role,
+          path: req.path,
+          method: req.method
+        }
+      );
+      
       return res.status(403).json({ message: 'Forbidden' });
     }
     next();
@@ -271,12 +285,28 @@ export function configureAuth(app: any) {
           return next(err);
         }
         if (!user) {
+          // Log failed authentication attempt
+          logFailedAuth(
+            req.body.username,
+            req.ip || 'unknown',
+            info.message || 'Invalid credentials',
+            req.headers['user-agent'] as string
+          );
           return res.status(401).json({ message: info.message || 'Invalid credentials' });
         }
         req.login(user, (err) => {
           if (err) {
             return next(err);
           }
+          
+          // Log successful authentication
+          logSuccessfulAuth(
+            user.id,
+            user.username,
+            req.ip || 'unknown',
+            req.headers['user-agent'] as string
+          );
+          
           return res.status(200).json(user);
         });
       })(req, res, next);
@@ -287,7 +317,18 @@ export function configureAuth(app: any) {
 
   // Logout endpoint
   app.post('/api/auth/logout', (req: Request, res: Response) => {
+    // Store user info before logout for logging
+    const user = req.user as any;
+    const userId = user?.id;
+    const username = user?.username;
+    const ipAddress = req.ip || 'unknown';
+
     req.logout(() => {
+      // Log the logout event if the user was authenticated
+      if (userId && username) {
+        logLogout(userId, username, ipAddress);
+      }
+      
       res.status(200).json({ message: 'Logged out successfully' });
     });
   });
@@ -336,11 +377,29 @@ export function configureAuth(app: any) {
       // Remove password from response
       const { password: _, ...userWithoutPassword } = newUser;
       
+      // Log the user creation event for audit purposes
+      logUserCreation(
+        newUser.id,
+        newUser.username,
+        undefined,
+        undefined,
+        req.ip || 'unknown'
+      );
+      
       // Log the user in
       req.login(userWithoutPassword, (err) => {
         if (err) {
           return next(err);
         }
+        
+        // Log successful authentication after registration
+        logSuccessfulAuth(
+          newUser.id,
+          newUser.username,
+          req.ip || 'unknown',
+          req.headers['user-agent'] as string
+        );
+        
         return res.status(201).json(userWithoutPassword);
       });
     } catch (error) {
