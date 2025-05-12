@@ -20,12 +20,26 @@ logger.info(`BullMQ queue status`, {
   mode: process.env.NODE_ENV || 'development' 
 });
 
-// Configure queue connection options
-// Using the imported connectionOptions directly
+// Get the Redis configuration for BullMQ
+// We don't directly use the connectionOptions to avoid TypeScript errors
+// (ConnectionOptions in BullMQ doesn't fully match IoRedis options)
+const queueConnection = {
+  // For mock Redis in development, we pass a simple connection
+  connection: queueActive 
+    ? { 
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+        password: process.env.REDIS_PASSWORD,
+        username: process.env.REDIS_USERNAME,
+        db: parseInt(process.env.REDIS_DB || '0'),
+        maxRetriesPerRequest: null
+      }
+    : {} // Empty object for development mode (will use mock)
+};
 
 // Create queue configuration
 const queueConfig = {
-  connection: connectionOptions.connection as unknown as ConnectionOptions,
+  connection: queueConnection,
   // Additional queue settings for production
   ...(queueActive ? {
     defaultJobOptions: {

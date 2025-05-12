@@ -92,6 +92,22 @@ To test if Redis is properly configured:
 - **Performance Issues**: Consider increasing Redis memory or connection pool
 - **Lost Jobs**: Enable AOF persistence in Redis configuration
 
+### Common Deployment Errors
+
+- **BullMQ Redis configuration error: maxRetriesPerRequest must be null in Redis connection options**
+  - This happens because some Redis hosting providers reject connections with non-null maxRetriesPerRequest
+  - Solution: The application now sets maxRetriesPerRequest to null in all Redis connections
+  
+- **Missing Redis URL or connection parameters in environment variables**
+  - Ensure that either REDIS_URL or individual REDIS_* connection parameters are set in your deployment environment
+  - Most Redis providers give you a connection string to use for REDIS_URL
+  
+- **Application requires Redis in production environment**
+  - The application is configured to always use a real Redis instance in production
+  - If your deployment sets NODE_ENV=production, you MUST provide a valid Redis connection
+
 For more information, refer to:
 - [BullMQ Documentation](https://docs.bullmq.io/)
 - [Redis Documentation](https://redis.io/docs/)
+- [Redis Cloud](https://redis.com/redis-enterprise-cloud/overview/)
+- [Upstash Redis](https://upstash.com/) (Serverless Redis with reasonable free tier)

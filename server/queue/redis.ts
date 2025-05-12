@@ -177,6 +177,17 @@ function createRedisClient() {
   try {
     // Configure Redis client
     const redisUrl = process.env.REDIS_URL;
+    
+    // In production, check for Redis configuration
+    if (process.env.NODE_ENV === 'production' && !redisUrl && !process.env.REDIS_HOST) {
+      logger.error('CRITICAL: Redis configuration missing in production environment', {
+        error: 'Missing REDIS_URL or REDIS_HOST configuration',
+        required: true,
+        resolution: 'Set REDIS_URL or individual REDIS_* environment variables for production deployment'
+      });
+      // Still attempt to connect with defaults, but log a clear error
+    }
+    
     const client = redisUrl 
       ? new Redis(redisUrl, { 
           maxRetriesPerRequest: null, // Required by some Redis providers for production
@@ -187,9 +198,12 @@ function createRedisClient() {
     
     // Add error handling
     client.on('error', (err: Error & { code?: string }) => {
-      logger.error('Redis connection error', { 
+      const isProd = process.env.NODE_ENV === 'production';
+      logger.error(`Redis connection error${isProd ? ' - CRITICAL FOR PRODUCTION' : ''}`, { 
         error: err.message,
-        code: err.code || 'unknown' 
+        code: err.code || 'unknown',
+        environment: process.env.NODE_ENV || 'development',
+        resolution: isProd ? 'Provide valid Redis credentials in environment variables' : 'Development can continue with mock Redis'
       });
     });
     
@@ -207,11 +221,25 @@ function createRedisClient() {
     // Test connection immediately
     return client;
   } catch (error: any) {
-    logger.error('Failed to connect to Redis', { 
+    const isProd = process.env.NODE_ENV === 'production';
+    logger.error(`Failed to connect to Redis${isProd ? ' - CRITICAL FOR PRODUCTION' : ''}`, { 
       error: error.message, 
       code: error.code,
-      fallback: 'Using mock implementation'
+      environment: process.env.NODE_ENV || 'development',
+      resolution: isProd 
+        ? 'Provide valid Redis credentials in environment variables for production deployment' 
+        : 'Development can continue with mock Redis',
+      fallback: isProd ? 'Using mock implementation (NOT RECOMMENDED FOR PRODUCTION)' : 'Using mock implementation'
     });
+    
+    // If we're in production, display an additional critical warning
+    if (isProd) {
+      logger.error('CRITICAL WARNING: Running in production with mock Redis', {
+        impact: 'Jobs will not persist between restarts and cannot be distributed across instances',
+        recommendation: 'Provide valid Redis credentials via REDIS_URL or individual REDIS_* environment variables'
+      });
+    }
+    
     return new MockRedisClient();
   }
 }
@@ -222,7 +250,10 @@ const redisClient = createRedisClient();
 // Function to create connection options for BullMQ
 export function createRedisClientOptions() {
   return {
-    connection: redisClient
+    connection: redisClient,
+    // Ensure maxRetriesPerRequest is explicitly set to null
+    // This is required for compatibility with many Redis providers
+    maxRetriesPerRequest: null
   };
 }
 
