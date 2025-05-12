@@ -98,6 +98,28 @@ function validateSecurityEnvVars() {
       console.warn('\x1b[33m%s\x1b[0m', 'WARNING: Auth0 SSO environment variables (AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET) are not fully set in production. SSO functionality will be disabled.');
     }
   }
+  
+  // Check MIT Horizon OIDC environment variables
+  const mitHorizonEnabled = process.env.MIT_HORIZON_OIDC_ISSUER_URL && 
+                           process.env.MIT_HORIZON_OIDC_CLIENT_ID && 
+                           process.env.MIT_HORIZON_OIDC_CLIENT_SECRET &&
+                           process.env.MIT_HORIZON_OIDC_CALLBACK_URL;
+  
+  if (mitHorizonEnabled) {
+    console.log('[INFO] MIT Horizon OIDC configuration detected');
+    
+    // Validate the issuer URL and callback URL
+    if (!process.env.MIT_HORIZON_OIDC_ISSUER_URL.startsWith('https://')) {
+      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: MIT_HORIZON_OIDC_ISSUER_URL should be a full URL starting with https://');
+    }
+    
+    if (!process.env.MIT_HORIZON_OIDC_CALLBACK_URL.startsWith('http')) {
+      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: MIT_HORIZON_OIDC_CALLBACK_URL should be a full URL including http/https protocol.');
+    }
+  } else {
+    // Only log informational message
+    console.log('[INFO] MIT Horizon OIDC is not configured. This authentication method will be disabled.');
+  }
 }
 
 export function configureAuth(app: any) {
