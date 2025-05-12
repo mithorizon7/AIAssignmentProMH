@@ -307,7 +307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let content = code || '';
       let mimeType = null;
       let fileSize = null;
-      let contentType = null;
+      let contentType: ContentType | null = null;
       
       if (submissionType === 'file' && req.file) {
         // Get file metadata
@@ -343,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Set default metadata for code submissions
         mimeType = 'text/plain';
-        contentType = 'text';
+        contentType = 'text' as ContentType;
         fileSize = Buffer.from(content).length;
       } else {
         return res.status(400).json({ message: 'Invalid submission type or missing file' });
@@ -479,7 +479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Set default metadata for code submissions
         mimeType = 'text/plain';
-        contentType = 'text';
+        contentType = 'text' as ContentType;
         fileSize = Buffer.from(content).length;
       } else {
         return res.status(400).json({ message: 'Invalid submission type or missing file' });
@@ -876,7 +876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const inProgressCount = [...inProgressStudents.values()].filter(
+      const inProgressCount = Array.from(inProgressStudents.values()).filter(
         s => s.status === 'pending' || s.status === 'processing'
       ).length;
       
