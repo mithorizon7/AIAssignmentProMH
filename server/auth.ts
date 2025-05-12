@@ -301,7 +301,7 @@ export function configureAuth(app: any) {
                     user.username,
                     undefined, // No creator user ID for SSO registration
                     undefined, // No creator username for SSO registration
-                    req.ip // Use the IP address from the request
+                    'Auth0 SSO' // Use a descriptive string instead of IP
                   );
                 }
               }
@@ -318,8 +318,8 @@ export function configureAuth(app: any) {
             logSuccessfulAuth(
               user.id,
               user.username,
-              'auth0' as any, // Cast to any for type compatibility
-              profile.id as any // Cast to any for type compatibility
+              'Auth0 SSO', // Indicate SSO authentication method
+              profile.provider || 'Auth0' // Use the provider information from the Auth0 profile
             );
             
             // Create a new object without the password property
