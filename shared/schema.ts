@@ -107,6 +107,7 @@ export const submissions = pgTable("submissions", {
   fileName: text("file_name"),
   mimeType: text("mime_type"), // Added to store MIME type information
   fileSize: integer("file_size"), // Added to store file size in bytes
+  contentType: contentTypeEnum("content_type"), // Added to store the content type category
   content: text("content"),
   notes: text("notes"),
   status: submissionStatusEnum("status").notNull().default('pending'),
@@ -117,11 +118,14 @@ export const submissions = pgTable("submissions", {
     assignmentIdIdx: index("idx_submissions_assignment_id").on(table.assignmentId),
     userIdIdx: index("idx_submissions_user_id").on(table.userId),
     statusIdx: index("idx_submissions_status").on(table.status),
+    contentTypeIdx: index("idx_submissions_content_type").on(table.contentType),
     createdAtIdx: index("idx_submissions_created_at").on(table.createdAt),
     // Composite index for efficiently finding submissions by user and assignment
     userAssignmentIdx: index("idx_submissions_user_assignment").on(table.userId, table.assignmentId),
     // Composite index for efficiently finding all submissions for an assignment with a specific status
-    assignmentStatusIdx: index("idx_submissions_assignment_status").on(table.assignmentId, table.status)
+    assignmentStatusIdx: index("idx_submissions_assignment_status").on(table.assignmentId, table.status),
+    // Composite index for finding submissions by content type and status
+    contentTypeStatusIdx: index("idx_submissions_content_type_status").on(table.contentType, table.status)
   };
 });
 

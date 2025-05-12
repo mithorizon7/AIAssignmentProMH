@@ -441,7 +441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let content = '';
       let mimeType = null;
       let fileSize = null;
-      let contentType = null;
+      let contentType: "text" | "image" | "audio" | "video" | "document" | null = null;
       
       if (submissionType === 'file' && req.file) {
         // Get file metadata
