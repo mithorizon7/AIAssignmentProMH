@@ -332,8 +332,13 @@ export function configureAuth(app: any) {
                 }
               } else {
                 // Create new user with Auth0 information
-                // Generate username from email
-                const username = email.split('@')[0] + '_' + Math.floor(Math.random() * 10000);
+                // Generate username from email with improved sanitization and uniqueness
+                const sanitizedEmailPrefix = email.split('@')[0]
+                  .replace(/[^a-zA-Z0-9._-]/g, '') // Remove special chars except some safe ones
+                  .toLowerCase();
+                const randomSuffix = Math.floor(Math.random() * 10000);
+                const timestamp = Date.now().toString().slice(-4); // Last 4 digits of timestamp
+                const username = `${sanitizedEmailPrefix}_${randomSuffix}${timestamp}`;
                 
                 // Create new user with default role of student and null password (Auth0-only user)
                 user = await storage.createUser({
@@ -478,8 +483,13 @@ export function configureAuth(app: any) {
             }
           } else {
             // Create new user with MIT Horizon information
-            // Generate username from email
-            const username = email.split('@')[0] + '_' + Math.floor(Math.random() * 10000);
+            // Generate username from email with improved sanitization and uniqueness
+            const sanitizedEmailPrefix = email.split('@')[0]
+              .replace(/[^a-zA-Z0-9._-]/g, '') // Remove special chars except some safe ones
+              .toLowerCase();
+            const randomSuffix = Math.floor(Math.random() * 10000);
+            const timestamp = Date.now().toString().slice(-4); // Last 4 digits of timestamp
+            const username = `${sanitizedEmailPrefix}_${randomSuffix}${timestamp}`;
             
             // Create new user with default role of student and null password (MIT Horizon-only user)
             user = await storage.createUser({
