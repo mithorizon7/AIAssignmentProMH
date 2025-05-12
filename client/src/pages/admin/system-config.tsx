@@ -42,7 +42,7 @@ export default function SystemConfigPage() {
   const [aiSettings, setAiSettings] = useState({
     provider: "gemini",
     apiKey: "gem_••••••••••••••••••••••••",
-    model: "gemini-pro",
+    model: "models/gemini-2.5-flash-preview-04-17", // Updated to use the newest Gemini model
     maxTokens: 4096,
     temperature: 0.7,
     enableContentFiltering: true,
@@ -424,10 +424,12 @@ export default function SystemConfigPage() {
                           <SelectValue placeholder="Select model" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="gemini-pro">Gemini Pro</SelectItem>
-                          <SelectItem value="gemini-ultra">Gemini Ultra</SelectItem>
+                          {/* Gemini models */}
+                          <SelectItem value="models/gemini-2.5-flash-preview-04-17">Gemini 2.5 Flash (Preview)</SelectItem>
+                          <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
+                          {/* OpenAI models */}
+                          <SelectItem value="gpt-4.1-mini-2025-04-14">GPT-4.1 Mini</SelectItem>
                           <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                          <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-sm text-muted-foreground">
@@ -497,9 +499,9 @@ export default function SystemConfigPage() {
                   <Button
                     variant="outline"
                     onClick={() => setAiSettings({
-                      provider: "gemini",
+                      provider: "gemini", 
                       apiKey: "gem_••••••••••••••••••••••••",
-                      model: "gemini-pro",
+                      model: "models/gemini-2.5-flash-preview-04-17",
                       maxTokens: 4096,
                       temperature: 0.7,
                       enableContentFiltering: true,

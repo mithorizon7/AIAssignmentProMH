@@ -75,14 +75,28 @@ if (queueEvents) {
 // Initialize AI Service
 function createAIService() {
   // Select the appropriate AI adapter based on available API keys
+  // Prioritizing Gemini over OpenAI as per requirements
   let aiAdapter;
+  
+  // Try to use Gemini first (prioritized model)
   if (process.env.GEMINI_API_KEY) {
-    logger.info('AI adapter selected', { adapter: 'Gemini' });
+    logger.info('AI adapter selected', { 
+      adapter: 'Gemini',
+      model: 'models/gemini-2.5-flash-preview-04-17'
+    });
     aiAdapter = new GeminiAdapter();
-  } else if (process.env.OPENAI_API_KEY) {
-    logger.info('AI adapter selected', { adapter: 'OpenAI' });
+  } 
+  // Fall back to OpenAI only if Gemini API key is not available
+  else if (process.env.OPENAI_API_KEY) {
+    logger.info('AI adapter selected', { 
+      adapter: 'OpenAI', 
+      model: 'gpt-4.1-mini-2025-04-14',
+      note: 'Using OpenAI as fallback (Gemini API key not found)'
+    });
     aiAdapter = new OpenAIAdapter();
-  } else {
+  } 
+  // Final fallback if no keys are available
+  else {
     logger.warn('No AI API key found - Gemini will be used by default', {
       adapter: 'Gemini',
       warning: 'Missing API key - functionality may be limited'

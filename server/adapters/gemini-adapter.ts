@@ -15,7 +15,7 @@ export class GeminiAdapter implements AIAdapter {
     }
     
     this.generativeAI = new GoogleGenerativeAI(apiKey);
-    this.modelName = "gemini-2.5-pro-flash"; // or another available Gemini model name
+    this.modelName = "models/gemini-2.5-flash-preview-04-17"; // Default recommended model
     this.model = this.generativeAI.getGenerativeModel({ model: this.modelName });
   }
 

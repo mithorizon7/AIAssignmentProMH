@@ -13,8 +13,8 @@ export class OpenAIAdapter implements AIAdapter {
     }
     
     this.openai = new OpenAI({ apiKey });
-    // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-    this.model = "gpt-4o"; 
+    // Using gpt-4.1-mini-2025-04-14 as requested, different from gpt-4o which was the previous default
+    this.model = "gpt-4.1-mini-2025-04-14"; 
   }
 
   async generateCompletion(prompt: string) {
