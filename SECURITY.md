@@ -44,6 +44,20 @@ This prevents unauthorized submissions to assignments by simply guessing assignm
   - X-XSS-Protection: Enables browser XSS filters
   - X-Content-Type-Options: Prevents MIME-sniffing
   - Strict-Transport-Security: (In production) Enforces HTTPS
+  
+## Rate Limiting
+
+The application implements rate limiting to protect against abuse, brute force attacks, and potential DoS attempts:
+
+| Endpoint | Limit | Window | Purpose |
+|----------|-------|--------|---------|
+| `/api/auth/login` | 10 requests | 1 minute | Prevent brute force login attempts |
+| `/api/auth/register` | 10 requests | 1 minute | Prevent mass account creation |
+| `/api/anonymous-submissions` | 5 requests | 1 minute | Protect AI service from abuse |
+| `/api/assignments/code/:code` | 100 requests | 15 minutes | Prevent excessive assignment lookups |
+| `/api/csrf-token` | 20 requests | 1 minute | Allow reasonable token refresh rate |
+
+Rate limits are enforced on a per-IP basis, with proper consideration for proxies through use of X-Forwarded-For headers when configured. Rate limits are disabled in development mode for easier testing.
 
 ## Development vs. Production
 

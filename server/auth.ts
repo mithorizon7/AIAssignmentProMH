@@ -279,8 +279,8 @@ export function configureAuth(app: any) {
     res.json(req.user);
   });
   
-  // Register new user endpoint with password strength enforcement
-  app.post('/api/auth/register', async (req: Request, res: Response, next: NextFunction) => {
+  // Register new user endpoint with password strength enforcement (with rate limiting)
+  app.post('/api/auth/register', authRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate request against our enhanced schema
       const result = registerSchema.safeParse(req.body);

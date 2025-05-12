@@ -13,6 +13,7 @@ import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { submissions, feedback, users } from "@shared/schema";
 import { v4 as uuidv4 } from "uuid";
+import { defaultRateLimiter, submissionRateLimiter } from "./middleware/rate-limiter";
 import adminRoutes from "./routes/admin";
 import instructorRoutes from "./routes/instructor";
 
@@ -218,8 +219,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Lookup assignment by shareable code (no auth required)
-  app.get('/api/assignments/code/:code', async (req: Request, res: Response) => {
+  // Lookup assignment by shareable code (no auth required) - with rate limiting
+  app.get('/api/assignments/code/:code', defaultRateLimiter, async (req: Request, res: Response) => {
     try {
       const code = req.params.code;
       
@@ -254,8 +255,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Anonymous submission (via shareable link)
-  app.post('/api/anonymous-submissions', upload.single('file'), async (req: Request, res: Response) => {
+  // Anonymous submission (via shareable link) - with strict rate limiting
+  app.post('/api/anonymous-submissions', submissionRateLimiter, upload.single('file'), async (req: Request, res: Response) => {
     try {
       // Validate request with enhanced security for shareable code
       const submissionSchema = z.object({
