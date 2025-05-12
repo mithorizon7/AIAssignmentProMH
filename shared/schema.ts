@@ -87,6 +87,7 @@ export const assignments = pgTable("assignments", {
   status: assignmentStatusEnum("status").notNull().default('upcoming'),
   shareableCode: text("shareable_code"),
   rubric: json("rubric"),
+  instructorContext: json("instructor_context"), // Hidden information for AI evaluation only
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => {
