@@ -22,24 +22,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Handle Auth0 logout redirect if returning from Auth0 logout page
-    const handleAuth0LogoutRedirect = () => {
+    // Handle SSO logout redirects (Auth0 or MIT Horizon)
+    const handleSSOLogoutRedirect = () => {
       try {
-        if (typeof sessionStorage !== 'undefined' && 
-            sessionStorage.getItem('auth0LogoutRedirect') === 'true') {
-          console.log('Detected return from Auth0 logout, redirecting to login page');
-          sessionStorage.removeItem('auth0LogoutRedirect');
-          navigate(APP_ROUTES.LOGIN);
+        if (typeof sessionStorage !== 'undefined') {
+          // Check for Auth0 logout redirect
+          if (sessionStorage.getItem('auth0LogoutRedirect') === 'true') {
+            console.log('Detected return from Auth0 logout, redirecting to login page');
+            sessionStorage.removeItem('auth0LogoutRedirect');
+            navigate(APP_ROUTES.LOGIN);
+          }
+          
+          // Check for MIT Horizon OIDC logout redirect
+          if (sessionStorage.getItem('horizonLogoutRedirect') === 'true') {
+            console.log('Detected return from MIT Horizon logout, redirecting to login page');
+            sessionStorage.removeItem('horizonLogoutRedirect');
+            navigate(APP_ROUTES.LOGIN);
+          }
         }
       } catch (error) {
-        console.error('Error handling Auth0 logout redirect:', error);
+        console.error('Error handling SSO logout redirect:', error);
       }
     };
     
     async function loadUser() {
       try {
-        // Check for Auth0 logout redirect first
-        handleAuth0LogoutRedirect();
+        // Check for SSO logout redirects first
+        handleSSOLogoutRedirect();
         
         const response = await fetch(API_ROUTES.USER, {
           credentials: 'include',
@@ -102,14 +111,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Clear user from state
       setUser(null);
       
-      // If the server indicates we need to redirect to Auth0 logout
+      // If the server indicates we need to redirect for SSO logout
       if (data.redirect && data.redirectUrl) {
-        console.log('Redirecting to Auth0 logout URL:', data.redirectUrl);
+        // Determine if this is an Auth0 or MIT Horizon redirect based on the URL
+        const isAuth0Redirect = data.redirectUrl.includes('auth0.com');
+        const isMitHorizonRedirect = data.redirectUrl.includes('mit-horizon.auth0.com');
         
-        // Set a flag in sessionStorage to handle the redirect back
-        sessionStorage.setItem('auth0LogoutRedirect', 'true');
+        if (isMitHorizonRedirect) {
+          console.log('Redirecting to MIT Horizon logout URL:', data.redirectUrl);
+          
+          // Set a flag in sessionStorage to handle the redirect back
+          sessionStorage.setItem('horizonLogoutRedirect', 'true');
+        } else if (isAuth0Redirect) {
+          console.log('Redirecting to Auth0 logout URL:', data.redirectUrl);
+          
+          // Set a flag in sessionStorage to handle the redirect back
+          sessionStorage.setItem('auth0LogoutRedirect', 'true');
+        } else {
+          console.log('Redirecting to SSO logout URL:', data.redirectUrl);
+          // Generic SSO logout - use auth0 flag as a fallback
+          sessionStorage.setItem('auth0LogoutRedirect', 'true');
+        }
         
-        // Use window.location for full page redirect to Auth0
+        // Use window.location for full page redirect to SSO provider
         window.location.href = data.redirectUrl;
         return; // Exit early since we're redirecting
       }

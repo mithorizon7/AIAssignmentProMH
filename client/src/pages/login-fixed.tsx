@@ -130,10 +130,12 @@ export default function Login() {
             
             <div className="text-center mb-4">
               <p className="text-sm text-neutral-500 mb-2">Or sign in with</p>
+              
+              {/* MIT Horizon Direct OIDC Button */}
               <Button 
                 variant="outline" 
-                className="w-full border-2 border-mit-red hover:bg-mit-red/10"
-                onClick={() => window.location.href = '/api/auth-sso/login'}
+                className="w-full border-2 border-mit-red hover:bg-mit-red/10 mb-3"
+                onClick={() => window.location.href = '/api/auth/horizon/login'}
               >
                 <svg 
                   className="h-5 w-5 mr-2" 
@@ -144,7 +146,24 @@ export default function Login() {
                   <rect width="512" height="512" fill="#A31F34" rx="15%"/>
                   <path fill="#fff" d="M157 291v-70h-35v-28h106v28h-36v70h-35m24-119V76h32l18 66 17-66h33v96h-30v-69l-19 69h-21l-18-69v69h-12"/>
                 </svg>
-                Log in with institutional account
+                Log in with MIT Horizon
+              </Button>
+              
+              {/* Auth0 SSO Button */}
+              <Button 
+                variant="outline" 
+                className="w-full border border-gray-200 hover:bg-gray-50"
+                onClick={() => window.location.href = '/api/auth-sso/login'}
+              >
+                <svg 
+                  className="h-5 w-5 mr-2" 
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-9h10v2H7v-2z"/>
+                </svg>
+                Log in with Google
               </Button>
             </div>
             
