@@ -4,7 +4,9 @@ import {
   assignments, 
   submissions, 
   feedback,
-  enrollments, 
+  enrollments,
+  systemSettings,
+  fileTypeSettings,
   type User, 
   type InsertUser, 
   type Course, 
@@ -17,6 +19,10 @@ import {
   type InsertFeedback,
   type Enrollment,
   type InsertEnrollment,
+  type SystemSetting,
+  type InsertSystemSetting,
+  type FileTypeSetting,
+  type InsertFileTypeSetting,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, gte, lt, like, or, sql } from "drizzle-orm";
@@ -59,6 +65,16 @@ export interface IStorage {
   getFeedback(id: number): Promise<Feedback | undefined>;
   getFeedbackBySubmissionId(submissionId: number): Promise<Feedback | undefined>;
   createFeedback(feedback: InsertFeedback): Promise<Feedback>;
+
+  // System Settings operations
+  getSystemSetting(key: string): Promise<SystemSetting | undefined>;
+  upsertSystemSetting(setting: InsertSystemSetting): Promise<SystemSetting>;
+  listSystemSettings(): Promise<SystemSetting[]>;
+  
+  // File Type Settings operations
+  getFileTypeSettings(contentType: string, context?: string, contextId?: number): Promise<FileTypeSetting[]>;
+  upsertFileTypeSetting(setting: InsertFileTypeSetting): Promise<FileTypeSetting>;
+  checkFileTypeEnabled(contentType: string, extension: string, mimeType: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -235,22 +251,161 @@ export class DatabaseStorage implements IStorage {
 
   // Feedback operations
   async getFeedback(id: number): Promise<Feedback | undefined> {
-    const [feedback] = await db.select()
-      .from(feedback)
-      .where(eq(feedback.id, id));
-    return feedback;
+    const result = await db.select().from(feedback).where(eq(feedback.id, id));
+    return result[0];
   }
 
   async getFeedbackBySubmissionId(submissionId: number): Promise<Feedback | undefined> {
-    const [feedbackItem] = await db.select()
-      .from(feedback)
-      .where(eq(feedback.submissionId, submissionId));
-    return feedbackItem;
+    const result = await db.select().from(feedback).where(eq(feedback.submissionId, submissionId));
+    return result[0];
   }
 
   async createFeedback(insertFeedback: InsertFeedback): Promise<Feedback> {
-    const [feedbackItem] = await db.insert(feedback).values(insertFeedback).returning();
-    return feedbackItem;
+    const result = await db.insert(feedback).values(insertFeedback).returning();
+    return result[0];
+  }
+
+  // System Settings operations
+  async getSystemSetting(key: string): Promise<SystemSetting | undefined> {
+    const result = await db.select()
+      .from(systemSettings)
+      .where(eq(systemSettings.key, key));
+    return result[0];
+  }
+
+  async upsertSystemSetting(setting: InsertSystemSetting): Promise<SystemSetting> {
+    // Check if setting exists
+    const existingSetting = await this.getSystemSetting(setting.key);
+    
+    if (existingSetting) {
+      // Update existing setting
+      const result = await db.update(systemSettings)
+        .set({
+          ...setting,
+          updatedAt: new Date()
+        })
+        .where(eq(systemSettings.key, setting.key))
+        .returning();
+      return result[0];
+    } else {
+      // Insert new setting
+      const result = await db.insert(systemSettings)
+        .values(setting)
+        .returning();
+      return result[0];
+    }
+  }
+
+  async listSystemSettings(): Promise<SystemSetting[]> {
+    return await db.select().from(systemSettings);
+  }
+  
+  // File Type Settings operations
+  async getFileTypeSettings(
+    contentType: string,
+    context: string = 'system',
+    contextId?: number
+  ): Promise<FileTypeSetting[]> {
+    // Create base query
+    const query = db.select().from(fileTypeSettings);
+    
+    // Apply filters
+    const filters = [];
+    filters.push(eq(fileTypeSettings.contentType, contentType));
+    filters.push(eq(fileTypeSettings.context, context));
+    
+    if (contextId !== undefined) {
+      filters.push(eq(fileTypeSettings.contextId, contextId));
+    } else {
+      filters.push(sql`${fileTypeSettings.contextId} IS NULL`);
+    }
+    
+    // Execute query with all filters
+    return await query.where(and(...filters));
+  }
+
+  async upsertFileTypeSetting(setting: InsertFileTypeSetting): Promise<FileTypeSetting> {
+    // Try to find existing setting
+    const filters = [];
+    filters.push(eq(fileTypeSettings.contentType, setting.contentType));
+    filters.push(eq(fileTypeSettings.context, setting.context));
+    
+    if (setting.contextId) {
+      filters.push(eq(fileTypeSettings.contextId, setting.contextId));
+    } else {
+      filters.push(sql`${fileTypeSettings.contextId} IS NULL`);
+    }
+    
+    const result = await db.select()
+      .from(fileTypeSettings)
+      .where(and(...filters));
+    
+    const existingSetting = result[0];
+    
+    if (existingSetting) {
+      // Update existing setting
+      const updateResult = await db.update(fileTypeSettings)
+        .set({
+          enabled: setting.enabled,
+          extensions: setting.extensions,
+          mimeTypes: setting.mimeTypes,
+          maxSize: setting.maxSize,
+          updatedAt: new Date(),
+          updatedBy: setting.updatedBy
+        })
+        .where(eq(fileTypeSettings.id, existingSetting.id))
+        .returning();
+      return updateResult[0];
+    } else {
+      // Insert new setting
+      const insertResult = await db.insert(fileTypeSettings)
+        .values(setting)
+        .returning();
+      return insertResult[0];
+    }
+  }
+
+  async checkFileTypeEnabled(
+    contentType: string,
+    extension: string,
+    mimeType: string
+  ): Promise<boolean> {
+    try {
+      // Get system settings for this content type
+      const query = db.select().from(fileTypeSettings)
+        .where(
+          and(
+            eq(fileTypeSettings.contentType, contentType),
+            eq(fileTypeSettings.context, 'system'),
+            eq(fileTypeSettings.enabled, true)
+          )
+        );
+      
+      const settings = await query;
+      
+      if (settings.length === 0) {
+        return false; // Content type not enabled at system level
+      }
+      
+      const systemSetting = settings[0];
+      
+      // Check if the extension and MIME type are allowed
+      const allowedExtensions = systemSetting.extensions as string[];
+      const allowedMimeTypes = systemSetting.mimeTypes as string[];
+      
+      const extMatch = allowedExtensions.some(ext => 
+        ext.toLowerCase() === extension.toLowerCase().replace(/^\./, '')
+      );
+      
+      const mimeMatch = allowedMimeTypes.some(mime => 
+        mime.toLowerCase() === mimeType.toLowerCase()
+      );
+      
+      return extMatch && mimeMatch;
+    } catch (error) {
+      console.error('Error checking file type enablement:', error);
+      return false; // Default to disallowed in case of error
+    }
   }
 }
 

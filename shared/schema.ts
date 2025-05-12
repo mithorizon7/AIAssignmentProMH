@@ -195,6 +195,41 @@ export const feedbackRelations = {
   }),
 };
 
+// System Settings
+export const systemSettings = pgTable("system_settings", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  value: json("value").$type<any>().notNull(),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedBy: integer("updated_by").references(() => users.id),
+}, (table) => {
+  return {
+    keyIdx: index("idx_system_settings_key").on(table.key)
+  };
+});
+
+// File Type Settings
+export const fileTypeSettings = pgTable("file_type_settings", {
+  id: serial("id").primaryKey(),
+  context: text("context").notNull(), // 'system', 'course', or 'user'
+  contextId: integer("context_id"), // ID of the course or user, null for system
+  contentType: contentTypeEnum("content_type").notNull(),
+  enabled: boolean("enabled").notNull().default(false),
+  extensions: json("extensions").$type<string[]>().notNull(),
+  mimeTypes: json("mime_types").$type<string[]>().notNull(),
+  maxSize: integer("max_size").notNull(), // in bytes
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedBy: integer("updated_by").references(() => users.id),
+}, (table) => {
+  return {
+    // Composite index for efficient lookup by context and type
+    contextTypeIdx: index("idx_file_type_settings_context_type").on(table.context, table.contentType),
+    // Composite index for efficient lookup by context ID and type
+    contextIdTypeIdx: index("idx_file_type_settings_context_id_type").on(table.contextId, table.contentType)
+  };
+});
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertCourseSchema = createInsertSchema(courses).omit({ id: true, createdAt: true });
@@ -202,6 +237,8 @@ export const insertEnrollmentSchema = createInsertSchema(enrollments).omit({ id:
 export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertFeedbackSchema = createInsertSchema(feedback).omit({ id: true, createdAt: true });
+export const insertSystemSettingsSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true });
+export const insertFileTypeSettingsSchema = createInsertSchema(fileTypeSettings).omit({ id: true, updatedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -221,3 +258,9 @@ export type InsertSubmission = z.infer<typeof insertSubmissionSchema>;
 
 export type Feedback = typeof feedback.$inferSelect;
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+
+export type SystemSetting = typeof systemSettings.$inferSelect;
+export type InsertSystemSetting = z.infer<typeof insertSystemSettingsSchema>;
+
+export type FileTypeSetting = typeof fileTypeSettings.$inferSelect;
+export type InsertFileTypeSetting = z.infer<typeof insertFileTypeSettingsSchema>;
