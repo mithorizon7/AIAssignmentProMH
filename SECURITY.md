@@ -68,6 +68,43 @@ The application has stricter security settings in production:
 - HTTP Strict Transport Security headers are enabled in production
 - Error messages are less verbose in production to avoid information disclosure
 
+## Security Testing
+
+Our security features have been extensively tested to ensure they function correctly. The security tests cover:
+
+1. **Environment Variable Validation**
+   - Tests validating required secrets (SESSION_SECRET, CSRF_SECRET)
+   - Tests confirming application behavior when secrets are missing or insecure
+   - Tests ensuring more stringent requirements in production mode
+
+2. **Rate Limiting**
+   - Tests validating different rate limiters are correctly configured
+   - Tests confirming rate limiting is properly applied in production
+   - Tests verifying rate limiting is bypassed in development
+   - Tests validating proper handling of proxy IPs
+
+3. **Shareable Code Validation**
+   - Tests ensuring anonymous submissions require a valid shareable code
+   - Tests verifying code validation against assignment ID
+   - Tests confirming proper error responses for invalid codes
+   - Tests checking proper error handling
+
+4. **CSRF Protection**
+   - Tests ensuring requests without valid CSRF tokens are rejected
+   - Tests confirming requests with valid CSRF tokens are accepted
+   - Tests verifying secure token generation
+   - Tests validating secure cookie settings in production
+   - Tests confirming CSRF protection is applied to all non-GET routes
+
+5. **Password Security**
+   - Tests verifying bcrypt is used with proper salt rounds
+   - Tests confirming password hashing creates secure hashes
+   - Tests validating correct passwords verify successfully
+   - Tests ensuring incorrect passwords are rejected
+   - Tests checking that same password produces different hashes
+
+All security tests can be found in the `test/unit/` directory.
+
 ## Security Bug Reporting
 
 If you discover a security vulnerability, please report it responsibly by contacting the maintainers directly rather than opening a public issue.
