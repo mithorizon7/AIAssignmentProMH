@@ -1,0 +1,51 @@
+We are significantly expanding AIGrader's capabilities to support a wider range of file types for AI analysis, moving beyond just code and basic text.
+Goal: Enable the platform to accept and process common text documents, images, audio, and video files for AI-driven feedback.
+•	Default Allowed Types: By default, students should be able to upload common document types (PDF, TXT, HTML, CSS, Markdown, CSV, XML, RTF, JS, PY) and image types (JPEG, PNG, WEBP, GIF, BMP, HEIC, HEIF).
+•	Configurable Advanced Types: Uploads for audio and video files should be disabled by default but configurable at a system, course, or teacher level (to be managed by an Administrator). This allows controlled rollout due to potentially higher processing costs and storage needs.
+Rationale: The underlying AI model (Gemini) can analyze multimodal inputs. We want to leverage this to make AIGrader applicable to a broader range of assignments across different disciplines, allowing for richer and more diverse student submissions.
+Existing System: Current file type support is limited (defined in client/src/lib/constants.ts and handled primarily as text or basic file URLs). The AIService primarily expects text content.
+Key Areas of Impact & High-Level Tasks:
+1.	File Type Configuration & Validation:
+o	Update client-side (client/src/lib/constants.ts, client/src/lib/utils/file.ts) and server-side (Multer in server/routes.ts) file type allowlists and validation logic. Distinguish between default types and conditionally enabled types (audio/video).
+o	Introduce a mechanism (e.g., database settings, environment variables manageable by an Admin) to enable audio/video uploads for specific contexts (teachers, courses, or system-wide).
+2.	Cloud Storage Integration:
+o	Implement robust cloud storage in StorageService (server/services/storage-service.ts) to replace mock storage. Handle secure uploads and URL generation.
+3.	Database Schema Updates (shared/schema.ts):
+o	Add a mimeType field to the submissions table.
+o	Consider how to store the configuration for enabled file types (e.g., a new table for course/teacher settings or extending existing tables).
+4.	AI Service & Adapter Enhancements (server/services/ai-service.ts, GeminiAdapter.ts, etc.):
+o	Refactor SubmissionAnalysisRequest to accept fileUrl and fileMimeType.
+o	Modify analyzeSubmission to handle multimodal input based on MIME type.
+o	For binary files (images, audio, video, PDF), adapters must fetch content from cloud storage and prepare it for the AI model's API (e.g., base64 encoding, file URIs for Gemini File Service). Refer to Gemini API documentation for image, audio, video, and document processing.
+Explore integrating Gemini's specific Code Execution or advanced document processing features where applicable.
+
+•  Gemini API Docs Alignment: The "Code Execution" documentation explains this is implemented as a "Tool" (tool_code_interpreter). The model doesn't execute code directly but generates code and can then request its execution via this tool if the tool is declared in the API call. Your backend would then receive this request, execute the code in a secure environment, and return the result to the model for it to use in its response.
+•  Refinement/Emphasis for Coder: Clarify that enabling code execution involves:
+1.	Declaring the codeExecution tool (or a custom tool that wraps it) in the tools parameter of the generateContentAPI call.
+2.	Your backend must be prepared to handle a functionCall from the model, securely execute the provided code, and then send a functionResponse back to the model with the execution output.
+3.	The prompt should instruct the AI that it can use the code execution tool if relevant for analyzing the student's submission.
+o	
+5.	Worker Updates (server/queue/bullmq-submission-queue.ts):
+o	Ensure the worker correctly passes fileUrl, mimeType, or content to the AIService.
+6.	Frontend UI (client/src/...):
+o	Update file upload components (react-dropzone) to reflect allowed types (dynamically if configuration changes).
+o	Enhance getFileIconByExtension for new types.
+7.	File Size Management:
+o	Review and adjust FILE_TYPES.MAX_SIZE and Multer limits, potentially having different limits or configurations based on whether advanced types like video are enabled.
+8.	Security:
+o	Reinforce server-side MIME type validation.
+o	Update Content Security Policy for cloud storage domains.
+o	Ensure no direct execution or unsafe serving of uploaded files.
+9.	Cost & Resource Management:
+o	Be mindful that processing and storing large media files will have higher costs. The configurable enablement of audio/video is a step towards managing this.
+•	NOTES: 
+File API Workflow: For video, audio, and other large files requiring the File API, ensure the coder understands the two-step process: (1) AIGrader uploads the file to the Gemini File API, then (2) uses the returned URI in the multimodal prompt to the Gemini model. This is distinct from just passing a URL from AIGrader's own S3 bucket directly into the main prompt for these types (though for some very simple cases or direct image linking, direct URLs might work, the File API is the documented robust approach for media).
+•	•  Refinement/Emphasis for Coder: The workflow for a video/audio/large PDF submission would be:
+o	Student uploads to AIGrader.
+o	AIGrader stores it in its own cloud storage (e.g., S3).
+o	When AI analysis is requested, the AIGrader backend fetches the file (or a stream) from its S3.
+o	The AIGrader backend then uploads this file to the Gemini File API.
+o	Gemini File API returns a URI.
+o	AIGrader backend makes the generateContent call to Gemini, providing this URI in the fileData part.
+
+Your task is to implement these features robustly, securely, and in a way that integrates smoothly with the existing platform architecture, ensuring all changes are thoroughly tested. This includes the new requirement for an admin-configurable setting for enabling audio/video uploads, which will influence how file type validation and UI options are presented.

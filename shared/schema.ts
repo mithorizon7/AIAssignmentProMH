@@ -30,6 +30,7 @@ export interface CriteriaScore {
 export const userRoleEnum = pgEnum('user_role', ['student', 'instructor', 'admin']);
 export const assignmentStatusEnum = pgEnum('assignment_status', ['active', 'completed', 'upcoming']);
 export const submissionStatusEnum = pgEnum('submission_status', ['pending', 'processing', 'completed', 'failed']);
+export const contentTypeEnum = pgEnum('content_type', ['text', 'image', 'audio', 'video', 'document']);
 
 // Users
 export const users = pgTable("users", {
@@ -104,6 +105,8 @@ export const submissions = pgTable("submissions", {
   userId: integer("user_id").references(() => users.id).notNull(),
   fileUrl: text("file_url"),
   fileName: text("file_name"),
+  mimeType: text("mime_type"), // Added to store MIME type information
+  fileSize: integer("file_size"), // Added to store file size in bytes
   content: text("content"),
   notes: text("notes"),
   status: submissionStatusEnum("status").notNull().default('pending'),
