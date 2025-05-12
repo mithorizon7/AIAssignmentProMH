@@ -74,9 +74,18 @@ function validateSecurityEnvVars() {
   if (auth0Enabled) {
     console.log('[INFO] Auth0 SSO configuration detected');
     
-    // Validate Auth0 callback URL
+    // Check for BASE_URL environment variable which is preferred for production deployments
+    if (isProduction && !process.env.BASE_URL) {
+      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: BASE_URL environment variable is not set in production. This is recommended for ensuring correct callback URLs.');
+    }
+    
+    // Validate Auth0 callback URL - explicit configuration is strongly recommended
     if (!process.env.AUTH0_CALLBACK_URL) {
-      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: AUTH0_CALLBACK_URL is not set. This is required for Auth0 SSO to work correctly.');
+      if (isProduction) {
+        console.error('\x1b[31m%s\x1b[0m', 'ERROR: AUTH0_CALLBACK_URL is not set in production. Auth0 SSO will likely fail without an explicit callback URL.');
+      } else {
+        console.warn('\x1b[33m%s\x1b[0m', 'WARNING: AUTH0_CALLBACK_URL is not set. A fallback URL will be generated, but explicit configuration is recommended.');
+      }
     } else if (!process.env.AUTH0_CALLBACK_URL.startsWith('http')) {
       console.warn('\x1b[33m%s\x1b[0m', 'WARNING: AUTH0_CALLBACK_URL should be a full URL including http/https protocol.');
     }
@@ -234,13 +243,35 @@ export function configureAuth(app: any) {
   if (auth0Enabled) {
     console.log('[INFO] Configuring Auth0 strategy for SSO');
     
+    // Determine the most reliable callback URL to use
+    const getCallbackUrl = () => {
+      // 1. Use explicit AUTH0_CALLBACK_URL if provided (highest priority)
+      if (process.env.AUTH0_CALLBACK_URL) {
+        return process.env.AUTH0_CALLBACK_URL;
+      }
+      
+      // 2. Construct from BASE_URL if available (recommended for production)
+      if (process.env.BASE_URL) {
+        return `${process.env.BASE_URL.replace(/\/$/, '')}/api/auth-sso/callback`;
+      }
+      
+      // 3. Fallback to constructed URL from host (least reliable)
+      const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+      const host = app.get('host') || 'localhost:5000';
+      return `${protocol}://${host}/api/auth-sso/callback`;
+    };
+    
+    // Log the callback URL being used
+    const callbackUrl = getCallbackUrl();
+    console.log(`[INFO] Auth0 callback URL: ${callbackUrl}`);
+    
     passport.use(
       new Auth0Strategy(
         {
           domain: process.env.AUTH0_DOMAIN!,
           clientID: process.env.AUTH0_CLIENT_ID!,
           clientSecret: process.env.AUTH0_CLIENT_SECRET!,
-          callbackURL: process.env.AUTH0_CALLBACK_URL || `${process.env.NODE_ENV === 'production' ? 'https' : 'http'}://${app.get('host') || 'localhost:5000'}/api/auth-sso/callback`,
+          callbackURL: callbackUrl,
           state: true
         },
         async (accessToken: string, refreshToken: string, extraParams: any, profile: any, done: any) => {
