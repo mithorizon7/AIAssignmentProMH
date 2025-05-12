@@ -142,7 +142,10 @@ export default function CreateAssignment() {
                 </div>
                 <div>
                   <h3 className="font-medium">Description</h3>
-                  <p className="text-sm text-neutral-600">{createdAssignment.description}</p>
+                  <div 
+                    className="text-sm text-neutral-600 prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: createdAssignment.description }}
+                  />
                 </div>
                 <div className="flex flex-wrap gap-4">
                   <div>
@@ -158,7 +161,10 @@ export default function CreateAssignment() {
                 {createdAssignment.instructorContext && (
                   <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
                     <h3 className="font-medium text-amber-800">Instructor-Only Context (Hidden from Students)</h3>
-                    <p className="text-sm text-amber-700 whitespace-pre-wrap">{createdAssignment.instructorContext}</p>
+                    <div 
+                      className="text-sm text-amber-700 prose prose-sm max-w-none prose-amber"
+                      dangerouslySetInnerHTML={{ __html: createdAssignment.instructorContext }}
+                    />
                   </div>
                 )}
                 
@@ -295,10 +301,12 @@ export default function CreateAssignment() {
                           } />
                         </div>
                         <FormControl>
-                          <Textarea 
+                          <RichTextEditor
+                            value={field.value}
+                            onChange={field.onChange}
                             placeholder="Enter private guidance for the AI (not visible to students)"
                             className="min-h-32 bg-amber-50 border-amber-200"
-                            {...field} 
+                            isDarkBg={false}
                           />
                         </FormControl>
                         <FormDescription>

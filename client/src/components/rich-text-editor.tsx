@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 
 type RichTextEditorProps = {
-  value: string
+  value: string | undefined
   onChange: (value: string) => void
   placeholder?: string
   className?: string
@@ -63,7 +63,7 @@ const RichTextEditor = ({
         },
       }),
     ],
-    content: value,
+    content: value || '',
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML())
     },
@@ -81,7 +81,7 @@ const RichTextEditor = ({
   useEffect(() => {
     // Update content when value prop changes (for external updates)
     if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value)
+      editor.commands.setContent(value || '')
     }
   }, [value, editor])
 
