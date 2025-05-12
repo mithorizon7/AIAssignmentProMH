@@ -1,60 +1,104 @@
-import { describe, it, expect } from 'vitest';
-import { determineContentType, ContentType } from '../../server/utils/file-type-settings';
+/**
+ * @jest-environment node
+ */
+import { getMimeTypeFromExtension, getContentTypeFromMimeType, isCSVFile } from '../../server/utils/file-type-settings';
 
-describe('File Type Settings Utils', () => {
-  describe('determineContentType', () => {
-    it('should correctly identify text files', () => {
-      expect(determineContentType('txt', 'text/plain')).toBe('text');
-      expect(determineContentType('js', 'application/javascript')).toBe('text');
-      expect(determineContentType('html', 'text/html')).toBe('text');
-      expect(determineContentType('md', 'text/markdown')).toBe('text');
-      expect(determineContentType('json', 'application/json')).toBe('text');
+describe('File Type Settings', () => {
+  describe('getMimeTypeFromExtension', () => {
+    test('returns correct mime type for common extensions', () => {
+      expect(getMimeTypeFromExtension('jpg')).toBe('image/jpeg');
+      expect(getMimeTypeFromExtension('jpeg')).toBe('image/jpeg');
+      expect(getMimeTypeFromExtension('png')).toBe('image/png');
+      expect(getMimeTypeFromExtension('pdf')).toBe('application/pdf');
+      expect(getMimeTypeFromExtension('txt')).toBe('text/plain');
+      expect(getMimeTypeFromExtension('html')).toBe('text/html');
+      expect(getMimeTypeFromExtension('mp3')).toBe('audio/mpeg');
+      expect(getMimeTypeFromExtension('mp4')).toBe('video/mp4');
     });
 
-    it('should correctly identify image files', () => {
-      expect(determineContentType('jpg', 'image/jpeg')).toBe('image');
-      expect(determineContentType('png', 'image/png')).toBe('image');
-      expect(determineContentType('svg', 'image/svg+xml')).toBe('image');
-      expect(determineContentType('gif', 'image/gif')).toBe('image');
-      expect(determineContentType('webp', 'image/webp')).toBe('image');
+    test('handles extensions with or without leading dot', () => {
+      expect(getMimeTypeFromExtension('.jpg')).toBe('image/jpeg');
+      expect(getMimeTypeFromExtension('jpg')).toBe('image/jpeg');
     });
 
-    it('should correctly identify document files', () => {
-      expect(determineContentType('pdf', 'application/pdf')).toBe('document');
-      expect(determineContentType('doc', 'application/msword')).toBe('document');
-      expect(determineContentType('docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')).toBe('document');
-      expect(determineContentType('csv', 'text/csv')).toBe('document');
+    test('returns default mime type for unknown extensions', () => {
+      expect(getMimeTypeFromExtension('unknown')).toBe('application/octet-stream');
+      expect(getMimeTypeFromExtension('')).toBe('application/octet-stream');
     });
 
-    it('should correctly identify audio files', () => {
-      expect(determineContentType('mp3', 'audio/mpeg')).toBe('audio');
-      expect(determineContentType('wav', 'audio/wav')).toBe('audio');
-      expect(determineContentType('ogg', 'audio/ogg')).toBe('audio');
+    test('is case insensitive', () => {
+      expect(getMimeTypeFromExtension('JPG')).toBe('image/jpeg');
+      expect(getMimeTypeFromExtension('Png')).toBe('image/png');
+    });
+  });
+
+  describe('getContentTypeFromMimeType', () => {
+    test('correctly identifies image mime types', () => {
+      expect(getContentTypeFromMimeType('image/jpeg')).toBe('image');
+      expect(getContentTypeFromMimeType('image/png')).toBe('image');
+      expect(getContentTypeFromMimeType('image/gif')).toBe('image');
+      expect(getContentTypeFromMimeType('image/webp')).toBe('image');
     });
 
-    it('should correctly identify video files', () => {
-      expect(determineContentType('mp4', 'video/mp4')).toBe('video');
-      expect(determineContentType('webm', 'video/webm')).toBe('video');
-      expect(determineContentType('avi', 'video/x-msvideo')).toBe('video');
+    test('correctly identifies document mime types', () => {
+      expect(getContentTypeFromMimeType('application/pdf')).toBe('document');
+      expect(getContentTypeFromMimeType('application/msword')).toBe('document');
+      expect(getContentTypeFromMimeType('application/vnd.openxmlformats-officedocument.wordprocessingml.document')).toBe('document');
+      expect(getContentTypeFromMimeType('application/vnd.ms-excel')).toBe('document');
+      expect(getContentTypeFromMimeType('text/csv')).toBe('document'); // Important - CSV should be document not text
     });
 
-    it('should fall back to extension analysis when MIME type is not meaningful', () => {
-      expect(determineContentType('mp4', 'application/octet-stream')).toBe('video');
-      expect(determineContentType('jpg', 'application/octet-stream')).toBe('image');
+    test('correctly identifies audio mime types', () => {
+      expect(getContentTypeFromMimeType('audio/mpeg')).toBe('audio');
+      expect(getContentTypeFromMimeType('audio/wav')).toBe('audio');
+      expect(getContentTypeFromMimeType('audio/webm')).toBe('audio');
     });
 
-    it('should default to text for unknown file types', () => {
-      expect(determineContentType('xyz', 'application/octet-stream')).toBe('text');
+    test('correctly identifies video mime types', () => {
+      expect(getContentTypeFromMimeType('video/mp4')).toBe('video');
+      expect(getContentTypeFromMimeType('video/webm')).toBe('video');
+      expect(getContentTypeFromMimeType('video/ogg')).toBe('video');
     });
 
-    it('should handle case-insensitive extensions', () => {
-      expect(determineContentType('JPG', 'image/jpeg')).toBe('image');
-      expect(determineContentType('PDF', 'application/pdf')).toBe('document');
+    test('correctly identifies text mime types', () => {
+      expect(getContentTypeFromMimeType('text/plain')).toBe('text');
+      expect(getContentTypeFromMimeType('text/html')).toBe('text');
+      expect(getContentTypeFromMimeType('text/javascript')).toBe('text');
+      expect(getContentTypeFromMimeType('text/markdown')).toBe('text');
+      expect(getContentTypeFromMimeType('application/json')).toBe('text');
     });
 
-    it('should return valid ContentType values', () => {
-      const result: ContentType = determineContentType('jpg', 'image/jpeg');
-      expect(['text', 'image', 'audio', 'video', 'document']).toContain(result);
+    test('defaults to text for unknown mime types', () => {
+      expect(getContentTypeFromMimeType('unknown/type')).toBe('text');
+      expect(getContentTypeFromMimeType('')).toBe('text');
+    });
+  });
+
+  describe('isCSVFile', () => {
+    test('identifies CSV files by mime type', () => {
+      expect(isCSVFile('text/csv', 'file.csv')).toBe(true);
+      expect(isCSVFile('application/csv', 'file.csv')).toBe(true);
+    });
+
+    test('identifies CSV files by extension even with different mime type', () => {
+      expect(isCSVFile('text/plain', 'file.csv')).toBe(true);
+      expect(isCSVFile('application/octet-stream', 'data.csv')).toBe(true);
+    });
+
+    test('correctly identifies non-CSV files', () => {
+      expect(isCSVFile('text/plain', 'file.txt')).toBe(false);
+      expect(isCSVFile('application/json', 'data.json')).toBe(false);
+    });
+
+    test('handles case insensitivity for extensions', () => {
+      expect(isCSVFile('text/csv', 'DATA.CSV')).toBe(true);
+      expect(isCSVFile('text/plain', 'Report.Csv')).toBe(true);
+    });
+
+    test('handles empty or missing inputs', () => {
+      expect(isCSVFile('', '')).toBe(false);
+      expect(isCSVFile(undefined, 'file.csv')).toBe(false);
+      expect(isCSVFile('text/csv', undefined)).toBe(false);
     });
   });
 });

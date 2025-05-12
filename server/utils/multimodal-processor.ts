@@ -1,279 +1,264 @@
+/**
+ * Utility for processing different types of content for multimodal AI processing
+ */
 import fs from 'fs';
-import path from 'path';
 import { promisify } from 'util';
-import { determineContentType, isFileTypeAllowed } from './file-type-settings';
+import { MultimodalPromptPart } from '../adapters/ai-adapter';
+import { 
+  getContentTypeFromMimeType, 
+  getMimeTypeFromExtension,
+  isCSVFile,
+  getExtensionFromFilename
+} from './file-type-settings';
 
 const readFileAsync = promisify(fs.readFile);
+const existsAsync = promisify(fs.exists);
+const unlinkAsync = promisify(fs.unlink);
 
 /**
- * Process a file to extract its content for use with Gemini's multimodal capabilities
- * 
- * @param filePath Path to the uploaded file
- * @param fileName Original file name
+ * Interface for file metadata
+ */
+export interface FileMetadata {
+  originalName: string;
+  filename: string;
+  path: string;
+  size: number;
+  mimeType: string;
+  contentType: 'text' | 'image' | 'audio' | 'video' | 'document';
+  assignmentId?: number;
+  userId?: number;
+}
+
+/**
+ * Extract text content from various document types
+ * Currently handles text files and CSV directly
+ * More complex document types would require external libraries
+ * @param filePath Path to the file
  * @param mimeType MIME type of the file
- * @returns Processed content and metadata
+ */
+export async function extractTextContent(
+  filePath: string, 
+  mimeType: string,
+  extension?: string
+): Promise<string | undefined> {
+  try {
+    // Check if file exists
+    const fileExists = await existsAsync(filePath);
+    if (!fileExists) {
+      throw new Error(`File does not exist: ${filePath}`);
+    }
+
+    // Handle based on content type
+    const contentType = getContentTypeFromMimeType(mimeType);
+    
+    // For text files, just return the content
+    if (contentType === 'text') {
+      const content = await readFileAsync(filePath, 'utf8');
+      return content;
+    }
+    
+    // Special handling for CSV files
+    if (isCSVFile(mimeType, filename)) {
+      const content = await readFileAsync(filePath, 'utf8');
+      // Basic CSV description
+      const lines = content.split('\n');
+      const headers = lines[0]?.split(',').map(h => h.trim()).filter(Boolean) || [];
+      
+      let csvDescription = `CSV file with ${lines.length - 1} data rows and ${headers.length} columns.\n`;
+      csvDescription += `Headers: ${headers.join(', ')}\n`;
+      
+      // Include a sample of the data (first 5 rows max)
+      csvDescription += `Sample data:\n`;
+      for (let i = 1; i < Math.min(lines.length, 6); i++) {
+        csvDescription += `${lines[i]}\n`;
+      }
+      
+      return csvDescription;
+    }
+    
+    // For other document types, return basic metadata
+    return `This is a ${contentType} file named ${filename} with MIME type ${mimeType}. Content processing not available for this file type.`;
+    
+  } catch (error: any) {
+    const errorMessage = error?.message || String(error);
+    console.error(`Error extracting text content: ${errorMessage}`);
+    return null;
+  }
+}
+
+/**
+ * Create multimodal prompt parts from file metadata
+ * @param fileMetadata Metadata for the file
+ * @param assignmentPrompt Optional assignment-specific prompt
+ */
+export async function createMultimodalPromptParts(
+  fileMetadata: FileMetadata,
+  assignmentPrompt?: string
+): Promise<MultimodalPromptPart[]> {
+  const parts: MultimodalPromptPart[] = [];
+  
+  try {
+    // Load file content
+    const fileContent = await readFileAsync(fileMetadata.path);
+    
+    // Base multimodal part with file content
+    const filePart: MultimodalPromptPart = {
+      type: fileMetadata.contentType,
+      content: fileContent,
+      mimeType: fileMetadata.mimeType
+    };
+    
+    // For document and text types, extract text content when possible
+    if (fileMetadata.contentType === 'document' || fileMetadata.contentType === 'text') {
+      const extractedText = await extractTextContent(
+        fileMetadata.path, 
+        fileMetadata.mimeType,
+        fileMetadata.originalName
+      );
+      
+      if (extractedText) {
+        filePart.textContent = extractedText;
+      }
+    }
+    
+    // Add the file part first
+    parts.push(filePart);
+    
+    // Add assignment prompt if provided
+    if (assignmentPrompt) {
+      parts.push({
+        type: 'text',
+        content: assignmentPrompt
+      });
+    }
+    
+    return parts;
+    
+  } catch (error: any) {
+    const errorMessage = error?.message || String(error);
+    console.error(`Error creating multimodal prompt parts: ${errorMessage}`);
+    
+    // Fallback to text-only if file processing fails
+    return [
+      {
+        type: 'text' as const,
+        content: `Failed to process ${fileMetadata.contentType} file: ${fileMetadata.originalName}. ${errorMessage}`
+      },
+      ...(assignmentPrompt ? [{
+        type: 'text' as const,
+        content: assignmentPrompt
+      }] : [])
+    ];
+  }
+}
+
+/**
+ * Create file metadata from uploaded file
+ * @param file The uploaded file object from multer
+ */
+export function createFileMetadata(file: Express.Multer.File): FileMetadata {
+  // Determine MIME type (use the detected one or fallback to extension)
+  const mimeType = file.mimetype || getMimeTypeFromExtension(getExtensionFromFilename(file.originalname));
+  
+  // Determine content type category
+  const contentType = getContentTypeFromMimeType(mimeType);
+  
+  return {
+    originalName: file.originalname,
+    filename: file.filename,
+    path: file.path,
+    size: file.size,
+    mimeType,
+    contentType
+  };
+}
+
+/**
+ * Clean up file resources
+ * @param filePath Path to the file to delete
+ */
+export async function cleanupFile(filePath: string): Promise<void> {
+  try {
+    if (filePath && fs.existsSync(filePath)) {
+      await unlinkAsync(filePath);
+    }
+  } catch (error: any) {
+    const errorMessage = error?.message || String(error);
+    console.error(`Error cleaning up file ${filePath}: ${errorMessage}`);
+  }
+}
+
+/**
+ * Batch cleanup multiple files
+ * @param filePaths Array of file paths to delete
+ */
+export async function cleanupFiles(filePaths: string[]): Promise<void> {
+  const cleanupPromises = filePaths.map(path => cleanupFile(path));
+  await Promise.allSettled(cleanupPromises);
+}
+
+/**
+ * Convert a file buffer to a data URI
+ * @param content Buffer containing file data
+ * @param mimeType MIME type of the file
+ * @returns Base64 encoded data URI string
+ */
+export function fileToDataURI(content: Buffer, mimeType: string): string {
+  const base64 = content.toString('base64');
+  return `data:${mimeType};base64,${base64}`;
+}
+
+/**
+ * Interface representing a processed file for multimodal content
+ */
+export interface ProcessedFile {
+  content: Buffer | string;
+  contentType: 'text' | 'image' | 'audio' | 'video' | 'document';
+  textContent?: string;
+  mimeType: string;
+}
+
+/**
+ * Process a file for multimodal AI analysis
+ * @param filePath Path to the file
+ * @param fileName Original name of the file
+ * @param mimeType MIME type of the file
+ * @returns ProcessedFile object containing the file content and metadata
  */
 export async function processFileForMultimodal(
   filePath: string,
-  fileName: string,
+  fileName: string, 
   mimeType: string
-): Promise<{
-  content: string | Buffer;
-  contentType: string;
-  isProcessable: boolean;
-  textContent?: string;
-  fileSize?: number;
-}> {
-  // Extract file extension from filename
-  const fileExtension = path.extname(fileName).slice(1).toLowerCase();
-  
-  // Determine content type based on extension and MIME type
-  const contentType = determineContentType(fileExtension, mimeType);
-  
-  // Check if the file type is allowed based on the content type
-  const fileTypeAllowed = await isFileTypeAllowed(contentType, fileExtension, mimeType);
-  if (!fileTypeAllowed) {
-    throw new Error(`File type ${fileExtension} (${mimeType}) is not allowed for processing`);
-  }
-  
-  // Read the file
-  const fileBuffer = await readFileAsync(filePath);
-  const fileSize = fileBuffer.length;
-  
-  // Get file description for logging
-  const fileDesc = getFileDescription(fileName, mimeType, fileSize);
-  console.log(`Processing file: ${fileDesc}`);
-  
-  // Process based on content type
-  switch (contentType) {
-    case 'text':
-      try {
-        // For text files, use the buffer to get the text content
-        const textContent = fileBuffer.toString('utf8');
-        console.log(`Extracted ${textContent.length} characters from text file`);
-        
-        // For basic text files, text IS the content
-        return {
-          content: textContent,
-          contentType,
-          isProcessable: true,
-          textContent,
-          fileSize
-        };
-      } catch (error) {
-        console.error('Error processing text file:', error);
-        // Fall back to treating as binary
-        return {
-          content: fileBuffer,
-          contentType,
-          isProcessable: false,
-          fileSize
-        };
-      }
-    
-    case 'image':
-      // For images, return the buffer directly - Gemini handles images well
-      return {
-        content: fileBuffer,
-        contentType,
-        isProcessable: true,
-        fileSize
-      };
-    
-    case 'document':
-      // For documents, we need to extract text when possible
-      try {
-        // Try to extract text from the document
-        const extractedText = await extractTextFromFile(filePath, mimeType);
-        
-        // For PDF, we'll attempt to extract text and also provide the buffer
-        if (mimeType === 'application/pdf') {
-          return {
-            content: fileBuffer,  // The original PDF buffer for multimodal models
-            contentType,
-            isProcessable: true,  // Modern multimodal models can process PDFs
-            textContent: extractedText || `PDF document "${fileName}" (${fileSize} bytes)`,
-            fileSize
-          };
-        } 
-        // For Word documents and other office formats
-        else if (mimeType.includes('word') || 
-                mimeType.includes('officedocument') ||
-                mimeType.includes('spreadsheet')) {
-          return {
-            content: fileBuffer,
-            contentType,
-            isProcessable: false,  // Most models can't process these directly yet
-            textContent: extractedText || `Document "${fileName}" (${fileSize} bytes)`,
-            fileSize
-          };
-        }
-        // CSV and other parseable documents
-        else if (mimeType === 'text/csv') {
-          return {
-            content: extractedText || fileBuffer.toString('utf8'),
-            contentType,
-            isProcessable: true,
-            textContent: extractedText || undefined,
-            fileSize
-          };
-        }
-        // Other document types
-        else {
-          return {
-            content: fileBuffer,
-            contentType,
-            isProcessable: false,
-            textContent: extractedText || undefined,
-            fileSize
-          };
-        }
-      } catch (error) {
-        console.error('Error processing document file:', error);
-        return {
-          content: fileBuffer,
-          contentType,
-          isProcessable: false,
-          fileSize
-        };
-      }
-    
-    case 'audio':
-      // For audio, we could use transcription services in production
-      // But for now, we'll just provide some metadata
-      return {
-        content: fileBuffer,
-        contentType,
-        isProcessable: false,  // Most models can't process audio directly yet
-        textContent: `Audio file "${fileName}" (${(fileSize / (1024 * 1024)).toFixed(2)} MB)`,
-        fileSize
-      };
-    
-    case 'video':
-      // For video, similar to audio
-      return {
-        content: fileBuffer,
-        contentType,
-        isProcessable: false,  // Most models can't process video directly yet
-        textContent: `Video file "${fileName}" (${(fileSize / (1024 * 1024)).toFixed(2)} MB)`,
-        fileSize
-      };
-    
-    default:
-      // For unknown file types, provide as much information as possible
-      return {
-        content: fileBuffer,
-        contentType: 'unknown',
-        isProcessable: false,
-        textContent: `Unknown file type: ${fileName} (${mimeType})`,
-        fileSize
-      };
-  }
-}
-
-/**
- * Convert an image or binary file to a base64 data URI for use with Gemini API
- */
-export function fileToDataURI(buffer: Buffer, mimeType: string): string {
-  return `data:${mimeType};base64,${buffer.toString('base64')}`;
-}
-
-/**
- * Extract text content from various file types
- * This function handles basic text extraction with placeholders for more advanced formats
- */
-export async function extractTextFromFile(
-  filePath: string,
-  mimeType: string
-): Promise<string | null> {
+): Promise<ProcessedFile> {
   try {
-    const fileBuffer = await readFileAsync(filePath);
+    // Read the file
+    const fileContent = await fs.promises.readFile(filePath);
     
-    // Plain text files
-    if (mimeType.startsWith('text/')) {
-      return fileBuffer.toString('utf8');
+    // Determine content type from the mime type and filename
+    const contentType = getContentTypeFromMimeType(mimeType);
+    
+    // For text and document types, attempt to extract text content
+    let textContent: string | undefined;
+    if (contentType === 'text' || contentType === 'document') {
+      try {
+        // The filename extension might be needed for some document types
+        const extension = path.extname(fileName).toLowerCase();
+        textContent = await extractTextContent(filePath, mimeType, extension);
+      } catch (error: any) {
+        console.warn(`Failed to extract text from ${fileName}: ${error.message}`);
+        // Continue with the process even if text extraction fails
+      }
     }
     
-    // Code files that might not have text MIME type
-    if (['application/javascript', 'application/typescript', 'application/json', 'application/xml'].includes(mimeType)) {
-      return fileBuffer.toString('utf8');
-    }
-    
-    // Markdown
-    if (mimeType === 'text/markdown') {
-      return fileBuffer.toString('utf8');
-    }
-    
-    // PDF content - in production, this would use a PDF parsing library
-    if (mimeType === 'application/pdf') {
-      // Here we would integrate with a PDF parser like pdf-parse
-      // For now, this is just a placeholder
-      return `[This is a PDF file. In production, the text would be extracted using a PDF parser library.]
-
-Example metadata that would be extracted:
-- PDF Title: (extracted from metadata)
-- Number of pages: (extracted from PDF)
-- Content: (extracted text from all pages)`;
-    }
-    
-    // Word documents
-    if (mimeType === 'application/msword' || 
-        mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-      // Here we would integrate with a Word document parser like mammoth.js
-      return `[This is a Word document. In production, the text would be extracted using a document parser library.]`;
-    }
-    
-    // CSV/Excel files
-    if (mimeType === 'text/csv') {
-      // Basic CSV parsing - for more complex CSV, we'd use a proper parser
-      return fileBuffer.toString('utf8');
-    }
-    
-    if (mimeType === 'application/vnd.ms-excel' ||
-        mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-      // Here we would integrate with an Excel parser like xlsx
-      return `[This is an Excel file. In production, the data would be extracted and formatted as text.]`;
-    }
-    
-    // If we don't recognize the file type or can't extract content
-    return null;
-  } catch (error) {
-    console.error('Error extracting text from file:', error);
-    return null;
+    // Return the processed file
+    return {
+      content: fileContent,
+      contentType,
+      textContent,
+      mimeType
+    };
+  } catch (error: any) {
+    console.error(`Error processing file ${fileName} for multimodal analysis:`, error);
+    throw new Error(`Failed to process file for multimodal analysis: ${error.message}`);
   }
-}
-
-/**
- * Get a human-readable description of a file based on its MIME type and size
- */
-export function getFileDescription(fileName: string, mimeType: string, fileSize: number): string {
-  const sizeInKB = Math.round(fileSize / 1024);
-  const sizeInMB = (fileSize / (1024 * 1024)).toFixed(2);
-  
-  // Format size string
-  const sizeStr = sizeInKB < 1024 ? `${sizeInKB} KB` : `${sizeInMB} MB`;
-  
-  // Get a friendly file type description
-  let fileType = 'Unknown file';
-  
-  if (mimeType.startsWith('text/')) {
-    fileType = 'Text file';
-  } else if (mimeType.startsWith('image/')) {
-    fileType = 'Image';
-  } else if (mimeType.startsWith('audio/')) {
-    fileType = 'Audio file';
-  } else if (mimeType.startsWith('video/')) {
-    fileType = 'Video file';
-  } else if (mimeType === 'application/pdf') {
-    fileType = 'PDF document';
-  } else if (mimeType === 'application/msword' || 
-            mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-    fileType = 'Word document';
-  } else if (mimeType === 'text/csv' || 
-            mimeType === 'application/vnd.ms-excel' ||
-            mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-    fileType = 'Spreadsheet';
-  }
-  
-  return `${fileType} "${fileName}" (${sizeStr})`;
 }

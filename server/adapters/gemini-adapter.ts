@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, GenerativeModel, Content, Part } from '@google/generative-ai';
+import { GoogleGenerativeAI, GenerativeModel, Content, Part, FileData } from '@google/generative-ai';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
@@ -7,6 +7,32 @@ import { AIAdapter, MultimodalPromptPart } from './ai-adapter';
 import { fileToDataURI } from '../utils/multimodal-processor';
 
 const readFileAsync = promisify(fs.readFile);
+
+// Extracted from Google AI Gemini API documentation
+// https://ai.google.dev/gemini-api/docs/image-understanding
+// https://ai.google.dev/gemini-api/docs/video-understanding
+// https://ai.google.dev/gemini-api/docs/audio
+// https://ai.google.dev/gemini-api/docs/document-processing
+const SUPPORTED_MIME_TYPES = {
+  // Images (inlineData for small, fileData for large)
+  image: [
+    'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'
+  ],
+  // Videos (always use fileData)
+  video: [
+    'video/mp4', 'video/mpeg', 'video/webm', 'video/quicktime', 'video/x-msvideo'
+  ],
+  // Audio (always use fileData)
+  audio: [
+    'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/x-wav', 'audio/webm'
+  ],
+  // Documents (use fileData)
+  document: [
+    'application/pdf', 'text/csv', 'text/plain', 'application/json', 
+    'text/markdown', 'text/html', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  ]
+};
 
 export class GeminiAdapter implements AIAdapter {
   private generativeAI: GoogleGenerativeAI;
@@ -26,7 +52,21 @@ export class GeminiAdapter implements AIAdapter {
   }
   
   /**
+   * Check if a MIME type is supported by Gemini for a given content type
+   * @param mimeType The MIME type to check
+   * @param contentType The content category (image, video, audio, document)
+   * @returns True if the MIME type is supported
+   */
+  private isMimeTypeSupported(mimeType: string, contentType: string): boolean {
+    const supportedTypes = SUPPORTED_MIME_TYPES[contentType as keyof typeof SUPPORTED_MIME_TYPES];
+    if (!supportedTypes) return false;
+    return supportedTypes.includes(mimeType);
+  }
+
+  /**
    * Get the default MIME type for a given content type
+   * @param contentType The content category
+   * @returns A default MIME type for the given category
    */
   private getDefaultMimeType(contentType: string): string {
     const defaults = {
@@ -41,43 +81,65 @@ export class GeminiAdapter implements AIAdapter {
   }
   
   /**
-   * Add inline image data to content parts
+   * Creates a file with the Gemini File API
+   * @param content Buffer containing file data
+   * @param mimeType MIME type of the file
+   * @returns A FileData object that can be used in a content part
+   */
+  private async createFileData(content: Buffer, mimeType: string): Promise<FileData> {
+    try {
+      // Check if the GenerativeAI instance has the createFile method (latest API version)
+      if (typeof (this.generativeAI as any).createFile === 'function') {
+        return await (this.generativeAI as any).createFile({
+          data: content,
+          mimeType
+        });
+      }
+      
+      // Fallback to createBlob for older API versions
+      if (typeof (this.generativeAI as any).createBlob === 'function') {
+        return await (this.generativeAI as any).createBlob({
+          data: content,
+          mimeType
+        });
+      }
+      
+      throw new Error('Gemini File API not available');
+    } catch (error: any) {
+      console.error('Error creating file with Gemini File API:', error.message);
+      throw error;
+    }
+  }
+  
+  /**
+   * Add inline image data to content parts for small images
+   * Following Google AI Gemini API documentation: https://ai.google.dev/gemini-api/docs/image-understanding
+   * @param contentParts Array of content parts to append to
+   * @param content Image content as buffer or base64 string
+   * @param mimeType Image MIME type
    */
   private addInlineImagePart(contentParts: Part[], content: string | Buffer, mimeType: string): void {
-    // For images, convert to data URI if it's a buffer
-    let imageData;
-    if (Buffer.isBuffer(content)) {
-      imageData = fileToDataURI(content, mimeType);
-    } else {
-      imageData = content; // Assume it's already a data URI
-    }
+    // For images, convert to base64 if it's a buffer
+    let base64Data: string;
     
-    // Handle different image data formats
-    if (typeof imageData === 'string' && imageData.startsWith('data:')) {
-      // It's a data URI
-      contentParts.push({
-        inlineData: {
-          data: imageData.replace(/^data:image\/\w+;base64,/, ''),
-          mimeType: mimeType
-        }
-      });
-    } else if (Buffer.isBuffer(imageData)) {
-      // It's still a buffer
-      contentParts.push({
-        inlineData: {
-          data: imageData.toString('base64'),
-          mimeType: mimeType
-        }
-      });
+    if (Buffer.isBuffer(content)) {
+      // Convert buffer to base64 string (without data URI prefix)
+      base64Data = content.toString('base64');
+    } else if (typeof content === 'string' && content.startsWith('data:')) {
+      // Extract base64 from data URI
+      base64Data = content.replace(/^data:image\/\w+;base64,/, '');
     } else {
       // Assume it's already a base64 string
-      contentParts.push({
-        inlineData: {
-          data: imageData,
-          mimeType: mimeType
-        }
-      });
+      base64Data = content as string;
     }
+    
+    // Add the image part with inline data
+    contentParts.push({
+      inlineData: {
+        data: base64Data,
+        mimeType: mimeType
+      }
+    });
   }
 
   async generateCompletion(prompt: string) {
@@ -133,6 +195,12 @@ export class GeminiAdapter implements AIAdapter {
   /**
    * Generate completion using multimodal inputs (text, images, audio, video, documents)
    * Properly processes content through Gemini API based on content type
+   * Following Google AI Gemini API documentation for handling different media types:
+   * https://ai.google.dev/gemini-api/docs/image-understanding
+   * https://ai.google.dev/gemini-api/docs/video-understanding
+   * https://ai.google.dev/gemini-api/docs/audio
+   * https://ai.google.dev/gemini-api/docs/document-processing
+   * 
    * @param parts Array of MultimodalPromptPart objects containing different content types
    * @param systemPrompt Optional system prompt to provide context to the model
    */
@@ -158,167 +226,197 @@ export class GeminiAdapter implements AIAdapter {
         
         // Determine file size if we have a buffer
         const fileSize = Buffer.isBuffer(part.content) ? part.content.length : 0;
-        const isLargeFile = fileSize > 3 * 1024 * 1024; // 3MB threshold
+        const isLargeFile = fileSize > 2 * 1024 * 1024; // 2MB threshold for image inlineData
         
         switch (part.type) {
           case 'text':
+            // Text is always handled directly
             contentParts.push({
               text: part.content as string
             });
             break;
             
           case 'image':
+            // Follow Gemini API image handling guidelines
+            // https://ai.google.dev/gemini-api/docs/image-understanding
             if (Buffer.isBuffer(part.content)) {
+              // Check if MIME type is supported
+              if (!this.isMimeTypeSupported(mimeType, 'image')) {
+                contentParts.push({
+                  text: `[IMAGE: Unsupported format ${mimeType}. Supported formats are: ${SUPPORTED_MIME_TYPES.image.join(', ')}]`
+                });
+                break;
+              }
+              
               if (isLargeFile) {
                 try {
-                  // For large images, try to use file handling if available
-                  // This is a conditional approach that works with or without type definitions
-                  if (typeof (this.generativeAI as any).createBlob === 'function') {
-                    // Gemini API sometimes uses 'createBlob' instead of 'createBlobFile'
-                    const fileData = await (this.generativeAI as any).createBlob({
-                      data: part.content,
-                      mimeType
-                    });
-                    
-                    fileObjects.push(fileData);
-                    
-                    contentParts.push({
-                      // Using 'as any' to bypass strict type checking
-                      // as the fileData structure might vary between API versions
-                      inlineData: { 
-                        data: fileData,
-                        mimeType
-                      } as any
-                    });
-                  } else {
-                    // Fallback to inline data if the File API method isn't available
-                    this.addInlineImagePart(contentParts, part.content, mimeType);
-                  }
+                  // For large images (>2MB), use Gemini File API
+                  const fileData = await this.createFileData(part.content, mimeType);
+                  fileObjects.push(fileData);
+                  
+                  // Add the file part with fileData
+                  // The FileData object might have different properties depending on API version
+                  contentParts.push({
+                    fileData: {
+                      fileUri: (fileData as any).uri || (fileData as any).fileUri || (fileData as any).url,
+                      mimeType: mimeType
+                    }
+                  });
                 } catch (error) {
                   console.warn('Failed to use Gemini File API for large image, falling back to inline data:', error);
+                  // Fallback to inline data
                   this.addInlineImagePart(contentParts, part.content, mimeType);
                 }
               } else {
-                // For smaller images, use inline data
+                // For smaller images, use inline data (more efficient)
                 this.addInlineImagePart(contentParts, part.content, mimeType);
               }
             } else if (typeof part.content === 'string') {
-              // Handle base64 or data URI strings
-              contentParts.push({
-                inlineData: {
-                  data: part.content.replace(/^data:image\/\w+;base64,/, ''),
-                  mimeType: mimeType
-                }
-              });
+              // Handle base64 or data URI strings for images
+              this.addInlineImagePart(contentParts, part.content, mimeType);
             }
             break;
             
           case 'document':
-            // Special handling for PDF documents
-            if (mimeType === 'application/pdf' && Buffer.isBuffer(part.content)) {
-              try {
-                if (typeof (this.generativeAI as any).createBlob === 'function') {
-                  // PDF is directly supported by Gemini API
-                  const fileData = await (this.generativeAI as any).createBlob({
-                    data: part.content,
-                    mimeType: 'application/pdf'
-                  });
-                  
-                  fileObjects.push(fileData);
-                  
-                  contentParts.push({
-                    inlineData: {
-                      data: fileData,
-                      mimeType: 'application/pdf'
-                    } as any
-                  });
-                } else {
-                  // If File API not available, use text content
-                  if (textContent) {
-                    contentParts.push({ text: textContent });
-                  } else {
-                    contentParts.push({ text: `[PDF: Unable to process content directly]` });
-                  }
-                }
-              } catch (error) {
-                console.warn('Failed to use Gemini File API for PDF, falling back to text content:', error);
-                // Use extracted text if available
+            // Follow Gemini API document handling guidelines
+            // https://ai.google.dev/gemini-api/docs/document-processing
+            if (Buffer.isBuffer(part.content)) {
+              // Check if MIME type is supported
+              if (!this.isMimeTypeSupported(mimeType, 'document')) {
+                contentParts.push({
+                  text: `[DOCUMENT: Unsupported format ${mimeType}]`
+                });
+                
+                // Include extracted text if available
                 if (textContent) {
                   contentParts.push({ text: textContent });
-                } else {
-                  contentParts.push({ text: `[PDF: Unable to process content directly]` });
                 }
+                break;
               }
-            } else {
-              // For other document types, use extracted text or direct content
-              if (textContent) {
-                contentParts.push({ text: textContent });
-              } else if (Buffer.isBuffer(part.content) && 
-                        ['text/csv', 'text/plain', 'application/json', 'text/markdown'].includes(mimeType)) {
-                // Handle text-based document formats directly
-                contentParts.push({ text: part.content.toString('utf8') });
-              } else {
-                contentParts.push({ text: `[DOCUMENT: ${mimeType} - See extracted text below if available]` });
-                if (Buffer.isBuffer(part.content)) {
-                  try {
-                    // Attempt to extract text from unknown document format
-                    const text = part.content.toString('utf8', 0, Math.min(part.content.length, 4000));
-                    if (text && /[\x20-\x7E]/.test(text)) { // Has printable ASCII
-                      contentParts.push({ text: `Extracted content sample:\n${text}` });
-                    }
-                  } catch (e) {
-                    // Ignore errors in content extraction
+              
+              try {
+                // For all document types, use File API (preferred method)
+                const fileData = await this.createFileData(part.content, mimeType);
+                fileObjects.push(fileData);
+                
+                // Add the file part with fileData 
+                contentParts.push({
+                  fileData: {
+                    fileUri: fileData.uri,
+                    mimeType: mimeType
                   }
+                });
+              } catch (error) {
+                console.warn(`Failed to use Gemini File API for document (${mimeType}), falling back to text:`, error);
+                
+                // Fallback to text content for text-based documents
+                if (textContent) {
+                  contentParts.push({ text: textContent });
+                } else if (['text/csv', 'text/plain', 'application/json', 'text/markdown', 'text/html'].includes(mimeType)) {
+                  // Handle text-based document formats directly
+                  contentParts.push({ text: part.content.toString('utf8') });
+                } else {
+                  contentParts.push({ text: `[DOCUMENT: ${mimeType} - Unable to process]` });
                 }
               }
+            } else if (typeof part.content === 'string') {
+              // Handle document content as text
+              contentParts.push({ text: part.content });
             }
             break;
             
           case 'audio':
-          case 'video':
+            // Follow Gemini API audio handling guidelines
+            // https://ai.google.dev/gemini-api/docs/audio
             if (Buffer.isBuffer(part.content)) {
-              try {
-                if (typeof (this.generativeAI as any).createBlob === 'function') {
-                  const fileData = await (this.generativeAI as any).createBlob({
-                    data: part.content,
-                    mimeType
-                  });
-                  
-                  fileObjects.push(fileData);
-                  
-                  contentParts.push({
-                    inlineData: {
-                      data: fileData,
-                      mimeType
-                    } as any
-                  });
-                } else {
-                  // Fallback to text description if File API not available
-                  contentParts.push({
-                    text: `[${part.type.toUpperCase()}: Media file of type ${mimeType}]`
-                  });
-                  
-                  // Include extracted text content if available
-                  if (textContent) {
-                    contentParts.push({ text: textContent });
-                  }
-                }
-              } catch (error) {
-                console.warn(`Failed to use Gemini File API for ${part.type}, falling back to text:`, error);
-                
+              // Check if MIME type is supported
+              if (!this.isMimeTypeSupported(mimeType, 'audio')) {
                 contentParts.push({
-                  text: `[${part.type.toUpperCase()}: Could not process file directly]`
+                  text: `[AUDIO: Unsupported format ${mimeType}. Supported formats are: ${SUPPORTED_MIME_TYPES.audio.join(', ')}]`
                 });
                 
-                // Include extracted text content if available
+                // Include extracted text if available
+                if (textContent) {
+                  contentParts.push({ text: textContent });
+                }
+                break;
+              }
+              
+              try {
+                // Audio must use File API (not inlineData)
+                const fileData = await this.createFileData(part.content, mimeType);
+                fileObjects.push(fileData);
+                
+                // Add the file part with fileData
+                contentParts.push({
+                  fileData: {
+                    fileUri: fileData.uri,
+                    mimeType: mimeType
+                  }
+                });
+              } catch (error) {
+                console.warn(`Failed to use Gemini File API for audio (${mimeType}):`, error);
+                
+                contentParts.push({
+                  text: `[AUDIO: Could not process file directly]`
+                });
+                
+                // Include extracted text or transcription if available
                 if (textContent) {
                   contentParts.push({ text: textContent });
                 }
               }
             } else {
-              // For non-buffer content
               contentParts.push({
-                text: `[${part.type.toUpperCase()}: File format not supported]`
+                text: `[AUDIO: File format not supported]`
+              });
+            }
+            break;
+            
+          case 'video':
+            // Follow Gemini API video handling guidelines
+            // https://ai.google.dev/gemini-api/docs/video-understanding
+            if (Buffer.isBuffer(part.content)) {
+              // Check if MIME type is supported
+              if (!this.isMimeTypeSupported(mimeType, 'video')) {
+                contentParts.push({
+                  text: `[VIDEO: Unsupported format ${mimeType}. Supported formats are: ${SUPPORTED_MIME_TYPES.video.join(', ')}]`
+                });
+                
+                // Include extracted text if available
+                if (textContent) {
+                  contentParts.push({ text: textContent });
+                }
+                break;
+              }
+              
+              try {
+                // Video must use File API (not inlineData)
+                const fileData = await this.createFileData(part.content, mimeType);
+                fileObjects.push(fileData);
+                
+                // Add the file part with fileData
+                contentParts.push({
+                  fileData: {
+                    fileUri: fileData.uri,
+                    mimeType: mimeType
+                  }
+                });
+              } catch (error) {
+                console.warn(`Failed to use Gemini File API for video (${mimeType}):`, error);
+                
+                contentParts.push({
+                  text: `[VIDEO: Could not process file directly]`
+                });
+                
+                // Include extracted text or description if available
+                if (textContent) {
+                  contentParts.push({ text: textContent });
+                }
+              }
+            } else {
+              contentParts.push({
+                text: `[VIDEO: File format not supported]`
               });
             }
             break;
