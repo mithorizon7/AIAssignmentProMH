@@ -1,8 +1,19 @@
 import { InsertFeedback, Rubric, CriteriaScore } from '@shared/schema';
-import { AIAdapter } from '../adapters/ai-adapter';
+import { AIAdapter, MultimodalPromptPart } from '../adapters/ai-adapter';
+import { processFileForMultimodal } from '../utils/multimodal-processor';
 
 interface SubmissionAnalysisRequest {
   studentSubmissionContent: string;
+  assignmentTitle: string;
+  assignmentDescription?: string;
+  rubric?: Rubric;
+}
+
+interface MultimodalSubmissionAnalysisRequest {
+  filePath: string;                // Path to the uploaded file
+  fileName: string;                // Original file name
+  mimeType: string;                // MIME type of the file
+  textContent?: string;            // Optional extracted text content
   assignmentTitle: string;
   assignmentDescription?: string;
   rubric?: Rubric;
