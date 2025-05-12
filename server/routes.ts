@@ -257,7 +257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Anonymous submission (via shareable link)
   app.post('/api/anonymous-submissions', upload.single('file'), async (req: Request, res: Response) => {
     try {
-      // Validate request
+      // Validate request with enhanced security for shareable code
       const submissionSchema = z.object({
         assignmentId: z.string().transform(val => parseInt(val)),
         submissionType: z.enum(['file', 'code']),
@@ -265,6 +265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: z.string().email(),
         notes: z.string().optional(),
         code: z.string().optional(),
+        shareableCode: z.string().min(1, "Shareable code is required for anonymous submissions"),
       });
       
       const result = submissionSchema.safeParse(req.body);
@@ -272,9 +273,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid submission data', errors: result.error });
       }
       
-      const { assignmentId, submissionType, name, email, notes, code } = result.data;
+      const { assignmentId, submissionType, name, email, notes, code, shareableCode } = result.data;
       
-      // Check if assignment exists and is active
+      // Get the assignment to validate the shareableCode
+      const assignment = await storage.getAssignment(assignmentId);
+      
+      // Check if assignment exists
+      if (!assignment) {
+        return res.status(404).json({ message: 'Assignment not found' });
+      }
+      
+      // Validate shareable code - this is a critical security check
+      if (!assignment.shareableCode || assignment.shareableCode !== shareableCode) {
+        return res.status(403).json({ 
+          message: 'Invalid shareable code for this assignment',
+          details: 'The provided shareable code does not match the assignment' 
+        });
+      }
+      
+      // Check if assignment is active and not past due date
       const isActive = await storageService.isAssignmentActive(assignmentId);
       if (!isActive) {
         return res.status(400).json({ message: 'Assignment is not active or has passed its due date' });

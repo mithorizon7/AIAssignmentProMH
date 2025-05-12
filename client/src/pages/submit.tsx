@@ -58,6 +58,12 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
         }
         
         const data = await response.json();
+        
+        // Verify the assignment has a shareable code
+        if (!data.shareableCode) {
+          throw new Error('Invalid assignment link. This assignment may not be configured for anonymous submissions.');
+        }
+        
         setAssignment(data);
       } catch (err: any) {
         setError(err.message || 'An error occurred while loading the assignment.');
@@ -130,6 +136,9 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
       formData.append('name', name);
       formData.append('email', email);
       
+      // Critical security parameter - include the shareable code for validation
+      formData.append('shareableCode', assignment.shareableCode);
+      
       if (notes) formData.append('notes', notes);
       if (submitType === 'code') formData.append('code', codeContent);
       if (submitType === 'file' && file) formData.append('file', file);
@@ -141,7 +150,17 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
       });
       
       if (!response.ok) {
-        throw new Error(`Submission failed: ${response.statusText}`);
+        // Handle different error types with appropriate messages
+        if (response.status === 403) {
+          throw new Error('Access denied. The submission link may have expired or is invalid.');
+        } else if (response.status === 404) {
+          throw new Error('Assignment not found. Please check the link and try again.');
+        } else if (response.status === 400) {
+          const errorData = await response.json();
+          throw new Error(`Submission failed: ${errorData.message || response.statusText}`);
+        } else {
+          throw new Error(`Submission failed: ${response.statusText}`);
+        }
       }
       
       // Show success message

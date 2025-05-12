@@ -149,6 +149,7 @@ For more detailed information about production optimizations, see [BUILD_OPTIMIZ
 
 - [Redis Configuration Guide](REDIS_CONFIGURATION.md): Detailed Redis setup instructions
 - [Build Optimization Guide](BUILD_OPTIMIZATION.md): Production build configuration
+- [Security Policy and Practices](SECURITY.md): Security requirements and best practices
 
 ## License
 

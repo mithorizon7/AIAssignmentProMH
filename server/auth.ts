@@ -8,6 +8,7 @@ import bcrypt from 'bcrypt';
 import connectPgSimple from 'connect-pg-simple';
 import { doubleCsrf } from 'csrf-csrf';
 import { pool } from './db';
+import { authRateLimiter, csrfRateLimiter } from './middleware/rate-limiter';
 
 // Create PostgreSQL session store
 const PgStore = connectPgSimple(session);
@@ -139,8 +140,8 @@ export function configureAuth(app: any) {
     }
   });
   
-  // Endpoint to get CSRF token
-  app.get('/api/csrf-token', (req: Request, res: Response) => {
+  // Endpoint to get CSRF token (with rate limiting)
+  app.get('/api/csrf-token', csrfRateLimiter, (req: Request, res: Response) => {
     // Generate a new token
     const csrfToken = csrfProtection.generateCsrfToken(req, res);
     return res.json({ csrfToken });
@@ -235,8 +236,8 @@ export function configureAuth(app: any) {
     role: z.enum(["student", "instructor", "admin"]).optional().default("student"),
   });
 
-  // Login endpoint
-  app.post('/api/auth/login', async (req: Request, res: Response, next: NextFunction) => {
+  // Login endpoint (with rate limiting)
+  app.post('/api/auth/login', authRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate request
       const result = loginSchema.safeParse(req.body);
