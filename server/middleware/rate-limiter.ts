@@ -1,5 +1,6 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
+import { logSecurityEvent, AuditEventType } from '../lib/audit-logger';
 
 /**
  * Rate limiting configuration for various API endpoints
@@ -22,8 +23,19 @@ export const defaultRateLimiter = rateLimit({
   ...getIPConfig(),
   // Custom handler for rate limit exceeded
   handler: (req: Request, res: Response) => {
-    // Log rate limit exceeded events
-    console.warn(`Rate limit exceeded for IP: ${req.ip}, path: ${req.path}`);
+    // Log rate limit exceeded events to audit log
+    logSecurityEvent(
+      AuditEventType.RATE_LIMIT_EXCEEDED,
+      req.ip || 'unknown',
+      (req.user as any)?.id,
+      (req.user as any)?.username,
+      {
+        path: req.path,
+        method: req.method,
+        userAgent: req.headers['user-agent']
+      }
+    );
+    
     res.status(429).json({
       status: 'error',
       message: 'Too many requests, please try again later.'
@@ -44,7 +56,20 @@ export const authRateLimiter = rateLimit({
   skip: (req) => process.env.NODE_ENV === 'development',
   ...getIPConfig(),
   handler: (req: Request, res: Response) => {
-    console.warn(`Auth rate limit exceeded for IP: ${req.ip}, path: ${req.path}`);
+    // Log authentication rate limit exceeded events to audit log
+    logSecurityEvent(
+      AuditEventType.RATE_LIMIT_EXCEEDED,
+      req.ip || 'unknown',
+      undefined,
+      req.body?.username, // Include username from failed login attempt if available
+      {
+        path: req.path,
+        method: req.method,
+        userAgent: req.headers['user-agent'],
+        authType: 'login attempt'
+      }
+    );
+    
     res.status(429).json({
       status: 'error',
       message: 'Too many login attempts, please try again later.'
@@ -65,7 +90,22 @@ export const submissionRateLimiter = rateLimit({
   skip: (req) => process.env.NODE_ENV === 'development',
   ...getIPConfig(),
   handler: (req: Request, res: Response) => {
-    console.warn(`Submission rate limit exceeded for IP: ${req.ip}`);
+    // Log submission rate limit exceeded events to audit log
+    logSecurityEvent(
+      AuditEventType.RATE_LIMIT_EXCEEDED,
+      req.ip || 'unknown',
+      (req.user as any)?.id,
+      (req.user as any)?.username,
+      {
+        path: req.path,
+        method: req.method,
+        userAgent: req.headers['user-agent'],
+        submissionType: 'assignment',
+        assignmentId: req.body?.assignmentId,
+        shareableCode: req.body?.shareableCode
+      }
+    );
+    
     res.status(429).json({
       status: 'error',
       message: 'Submission rate limit exceeded. Please try again later.'
@@ -86,7 +126,20 @@ export const csrfRateLimiter = rateLimit({
   skip: (req) => process.env.NODE_ENV === 'development',
   ...getIPConfig(),
   handler: (req: Request, res: Response) => {
-    console.warn(`CSRF token rate limit exceeded for IP: ${req.ip}`);
+    // Log CSRF token rate limit exceeded events to audit log
+    logSecurityEvent(
+      AuditEventType.RATE_LIMIT_EXCEEDED,
+      req.ip || 'unknown',
+      (req.user as any)?.id,
+      (req.user as any)?.username,
+      {
+        path: req.path,
+        method: req.method,
+        userAgent: req.headers['user-agent'],
+        tokenType: 'CSRF'
+      }
+    );
+    
     res.status(429).json({
       status: 'error',
       message: 'Too many requests for CSRF token, please try again later.'

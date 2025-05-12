@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { rateLimit } from 'express-rate-limit';
+import { rateLimit, RateLimitRequestHandler } from 'express-rate-limit';
 import { authRateLimiter, csrfRateLimiter, defaultRateLimiter, submissionRateLimiter } from '../../server/middleware/rate-limiter';
+
+// Custom interface for our test rate limiter with testing properties
+interface TestRateLimiter extends RateLimitRequestHandler {
+  _handler: (req: any, res: any) => void;
+  _windowMs: number;
+  _max: number;
+}
 import { 
   logSecurityEvent,
   AuditEventType
@@ -17,12 +24,19 @@ vi.mock('../../server/lib/audit-logger', () => ({
 // Mock express-rate-limit
 vi.mock('express-rate-limit', () => ({
   rateLimit: vi.fn().mockImplementation((config) => {
-    // Store the handler function so we can access it in tests
-    return {
+    // Create a mock rate limiter that exposes config for testing
+    const rateLimiter = (req: any, res: any, next: any) => {
+      next();
+    };
+    
+    // Add test properties to the function object
+    Object.assign(rateLimiter, {
       _handler: config.handler,
       _windowMs: config.windowMs,
-      _max: config.max
-    };
+      _max: config.limit
+    });
+    
+    return rateLimiter;
   })
 }));
 
@@ -44,8 +58,8 @@ describe('Rate Limiters', () => {
     
     // Verify the limits are production-appropriate for auth
     if (process.env.NODE_ENV === 'production') {
-      expect(authRateLimiter._windowMs).toBeLessThanOrEqual(15 * 60 * 1000); // 15 minutes or less
-      expect(authRateLimiter._max).toBeLessThanOrEqual(10); // No more than 10 attempts 
+      expect((authRateLimiter as TestRateLimiter)._windowMs).toBeLessThanOrEqual(15 * 60 * 1000); // 15 minutes or less
+      expect((authRateLimiter as TestRateLimiter)._max).toBeLessThanOrEqual(10); // No more than 10 attempts 
     }
   });
   
@@ -54,8 +68,8 @@ describe('Rate Limiters', () => {
     
     // Verify the limits are production-appropriate for submissions
     if (process.env.NODE_ENV === 'production') {
-      expect(submissionRateLimiter._windowMs).toBeLessThanOrEqual(60 * 60 * 1000); // 1 hour or less
-      expect(submissionRateLimiter._max).toBeLessThanOrEqual(30); // No more than 30 submissions
+      expect((submissionRateLimiter as TestRateLimiter)._windowMs).toBeLessThanOrEqual(60 * 60 * 1000); // 1 hour or less
+      expect((submissionRateLimiter as TestRateLimiter)._max).toBeLessThanOrEqual(30); // No more than 30 submissions
     }
   });
   
@@ -68,7 +82,7 @@ describe('Rate Limiters', () => {
     };
     
     // Call the handler directly with mock request and response
-    authRateLimiter._handler(req, res);
+    (authRateLimiter as TestRateLimiter)._handler(req, res);
     
     // Verify response was set correctly
     expect(res.status).toHaveBeenCalledWith(429);
