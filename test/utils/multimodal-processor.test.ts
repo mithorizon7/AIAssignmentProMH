@@ -1,14 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import fs from 'fs';
-import path from 'path';
 import { processFileForMultimodal } from '../../server/utils/multimodal-processor';
 
 // Mock the file system operations
-vi.mock('fs', () => ({
-  promises: {
+vi.mock('fs', () => {
+  return {
+    default: {
+      promises: {
+        readFile: vi.fn()
+      },
+      readFile: vi.fn()
+    },
+    promises: {
+      readFile: vi.fn()
+    },
     readFile: vi.fn()
-  }
-}));
+  };
+});
+
+// Import fs after mocking
+import fs from 'fs';
 
 describe('Multimodal Processor Utils', () => {
   beforeEach(() => {
@@ -62,7 +72,7 @@ describe('Multimodal Processor Utils', () => {
       const textContent = 'Default text content';
       (fs.promises.readFile as any).mockResolvedValue(Buffer.from(textContent));
 
-      const result = await processFileForMultimodal(null, '/path/to/unknown.xyz', 'application/octet-stream', 150);
+      const result = await processFileForMultimodal('/path/to/unknown.xyz', 'unknown.xyz', 'application/octet-stream');
       
       expect(result).toBeDefined();
       expect(result.contentType).toBe('text');
@@ -72,7 +82,7 @@ describe('Multimodal Processor Utils', () => {
       (fs.promises.readFile as any).mockRejectedValue(new Error('File read error'));
 
       await expect(
-        processFileForMultimodal('text', '/path/to/nonexistent.txt', 'text/plain', 100)
+        processFileForMultimodal('/path/to/nonexistent.txt', 'nonexistent.txt', 'text/plain')
       ).rejects.toThrow('Error processing file for multimodal analysis');
     });
   });
