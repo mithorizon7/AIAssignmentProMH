@@ -83,11 +83,11 @@ export function logAudit(entry: Omit<AuditLogEntry, 'timestamp'>): void {
   if (logEntry.details) {
     // Remove passwords, tokens, etc.
     const sanitizedDetails = { ...logEntry.details };
-    const sensitiveFields = ['password', 'token', 'secret', 'apiKey', 'csrf'];
+    const sensitiveFields = ['password', 'token', 'secret', 'api', 'key', 'csrf'];
     
     for (const field of sensitiveFields) {
       for (const key of Object.keys(sanitizedDetails)) {
-        if (key.toLowerCase().includes(field)) {
+        if (key.toLowerCase().includes(field.toLowerCase())) {
           sanitizedDetails[key] = '[REDACTED]';
         }
       }
