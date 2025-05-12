@@ -7,6 +7,7 @@ import { storage } from './storage';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import connectPgSimple from 'connect-pg-simple';
+import { User } from '@shared/schema';
 import { doubleCsrf } from 'csrf-csrf';
 import { pool } from './db';
 import { authRateLimiter, csrfRateLimiter } from './middleware/rate-limiter';
@@ -242,7 +243,7 @@ export function configureAuth(app: any) {
           callbackURL: process.env.AUTH0_CALLBACK_URL || `${process.env.NODE_ENV === 'production' ? 'https' : 'http'}://${app.get('host') || 'localhost:5000'}/api/auth-sso/callback`,
           state: true
         },
-        async (accessToken, refreshToken, extraParams, profile, done) => {
+        async (accessToken: string, refreshToken: string, extraParams: any, profile: any, done: any) => {
           try {
             // Log profile information during development to help with integration
             if (process.env.NODE_ENV !== 'production') {
@@ -272,7 +273,9 @@ export function configureAuth(app: any) {
                 console.log(`[INFO] Linked Auth0 ID to existing user: ${existingUser.username}`);
                 
                 // Update email verification status
-                await storage.updateUserEmailVerifiedStatus(existingUser.id, emailVerified);
+                if (user) {
+                  await storage.updateUserEmailVerifiedStatus(user.id, emailVerified);
+                }
               } else {
                 // Create new user with Auth0 information
                 // Generate username from email
@@ -292,31 +295,37 @@ export function configureAuth(app: any) {
                 console.log(`[INFO] Created new user from Auth0 login: ${username}`);
                 
                 // Log the user creation event for audit purposes
-                logUserCreation(
-                  user.id,
-                  user.username,
-                  'auth0',
-                  auth0UserId,
-                  'SSO login'
-                );
+                if (user) {
+                  logUserCreation(
+                    user.id,
+                    user.username,
+                    undefined, // No creator user ID for SSO registration
+                    undefined, // No creator username for SSO registration
+                    req.ip // Use the IP address from the request
+                  );
+                }
               }
             } else {
               // We found the user by Auth0 ID, update email verification status
               await storage.updateUserEmailVerifiedStatus(user.id, emailVerified);
             }
             
-            // Remove password from the user object before returning
-            const { password: _, ...userWithoutPassword } = user;
+            if (!user) {
+              return done(new Error('Failed to retrieve or create user account'));
+            }
             
             // Log successful authentication
             logSuccessfulAuth(
               user.id,
               user.username,
-              'auth0',
-              profile.id
+              'auth0' as any, // Cast to any for type compatibility
+              profile.id as any // Cast to any for type compatibility
             );
             
-            return done(null, userWithoutPassword);
+            // Create a new object without the password property
+            const { password, ...userWithoutPassword } = user;
+            
+            return done(null, userWithoutPassword as User);
           } catch (error) {
             console.error('[ERROR] Auth0 authentication error:', error);
             return done(error);
@@ -331,22 +340,22 @@ export function configureAuth(app: any) {
     }));
     
     // Auth0 callback route
-    app.get('/api/auth-sso/callback', (req, res, next) => {
-      passport.authenticate('auth0', (err, user, info) => {
+    app.get('/api/auth-sso/callback', (req: Request, res: Response, next: NextFunction) => {
+      passport.authenticate('auth0', (err: Error | null, user: User | undefined, info: any) => {
         if (err) {
           console.error('[ERROR] Auth0 callback error:', err);
-          return res.redirect('/auth?error=sso_failed&reason=' + encodeURIComponent(err.message));
+          return res.redirect('/login?error=sso_failed&reason=' + encodeURIComponent(err.message));
         }
         
         if (!user) {
           console.error('[ERROR] Auth0 callback did not return a user');
-          return res.redirect('/auth?error=sso_failed&reason=no_user_returned');
+          return res.redirect('/login?error=sso_failed&reason=no_user_returned');
         }
         
         req.login(user, (err) => {
           if (err) {
             console.error('[ERROR] Session login error:', err);
-            return res.redirect('/auth?error=sso_failed&reason=session_error');
+            return res.redirect('/login?error=sso_failed&reason=session_error');
           }
           
           // Successful login
