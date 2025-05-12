@@ -58,7 +58,7 @@ export async function extractTextContent(
     }
     
     // Special handling for CSV files
-    if (isCSVFile(mimeType, filename)) {
+    if (isCSVFile(mimeType, extension || '')) {
       const content = await readFileAsync(filePath, 'utf8');
       // Basic CSV description
       const lines = content.split('\n');
@@ -77,12 +77,12 @@ export async function extractTextContent(
     }
     
     // For other document types, return basic metadata
-    return `This is a ${contentType} file named ${filename} with MIME type ${mimeType}. Content processing not available for this file type.`;
+    return `This is a ${contentType} file with MIME type ${mimeType}. Content processing not available for this file type.`;
     
   } catch (error: any) {
     const errorMessage = error?.message || String(error);
     console.error(`Error extracting text content: ${errorMessage}`);
-    return null;
+    return undefined;
   }
 }
 
