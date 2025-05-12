@@ -62,7 +62,7 @@ export function AdminShell({ children }: AdminShellProps) {
   return (
     <div className="flex h-screen">
       {/* Desktop sidebar */}
-      <div className="hidden md:flex w-64 flex-col fixed inset-y-0">
+      <div className="hidden md:flex w-80 flex-col fixed inset-y-0">
         <div className="flex flex-col flex-grow border-r bg-primary-foreground pt-5 overflow-y-auto">
           <div className="flex items-center flex-shrink-0 px-4 mb-5">
             <div className="h-8 w-8 rounded-full bg-primary mr-3 flex items-center justify-center">
@@ -109,7 +109,7 @@ export function AdminShell({ children }: AdminShellProps) {
             <Menu />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-0">
+        <SheetContent side="left" className="w-80 p-0">
           <div className="flex flex-col h-full pt-5">
             <div className="flex items-center flex-shrink-0 px-4 mb-5">
               <div className="h-8 w-8 rounded-full bg-primary mr-3 flex items-center justify-center">
@@ -152,7 +152,7 @@ export function AdminShell({ children }: AdminShellProps) {
       </Sheet>
 
       {/* Main content */}
-      <div className="flex flex-col flex-1 md:pl-64">
+      <div className="flex flex-col flex-1 md:pl-80">
         <main className="flex-1 pt-16 md:pt-8 px-4 sm:px-6 md:px-8 bg-background min-h-screen">
           {children}
         </main>
