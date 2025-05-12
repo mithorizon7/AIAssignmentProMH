@@ -6,20 +6,6 @@ import { promisify } from 'util';
 import { AIAdapter, MultimodalPromptPart } from './ai-adapter';
 import { fileToDataURI } from '../utils/multimodal-processor';
 
-// Define interfaces for Gemini File API types that might not be fully exported
-// These match the expected structure for the Gemini API
-interface FileData {
-  data: Uint8Array | Buffer;
-  mimeType: string;
-}
-
-// Add missing methods to the GoogleGenerativeAI type
-declare module '@google/generative-ai' {
-  interface GoogleGenerativeAI {
-    createBlobFile(fileData: FileData): Promise<any>;
-  }
-}
-
 const readFileAsync = promisify(fs.readFile);
 
 export class GeminiAdapter implements AIAdapter {
@@ -155,31 +141,24 @@ export class GeminiAdapter implements AIAdapter {
       // Create the content parts
       const contentParts: Part[] = [];
       
-      // Track any file data objects that need to be created for larger files
-      const fileDataObjects: FileData[] = [];
-      
       // Add system prompt if provided
       if (systemPrompt) {
-        // We'll add system prompt as a regular text part
         contentParts.push({
           text: systemPrompt
         });
       }
       
+      // Track any file objects for cleanup
+      const fileObjects: any[] = [];
+      
       // Process each part based on its type
       for (const part of parts) {
-        // Get text content if available but not directly in the part object
-        const textContent = part.textContent || undefined;
+        const textContent = part.textContent;
         const mimeType = part.mimeType || this.getDefaultMimeType(part.type);
         
         // Determine file size if we have a buffer
-        const fileSize = Buffer.isBuffer(part.content) ? part.content.length : null;
-        const isLargeFile = fileSize && fileSize > 3 * 1024 * 1024; // 3MB threshold
-        const needsFileAPI = 
-          isLargeFile || 
-          part.type === 'audio' || 
-          part.type === 'video' || 
-          (part.type === 'document' && mimeType === 'application/pdf');
+        const fileSize = Buffer.isBuffer(part.content) ? part.content.length : 0;
+        const isLargeFile = fileSize > 3 * 1024 * 1024; // 3MB threshold
         
         switch (part.type) {
           case 'text':
@@ -189,114 +168,155 @@ export class GeminiAdapter implements AIAdapter {
             break;
             
           case 'image':
-            // For images, use Gemini File API for large images
-            if (needsFileAPI && Buffer.isBuffer(part.content)) {
-              try {
-                // Create FileData object using Gemini's File API
-                const fileData = await this.generativeAI.createBlobFile({
-                  data: part.content,
-                  mimeType
-                });
-                
-                fileDataObjects.push(fileData);
-                
-                // Add as fileData part
-                contentParts.push({
-                  fileData: {
-                    fileData,
-                    mimeType
+            if (Buffer.isBuffer(part.content)) {
+              if (isLargeFile) {
+                try {
+                  // For large images, try to use file handling if available
+                  // This is a conditional approach that works with or without type definitions
+                  if (typeof (this.generativeAI as any).createBlob === 'function') {
+                    // Gemini API sometimes uses 'createBlob' instead of 'createBlobFile'
+                    const fileData = await (this.generativeAI as any).createBlob({
+                      data: part.content,
+                      mimeType
+                    });
+                    
+                    fileObjects.push(fileData);
+                    
+                    contentParts.push({
+                      // Using 'as any' to bypass strict type checking
+                      // as the fileData structure might vary between API versions
+                      inlineData: { 
+                        data: fileData,
+                        mimeType
+                      } as any
+                    });
+                  } else {
+                    // Fallback to inline data if the File API method isn't available
+                    this.addInlineImagePart(contentParts, part.content, mimeType);
                   }
-                });
-              } catch (error) {
-                console.warn('Failed to use Gemini File API, falling back to inline data:', error);
+                } catch (error) {
+                  console.warn('Failed to use Gemini File API for large image, falling back to inline data:', error);
+                  this.addInlineImagePart(contentParts, part.content, mimeType);
+                }
+              } else {
+                // For smaller images, use inline data
                 this.addInlineImagePart(contentParts, part.content, mimeType);
               }
-            } else {
-              // Smaller images use inline data
-              this.addInlineImagePart(contentParts, part.content, mimeType);
+            } else if (typeof part.content === 'string') {
+              // Handle base64 or data URI strings
+              contentParts.push({
+                inlineData: {
+                  data: part.content.replace(/^data:image\/\w+;base64,/, ''),
+                  mimeType: mimeType
+                }
+              });
             }
             break;
             
           case 'document':
-            // For PDF documents specifically, use Gemini File API
+            // Special handling for PDF documents
             if (mimeType === 'application/pdf' && Buffer.isBuffer(part.content)) {
               try {
-                // Create FileData object using Gemini's File API
-                const fileData = await this.generativeAI.createBlobFile({
-                  data: part.content,
-                  mimeType: 'application/pdf'
-                });
-                
-                fileDataObjects.push(fileData);
-                
-                // Add as fileData part
-                contentParts.push({
-                  fileData: {
-                    fileData,
+                if (typeof (this.generativeAI as any).createBlob === 'function') {
+                  // PDF is directly supported by Gemini API
+                  const fileData = await (this.generativeAI as any).createBlob({
+                    data: part.content,
                     mimeType: 'application/pdf'
-                  }
-                });
-              } catch (error) {
-                console.warn('Failed to use Gemini File API for PDF, falling back to text extraction:', error);
-                // For other documents, or if File API fails, use text content if available
-                if (part.textContent) {
-                  contentParts.push({ text: part.textContent });
-                } else if (Buffer.isBuffer(part.content) && ['text/csv', 'text/plain'].includes(mimeType)) {
-                  // Try to extract text from the buffer for certain document types
-                  contentParts.push({ text: part.content.toString('utf8') });
+                  });
+                  
+                  fileObjects.push(fileData);
+                  
+                  contentParts.push({
+                    inlineData: {
+                      data: fileData,
+                      mimeType: 'application/pdf'
+                    } as any
+                  });
                 } else {
-                  // Generic document mention
-                  contentParts.push({ text: `[DOCUMENT: Unable to process content directly]` });
+                  // If File API not available, use text content
+                  if (textContent) {
+                    contentParts.push({ text: textContent });
+                  } else {
+                    contentParts.push({ text: `[PDF: Unable to process content directly]` });
+                  }
+                }
+              } catch (error) {
+                console.warn('Failed to use Gemini File API for PDF, falling back to text content:', error);
+                // Use extracted text if available
+                if (textContent) {
+                  contentParts.push({ text: textContent });
+                } else {
+                  contentParts.push({ text: `[PDF: Unable to process content directly]` });
                 }
               }
             } else {
-              // For other documents, use text content if available
-              if (part.textContent) {
-                contentParts.push({ text: part.textContent });
-              } else if (Buffer.isBuffer(part.content) && ['text/csv', 'text/plain'].includes(mimeType)) {
-                // Try to extract text from the buffer for certain document types
+              // For other document types, use extracted text or direct content
+              if (textContent) {
+                contentParts.push({ text: textContent });
+              } else if (Buffer.isBuffer(part.content) && 
+                        ['text/csv', 'text/plain', 'application/json', 'text/markdown'].includes(mimeType)) {
+                // Handle text-based document formats directly
                 contentParts.push({ text: part.content.toString('utf8') });
               } else {
-                // Generic document mention
-                contentParts.push({ text: `[DOCUMENT: Unable to process content directly]` });
+                contentParts.push({ text: `[DOCUMENT: ${mimeType} - See extracted text below if available]` });
+                if (Buffer.isBuffer(part.content)) {
+                  try {
+                    // Attempt to extract text from unknown document format
+                    const text = part.content.toString('utf8', 0, Math.min(part.content.length, 4000));
+                    if (text && /[\x20-\x7E]/.test(text)) { // Has printable ASCII
+                      contentParts.push({ text: `Extracted content sample:\n${text}` });
+                    }
+                  } catch (e) {
+                    // Ignore errors in content extraction
+                  }
+                }
               }
             }
             break;
             
           case 'audio':
           case 'video':
-            // For audio/video, try using Gemini File API
             if (Buffer.isBuffer(part.content)) {
               try {
-                // Create FileData object using Gemini's File API
-                const fileData = await this.generativeAI.createBlobFile({
-                  data: part.content,
-                  mimeType
-                });
-                
-                fileDataObjects.push(fileData);
-                
-                // Add as fileData part
-                contentParts.push({
-                  fileData: {
-                    fileData,
+                if (typeof (this.generativeAI as any).createBlob === 'function') {
+                  const fileData = await (this.generativeAI as any).createBlob({
+                    data: part.content,
                     mimeType
+                  });
+                  
+                  fileObjects.push(fileData);
+                  
+                  contentParts.push({
+                    inlineData: {
+                      data: fileData,
+                      mimeType
+                    } as any
+                  });
+                } else {
+                  // Fallback to text description if File API not available
+                  contentParts.push({
+                    text: `[${part.type.toUpperCase()}: Media file of type ${mimeType}]`
+                  });
+                  
+                  // Include extracted text content if available
+                  if (textContent) {
+                    contentParts.push({ text: textContent });
                   }
-                });
+                }
               } catch (error) {
-                console.warn(`Failed to use Gemini File API for ${part.type}, falling back to text description:`, error);
-                // Fallback to text description
+                console.warn(`Failed to use Gemini File API for ${part.type}, falling back to text:`, error);
+                
                 contentParts.push({
                   text: `[${part.type.toUpperCase()}: Could not process file directly]`
                 });
                 
-                // If there's text content extracted from the file, add it
-                if (part.textContent) {
-                  contentParts.push({ text: part.textContent });
+                // Include extracted text content if available
+                if (textContent) {
+                  contentParts.push({ text: textContent });
                 }
               }
             } else {
-              // If not a buffer, provide notification
+              // For non-buffer content
               contentParts.push({
                 text: `[${part.type.toUpperCase()}: File format not supported]`
               });
@@ -304,14 +324,14 @@ export class GeminiAdapter implements AIAdapter {
             break;
             
           default:
-            // Handle unknown types as text with a note
+            // Handle unknown types with appropriate warning
             contentParts.push({
-              text: `[${part.type.toUpperCase()} CONTENT - Not directly processed by the model]`
+              text: `[CONTENT of type ${String(part.type).toUpperCase()} - Not directly processed]`
             });
             
-            // If there's text content extracted from the file, add it
-            if (part.textContent) {
-              contentParts.push({ text: part.textContent });
+            // Include extracted text content if available
+            if (textContent) {
+              contentParts.push({ text: textContent });
             }
         }
       }
