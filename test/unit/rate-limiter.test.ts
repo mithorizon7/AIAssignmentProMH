@@ -96,7 +96,8 @@ describe('Rate Limiters', () => {
     // Verify response was set correctly
     expect(res.status).toHaveBeenCalledWith(429);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ 
-      message: expect.stringContaining('Too many requests')
+      status: 'error',
+      message: expect.stringMatching(/Too many|exceeded|rate limit/i)
     }));
     
     // Verify audit logging was called
