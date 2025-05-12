@@ -242,6 +242,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get course information
       const course = await storage.getCourse(assignment.courseId);
       
+      if (!course) {
+        return res.status(404).json({ message: 'Course not found for this assignment' });
+      }
+      
       // Return limited information about the assignment (for public access)
       res.json({
         id: assignment.id,

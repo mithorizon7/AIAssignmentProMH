@@ -114,7 +114,7 @@ export async function processFileForMultimodal(
             content: extractedText || fileBuffer.toString('utf8'),
             contentType,
             isProcessable: true,
-            textContent: extractedText,
+            textContent: extractedText || undefined,
             fileSize
           };
         }
@@ -124,7 +124,7 @@ export async function processFileForMultimodal(
             content: fileBuffer,
             contentType,
             isProcessable: false,
-            textContent: extractedText,
+            textContent: extractedText || undefined,
             fileSize
           };
         }
