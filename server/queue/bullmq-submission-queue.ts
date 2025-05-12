@@ -211,6 +211,7 @@ if (queueActive) {
             textContent: submission.content || undefined, // Optional extracted text
             assignmentTitle: assignment.title,
             assignmentDescription: assignment.description || undefined,
+            instructorContext: assignment.instructorContext || undefined, // Instructor-only guidance
             rubric: rubric
           });
         } else {
@@ -220,6 +221,7 @@ if (queueActive) {
             studentSubmissionContent: content,
             assignmentTitle: assignment.title,
             assignmentDescription: assignment.description || undefined,
+            instructorContext: assignment.instructorContext || undefined, // Instructor-only guidance
             rubric: rubric
           });
         }
@@ -410,6 +412,7 @@ export const queueApi = {
                 textContent: submission.content || undefined, // Optional extracted text
                 assignmentTitle: assignment.title,
                 assignmentDescription: assignment.description || undefined,
+                instructorContext: assignment.instructorContext || undefined, // Instructor-only guidance
                 rubric: rubric
               });
             } else {
@@ -419,6 +422,7 @@ export const queueApi = {
                 studentSubmissionContent: content,
                 assignmentTitle: assignment.title,
                 assignmentDescription: assignment.description || undefined,
+                instructorContext: assignment.instructorContext || undefined, // Instructor-only guidance
                 rubric: rubric
               });
             }
