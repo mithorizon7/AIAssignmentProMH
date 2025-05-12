@@ -174,6 +174,91 @@ ${params.studentSubmissionContent}
     }
   }
 
+  /**
+   * Analyzes a multimodal student submission (images, PDFs, etc.)
+   * @param params Object containing file information, assignment details, and optional rubric
+   */
+  async analyzeMultimodalSubmission(params: MultimodalSubmissionAnalysisRequest): Promise<FeedbackResponse> {
+    const startTime = Date.now();
+    
+    try {
+      // Process the file to extract content based on file type
+      const processedFile = await processFileForMultimodal(
+        params.filePath,
+        params.fileName,
+        params.mimeType
+      );
+      
+      // If the adapter doesn't support multimodal input, fallback to text analysis
+      if (!this.adapter.generateMultimodalCompletion) {
+        console.log('AI adapter does not support multimodal content; falling back to text-only analysis');
+        
+        // Use extracted text content if available
+        let textContent = params.textContent || '';
+        if (processedFile.textContent) {
+          textContent = processedFile.textContent;
+        } else if (typeof processedFile.content === 'string') {
+          textContent = processedFile.content;
+        } else {
+          textContent = `[This submission contains ${processedFile.contentType} content that could not be automatically processed as text]`;
+        }
+        
+        return this.analyzeSubmission({
+          studentSubmissionContent: textContent,
+          assignmentTitle: params.assignmentTitle,
+          assignmentDescription: params.assignmentDescription,
+          rubric: params.rubric
+        });
+      }
+      
+      // Create prompt parts for multimodal analysis
+      const promptParts: MultimodalPromptPart[] = [];
+      
+      // Add the file content as the appropriate type
+      promptParts.push({
+        type: processedFile.contentType as any,
+        content: processedFile.content,
+        mimeType: params.mimeType
+      });
+      
+      // If there's extracted text content, add it
+      if (processedFile.textContent) {
+        promptParts.push({
+          type: 'text',
+          content: processedFile.textContent
+        });
+      }
+      
+      // Build a system prompt for assignment context
+      let systemPrompt = `You are an expert AI Teaching Assistant analyzing a ${processedFile.contentType} submission. `;
+      systemPrompt += `\nAssignment: ${params.assignmentTitle}`;
+      
+      if (params.assignmentDescription) {
+        systemPrompt += `\nDescription: ${params.assignmentDescription}`;
+      }
+      
+      if (params.rubric && params.rubric.criteria && params.rubric.criteria.length > 0) {
+        systemPrompt += '\n\nRubric criteria to assess:';
+        for (const criterion of params.rubric.criteria) {
+          systemPrompt += `\n- ${criterion.name}: ${criterion.description} (Max score: ${criterion.maxScore})`;
+        }
+      }
+      
+      // Generate the completion using multimodal capabilities
+      const response = await this.adapter.generateMultimodalCompletion(promptParts, systemPrompt);
+      
+      const processingTime = Date.now() - startTime;
+      
+      return {
+        ...response,
+        processingTime
+      };
+    } catch (error: any) {
+      console.error('AI multimodal submission analysis error:', error);
+      throw new Error(`Failed to analyze multimodal submission: ${error.message || String(error)}`);
+    }
+  }
+
   async prepareFeedbackForStorage(submissionId: number, feedback: FeedbackResponse): Promise<InsertFeedback> {
     return {
       submissionId,

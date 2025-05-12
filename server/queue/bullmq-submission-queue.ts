@@ -145,16 +145,16 @@ if (queueActive) {
         }
         await job.updateProgress(30);
 
-        // Prepare content for analysis
-        let content = submission.content || ''; 
-        if (submission.fileUrl && !content) {
-          // In a production environment, this would download from cloud storage
-          content = `File submission: ${submission.fileName || 'Unnamed file'}`;
-        }
+        // Prepare for analysis
         await job.updateProgress(40);
-
+        
         // Initialize AI service on demand
         const aiService = createAIService();
+        
+        // Determine if this is a multimodal submission
+        const isMultimodal = submission.mimeType && 
+                             submission.mimeType !== 'text/plain' && 
+                             submission.fileUrl;
 
         // Parse the rubric if it exists in the assignment
         let rubric;
@@ -191,13 +191,38 @@ if (queueActive) {
           rubric = undefined;
         }
         
-        // Analyze the submission with AI using the new method
-        const feedbackResult = await aiService.analyzeSubmission({
-          studentSubmissionContent: content,
-          assignmentTitle: assignment.title,
-          assignmentDescription: assignment.description || undefined,
-          rubric: rubric
-        });
+        // Analyze the submission with AI based on file type
+        let feedbackResult;
+        if (isMultimodal) {
+          // In production, fileUrl would be a path to cloud storage
+          // Here we use a server-local path for simplicity
+          const filePath = submission.fileUrl || '';
+          
+          logger.info(`Processing multimodal submission`, {
+            submissionId,
+            type: submission.mimeType,
+            filename: submission.fileName
+          });
+          
+          feedbackResult = await aiService.analyzeMultimodalSubmission({
+            filePath: filePath,
+            fileName: submission.fileName || 'unknown',
+            mimeType: submission.mimeType || 'application/octet-stream',
+            textContent: submission.content || undefined, // Optional extracted text
+            assignmentTitle: assignment.title,
+            assignmentDescription: assignment.description || undefined,
+            rubric: rubric
+          });
+        } else {
+          // Process as standard text submission
+          const content = submission.content || '';
+          feedbackResult = await aiService.analyzeSubmission({
+            studentSubmissionContent: content,
+            assignmentTitle: assignment.title,
+            assignmentDescription: assignment.description || undefined,
+            rubric: rubric
+          });
+        }
         await job.updateProgress(70);
 
         // Prepare feedback for database
@@ -364,13 +389,39 @@ export const queueApi = {
               rubric = undefined;
             }
               
-            // Analyze submission with the new method
-            const feedbackResult = await aiService.analyzeSubmission({
-              studentSubmissionContent: content,
-              assignmentTitle: assignment.title,
-              assignmentDescription: assignment.description || undefined,
-              rubric: rubric
-            });
+            // Determine if this is a multimodal submission
+            const isMultimodal = submission.mimeType && 
+                                 submission.mimeType !== 'text/plain' && 
+                                 submission.fileUrl;
+            
+            // Analyze the submission with AI based on file type
+            let feedbackResult;
+            if (isMultimodal) {
+              // In production, fileUrl would be a path to cloud storage
+              // Here we use a server-local path for simplicity
+              const filePath = submission.fileUrl || '';
+              
+              console.log(`[DEVELOPMENT] Processing multimodal submission ${submissionId} of type ${submission.mimeType}`);
+              
+              feedbackResult = await aiService.analyzeMultimodalSubmission({
+                filePath: filePath,
+                fileName: submission.fileName || 'unknown',
+                mimeType: submission.mimeType || 'application/octet-stream',
+                textContent: submission.content || undefined, // Optional extracted text
+                assignmentTitle: assignment.title,
+                assignmentDescription: assignment.description || undefined,
+                rubric: rubric
+              });
+            } else {
+              // Process as standard text submission
+              const content = submission.content || '';
+              feedbackResult = await aiService.analyzeSubmission({
+                studentSubmissionContent: content,
+                assignmentTitle: assignment.title,
+                assignmentDescription: assignment.description || undefined,
+                rubric: rubric
+              });
+            }
             
             // Prepare and save feedback
             const feedbackData = await aiService.prepareFeedbackForStorage(
