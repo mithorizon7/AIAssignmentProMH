@@ -1,19 +1,34 @@
-import { expect, afterEach, beforeAll, afterAll } from 'vitest';
-import { cleanup } from '@testing-library/react';
-import * as matchers from '@testing-library/jest-dom/matchers';
-import { server } from './mocks/server';
+/**
+ * Global test setup file
+ * Runs before any tests are executed
+ */
 
-// Extend Vitest's expect method with methods from react-testing-library
-expect.extend(matchers);
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 
-// Setup MSW server before tests
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-
-// Reset handlers after each test (important for test isolation)
-afterEach(() => {
-  cleanup();
-  server.resetHandlers();
+// Setup default environment variables for tests
+beforeAll(() => {
+  // Set environment variables needed for tests to pass
+  process.env.NODE_ENV = 'test';
+  process.env.SESSION_SECRET = 'test_session_secret_with_more_than_30_chars';
+  process.env.CSRF_SECRET = 'test_csrf_secret_with_more_than_30_chars';
+  
+  // Suppress console warnings/errors during tests
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
-// Clean up after all tests are done
-afterAll(() => server.close());
+// Cleanup environment after all tests
+afterAll(() => {
+  // Reset environment variables
+  delete process.env.SESSION_SECRET;
+  delete process.env.CSRF_SECRET;
+  
+  // Restore console
+  vi.restoreAllMocks();
+});
+
+// Clean up after each test
+afterEach(() => {
+  vi.resetAllMocks();
+  vi.resetModules();
+});

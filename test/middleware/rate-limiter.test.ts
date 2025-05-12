@@ -98,7 +98,7 @@ describe('Rate Limiter Middleware', () => {
     
     // Get a fresh instance of middleware
     vi.resetModules();
-    jest.isolateModules(() => {
+    vi.isolateModules(() => {
       const { defaultRateLimiter } = require('../../server/middleware/rate-limiter');
       
       // Call the middleware
@@ -140,7 +140,7 @@ describe('Rate Limiter Middleware', () => {
     
     // Get a fresh instance of middleware with trust proxy
     vi.resetModules();
-    jest.isolateModules(() => {
+    vi.isolateModules(() => {
       const { defaultRateLimiter } = require('../../server/middleware/rate-limiter');
       
       // Call the middleware
