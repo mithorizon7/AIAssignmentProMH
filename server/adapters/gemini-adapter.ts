@@ -81,9 +81,9 @@ export class GeminiAdapter implements AIAdapter {
       
       // Add system prompt if provided
       if (systemPrompt) {
+        // We'll add system prompt as a regular text part
         contentParts.push({
-          text: systemPrompt,
-          role: 'user'
+          text: systemPrompt
         });
       }
       
@@ -106,12 +106,32 @@ export class GeminiAdapter implements AIAdapter {
               imageData = part.content; // Assume it's already a data URI
             }
             
-            contentParts.push({
-              inlineData: {
-                data: imageData.replace(/^data:image\/\w+;base64,/, ''),
-                mimeType: part.mimeType || 'image/jpeg'
-              }
-            });
+            // Handle different image data formats
+            if (typeof imageData === 'string' && imageData.startsWith('data:')) {
+              // It's a data URI
+              contentParts.push({
+                inlineData: {
+                  data: imageData.replace(/^data:image\/\w+;base64,/, ''),
+                  mimeType: part.mimeType || 'image/jpeg'
+                }
+              });
+            } else if (Buffer.isBuffer(imageData)) {
+              // It's still a buffer
+              contentParts.push({
+                inlineData: {
+                  data: imageData.toString('base64'),
+                  mimeType: part.mimeType || 'image/jpeg'
+                }
+              });
+            } else {
+              // Assume it's already a base64 string
+              contentParts.push({
+                inlineData: {
+                  data: imageData,
+                  mimeType: part.mimeType || 'image/jpeg'
+                }
+              });
+            }
             break;
             
           default:

@@ -403,11 +403,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let fileUrl = '';
       let fileName = '';
       let content = '';
+      let mimeType = null;
+      let fileSize = null;
+      let contentType = null;
       
       if (submissionType === 'file' && req.file) {
+        // Get file metadata
+        fileName = req.file.originalname;
+        mimeType = req.file.mimetype;
+        fileSize = req.file.size;
+        
+        // Determine content type based on file extension and MIME type
+        const fileExtension = path.extname(fileName).slice(1).toLowerCase();
+        contentType = determineContentType(fileExtension, mimeType);
+        
+        // Verify that the file type is allowed
+        const isAllowed = await isFileTypeAllowed(contentType, fileExtension, mimeType);
+        if (!isAllowed) {
+          return res.status(400).json({ 
+            message: `File type ${fileExtension} (${mimeType}) is not allowed`,
+            details: 'This file type is currently not supported for AI evaluation'
+          });
+        }
+        
         // Store file and get URL
         fileUrl = await storageService.storeSubmissionFile(req.file, user.id, assignmentId);
-        fileName = req.file.originalname;
+        
+        // For text files, extract and store content
+        if (contentType === 'text' && mimeType.startsWith('text/')) {
+          content = req.file.buffer.toString('utf8');
+        }
       } else if (submissionType === 'code') {
         // Get code from request body
         content = req.body.code || '';
@@ -415,6 +440,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!content.trim()) {
           return res.status(400).json({ message: 'Code content is required for code submissions' });
         }
+        
+        // Set default metadata for code submissions
+        mimeType = 'text/plain';
+        contentType = 'text';
+        fileSize = Buffer.from(content).length;
       } else {
         return res.status(400).json({ message: 'Invalid submission type or missing file' });
       }
