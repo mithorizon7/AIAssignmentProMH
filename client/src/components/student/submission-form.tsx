@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { FileUpload } from "@/components/ui/file-upload";
 import { CodeEditor } from "@/components/ui/code-editor";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import { Assignment, Submission } from "@/lib/types";
 import { formatDate, formatTimeRemaining } from "@/lib/utils/format";
 import { apiRequest } from "@/lib/queryClient";
@@ -169,13 +170,10 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
           <label htmlFor="notes" className="block text-sm font-medium text-neutral-700 mb-1">
             Submission Notes (optional)
           </label>
-          <Textarea
-            id="notes"
-            rows={3}
+          <RichTextEditor
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={setNotes}
             placeholder="Add any notes for your instructor..."
-            className="w-full"
           />
         </div>
       </CardContent>
