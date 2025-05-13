@@ -1,245 +1,158 @@
-import { useState } from "react";
+import React, { Dispatch, SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { PlusCircle, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import * as SharedEnums from '@shared/enums';
-import { v4 as uuidv4 } from 'uuid';
-import { RubricCriterion, Rubric } from '@shared/schema';
-import { QuillEditor } from "@/components/quill-editor";
-import { QuillContent } from "@/components/quill-content";
+import { Textarea } from "@/components/ui/textarea";
+import { Rubric, RubricCriterion } from "@shared/schema";
 
-interface RubricBuilderProps {
-  value: Rubric;
-  onChange: (rubric: Rubric) => void;
+export interface RubricBuilderProps {
+  rubric: Rubric;
+  setRubric: Dispatch<SetStateAction<Rubric>>;
 }
 
-export function RubricBuilder({ value, onChange }: RubricBuilderProps) {
-  const [newCriterionName, setNewCriterionName] = useState('');
-  const [newCriterionType, setNewCriterionType] = useState(SharedEnums.RUBRIC_CRITERIA_TYPE.CODE_QUALITY);
-  const [newCriterionDescription, setNewCriterionDescription] = useState('');
-  const [newCriterionMaxScore, setNewCriterionMaxScore] = useState(10);
-  const [newCriterionWeight, setNewCriterionWeight] = useState(1);
-  
+export function RubricBuilder({ rubric, setRubric }: RubricBuilderProps) {
   const handleAddCriterion = () => {
-    if (!newCriterionName.trim()) return;
-    
-    const newCriterion: RubricCriterion = {
-      id: uuidv4(),
-      type: newCriterionType,
-      name: newCriterionName,
-      description: newCriterionDescription,
-      maxScore: newCriterionMaxScore,
-      weight: newCriterionWeight
-    };
-    
-    onChange({
-      ...value,
-      criteria: [...value.criteria, newCriterion]
-    });
-    
-    // Reset form
-    setNewCriterionName('');
-    setNewCriterionDescription('');
-    setNewCriterionMaxScore(10);
-    setNewCriterionWeight(1);
+    setRubric((prev) => ({
+      ...prev,
+      criteria: [
+        ...prev.criteria,
+        {
+          id: Date.now().toString(),
+          name: "",
+          description: "",
+          weight: 10,
+          type: "code_quality"
+        },
+      ],
+    }));
   };
-  
+
   const handleRemoveCriterion = (id: string) => {
-    onChange({
-      ...value,
-      criteria: value.criteria.filter(c => c.id !== id)
-    });
+    setRubric((prev) => ({
+      ...prev,
+      criteria: prev.criteria.filter((c) => c.id !== id),
+    }));
   };
-  
-  const handleUpdatePassingThreshold = (threshold: number | undefined) => {
-    onChange({
-      ...value,
-      passingThreshold: threshold
-    });
+
+  const handleCriterionChange = (id: string, field: keyof RubricCriterion, value: any) => {
+    setRubric((prev) => ({
+      ...prev,
+      criteria: prev.criteria.map((c) =>
+        c.id === id ? { ...c, [field]: field === "weight" ? Number(value) : value } : c
+      ),
+    }));
   };
-  
-  const getTotalPoints = () => {
-    return value.criteria.reduce((sum, criterion) => sum + criterion.maxScore * criterion.weight, 0);
+
+  const handlePassingThresholdChange = (value: string) => {
+    const threshold = parseInt(value, 10);
+    if (!isNaN(threshold) && threshold >= 0 && threshold <= 100) {
+      setRubric((prev) => ({
+        ...prev,
+        passingThreshold: threshold,
+      }));
+    }
   };
-  
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Assignment Rubric</CardTitle>
-          <CardDescription>
-            Define criteria for AI evaluation and feedback
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {value.criteria.length > 0 ? (
-            <div className="space-y-4">
-              {value.criteria.map((criterion) => (
-                <div key={criterion.id} className="flex items-start p-3 border rounded-md relative group hover:border-primary/50 transition-colors">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium">{criterion.name}</span>
-                      <span className="bg-primary/10 text-primary rounded-md text-xs px-2 py-0.5">
-                        {criterion.type}
-                      </span>
-                    </div>
-                    <QuillContent 
-                      content={criterion.description} 
-                      className="text-sm text-muted-foreground mb-1" 
-                    />
-                    <div className="flex gap-4 text-xs text-muted-foreground">
-                      <span>Max Score: {criterion.maxScore}</span>
-                      <span>Weight: {criterion.weight}x</span>
-                      <span>Total: {criterion.maxScore * criterion.weight} points</span>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-2"
-                    onClick={() => handleRemoveCriterion(criterion.id)}
-                  >
-                    <span className="material-icons-outlined text-sm">delete</span>
-                  </Button>
-                </div>
-              ))}
-              
-              <div className="flex justify-between p-3 border rounded-md bg-secondary/10">
-                <span className="font-medium">Total Points</span>
-                <span>{getTotalPoints()} points</span>
-              </div>
-              
-              <div className="flex items-center gap-4 p-3 border rounded-md">
-                <div className="flex items-center gap-2">
-                  <input
-                    id="enablePassingThreshold"
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    checked={value.passingThreshold !== undefined}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        handleUpdatePassingThreshold(60); // Default value
-                      } else {
-                        handleUpdatePassingThreshold(undefined);
-                      }
-                    }}
-                  />
-                  <Label htmlFor="enablePassingThreshold" className="whitespace-nowrap">
-                    Enable Passing Threshold
-                  </Label>
-                </div>
-                {value.passingThreshold !== undefined && (
-                  <div className="flex items-center gap-2 ml-2">
-                    <Label htmlFor="passingThreshold" className="whitespace-nowrap">
-                      Threshold (%)
-                    </Label>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-sm font-medium">Passing Threshold</h3>
+          <div className="flex items-center mt-1 space-x-2">
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              value={rubric.passingThreshold}
+              onChange={(e) => handlePassingThresholdChange(e.target.value)}
+              className="w-20 field-focus-animation"
+            />
+            <span className="text-sm text-muted-foreground">%</span>
+          </div>
+        </div>
+        <Button
+          type="button"
+          onClick={handleAddCriterion}
+          variant="outline"
+          className="press-effect"
+        >
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Add Criterion
+        </Button>
+      </div>
+
+      {rubric.criteria.length === 0 ? (
+        <div className="text-center py-8 border border-dashed rounded-lg">
+          <p className="text-muted-foreground">
+            No criteria defined yet. Add your first criterion to get started.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {rubric.criteria.map((criterion, index) => (
+            <Card key={criterion.id} className="overflow-hidden scale-in" style={{animationDelay: `${index * 50}ms`}}>
+              <CardContent className="p-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor={`criterion-${criterion.id}-name`} className="text-sm font-medium mb-1 block">
+                      Criterion Name
+                    </label>
                     <Input
-                      id="passingThreshold"
+                      id={`criterion-${criterion.id}-name`}
+                      value={criterion.name}
+                      onChange={(e) => handleCriterionChange(criterion.id, "name", e.target.value)}
+                      placeholder="e.g., Code Structure"
+                      className="field-focus-animation"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor={`criterion-${criterion.id}-type`} className="text-sm font-medium mb-1 block">
+                      Weight (%)
+                    </label>
+                    <Input
+                      id={`criterion-${criterion.id}-weight`}
                       type="number"
                       min={0}
                       max={100}
-                      value={value.passingThreshold}
-                      onChange={(e) => handleUpdatePassingThreshold(parseInt(e.target.value))}
-                      className="w-20"
+                      value={criterion.weight}
+                      onChange={(e) => handleCriterionChange(criterion.id, "weight", e.target.value)}
+                      className="field-focus-animation"
                     />
                   </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-6 border border-dashed rounded-md">
-              <p className="text-muted-foreground">No criteria defined yet</p>
-              <p className="text-xs text-muted-foreground">Add criteria below to build your rubric</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Add Criterion</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="criterionName">Criterion Name</Label>
-                <Input
-                  id="criterionName"
-                  value={newCriterionName}
-                  onChange={(e) => setNewCriterionName(e.target.value)}
-                  placeholder="e.g., Code Organization"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="criterionType">Type</Label>
-                <Select 
-                  value={newCriterionType}
-                  onValueChange={setNewCriterionType}
-                >
-                  <SelectTrigger id="criterionType">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(SharedEnums.RUBRIC_CRITERIA_TYPE).map(([key, value]) => (
-                      <SelectItem key={value} value={value}>
-                        {key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="criterionDescription">Description</Label>
-              <QuillEditor
-                value={newCriterionDescription}
-                onChange={setNewCriterionDescription}
-                placeholder="Describe what this criterion evaluates"
-                className="min-h-[150px]"
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="maxScore">Max Score</Label>
-                <Input
-                  id="maxScore"
-                  type="number"
-                  min={1}
-                  value={newCriterionMaxScore}
-                  onChange={(e) => setNewCriterionMaxScore(parseInt(e.target.value))}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="weight">Weight</Label>
-                <Input
-                  id="weight"
-                  type="number"
-                  min={1}
-                  value={newCriterionWeight}
-                  onChange={(e) => setNewCriterionWeight(parseInt(e.target.value))}
-                />
-              </div>
-            </div>
-            
-            <Button 
-              onClick={handleAddCriterion}
-              disabled={!newCriterionName.trim()}
-              className="w-full md:w-auto md:ml-auto"
-            >
-              <span className="material-icons-outlined text-sm mr-1">add</span>
-              Add Criterion
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+                </div>
+                
+                <div className="mt-3">
+                  <label htmlFor={`criterion-${criterion.id}-description`} className="text-sm font-medium mb-1 block">
+                    Description
+                  </label>
+                  <Textarea
+                    id={`criterion-${criterion.id}-description`}
+                    value={criterion.description}
+                    onChange={(e) => handleCriterionChange(criterion.id, "description", e.target.value)}
+                    placeholder="Describe what this criterion evaluates and how it should be assessed"
+                    rows={3}
+                    className="field-focus-animation"
+                  />
+                </div>
+                
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 press-effect"
+                    onClick={() => handleRemoveCriterion(criterion.id)}
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" />
+                    Remove
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

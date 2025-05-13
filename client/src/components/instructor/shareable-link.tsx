@@ -1,9 +1,8 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/hooks/use-toast";
-import { APP_ROUTES } from "@/lib/constants";
+import { Copy, Check, Share2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface ShareableLinkProps {
   assignmentId: number;
@@ -11,63 +10,86 @@ interface ShareableLinkProps {
 }
 
 export function ShareableLink({ assignmentId, shareableCode }: ShareableLinkProps) {
+  const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   
-  const fullUrl = `${window.location.origin}${APP_ROUTES.SUBMIT_BY_CODE(shareableCode)}`;
+  // Create the shareable URL
+  const shareableUrl = `${window.location.origin}/submit/${shareableCode}`;
   
-  const handleCopy = () => {
-    navigator.clipboard.writeText(fullUrl)
-      .then(() => {
-        setCopied(true);
-        toast({
-          title: "Copied!",
-          description: "Link copied to clipboard",
-        });
-        
-        // Reset copied state after 2 seconds
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(err => {
-        console.error('Failed to copy link:', err);
-        toast({
-          title: "Error",
-          description: "Failed to copy link to clipboard",
-          variant: "destructive",
-        });
+  // Copy link to clipboard
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(shareableUrl);
+      setCopied(true);
+      toast({
+        title: "Link copied!",
+        description: "The link has been copied to your clipboard",
+        className: "success-pulse",
       });
+      
+      // Reset copied state after 2 seconds
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      toast({
+        title: "Failed to copy",
+        description: "Please copy the link manually",
+        variant: "destructive",
+      });
+    }
   };
   
   return (
-    <Card className="shadow-md hover:shadow-lg transition-shadow">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Shareable Link</CardTitle>
-        <CardDescription>
-          Share this link with students who need to submit to this assignment
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex space-x-2">
-          <Input 
-            value={fullUrl} 
-            readOnly 
-            className="bg-secondary/10 font-mono text-sm" 
-          />
-          <Button
-            onClick={handleCopy}
-            variant={copied ? "secondary" : "default"}
-            className="whitespace-nowrap"
-          >
-            <span className="material-icons-outlined text-sm mr-1">
-              {copied ? "check" : "content_copy"}
-            </span>
-            {copied ? "Copied!" : "Copy"}
-          </Button>
-        </div>
-        <p className="text-sm text-muted-foreground mt-2">
-          <span className="material-icons-outlined text-sm align-middle mr-1">info</span>
-          Students don't need to create an account to submit using this link
-        </p>
-      </CardContent>
-    </Card>
+    <div className="space-y-2">
+      <div className="flex justify-between items-center">
+        <h3 className="text-sm font-medium">Shareable Link</h3>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-8 text-sky-600 hover:text-sky-700 hover:bg-sky-50 flex items-center gap-1 press-effect"
+          onClick={() => {
+            if (navigator.share) {
+              navigator.share({
+                title: "Submit your assignment",
+                text: "Use this link to submit your assignment",
+                url: shareableUrl,
+              }).catch(() => {
+                // Fallback to copy if share fails
+                copyToClipboard();
+              });
+            } else {
+              // Fallback for browsers that don't support share API
+              copyToClipboard();
+            }
+          }}
+        >
+          <Share2 className="h-4 w-4" />
+          Share
+        </Button>
+      </div>
+      
+      <div className="flex items-center">
+        <Input
+          value={shareableUrl}
+          readOnly
+          className="rounded-r-none field-focus-animation"
+        />
+        <Button 
+          type="button"
+          onClick={copyToClipboard}
+          className={`rounded-l-none border border-l-0 px-3 h-10 press-effect ${copied ? 'bg-green-50 text-green-600 border-green-200' : ''}`}
+          variant="outline"
+        >
+          {copied ? (
+            <Check className="h-4 w-4" />
+          ) : (
+            <Copy className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+      
+      <p className="text-sm text-muted-foreground">
+        Share this link with students who need to submit this assignment. No login required.
+      </p>
+    </div>
   );
 }

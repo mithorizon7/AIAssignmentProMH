@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { Button } from "@/components/ui/button";
-import { Trash2, Info, Lightbulb, AlertTriangle, RefreshCw, RotateCw } from "lucide-react";
+import { Trash2, Info, Lightbulb, AlertTriangle, RefreshCw, RotateCw, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function UXExamples() {
@@ -235,7 +235,7 @@ export default function UXExamples() {
                     variant="outline"
                     className="text-green-700 border-green-200 hover:bg-green-50 press-effect"
                   >
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    <CheckCircle className="mr-2 h-4 w-4" />
                     Show Success Toast
                   </Button>
                   

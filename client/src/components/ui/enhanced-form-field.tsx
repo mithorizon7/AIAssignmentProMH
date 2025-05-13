@@ -6,7 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { CheckCircle, AlertCircle } from "lucide-react";
 import { Control, FieldPath, FieldValues } from "react-hook-form";
 
 interface EnhancedFormFieldProps<
@@ -18,7 +23,7 @@ interface EnhancedFormFieldProps<
   label: string;
   description?: string;
   placeholder?: string;
-  type?: "text" | "email" | "password" | "number" | "textarea" | "select" | "checkbox" | "switch" | "radio";
+  type?: "text" | "email" | "password" | "number" | "textarea" | "select" | "checkbox" | "switch" | "radio" | "date";
   options?: { label: string; value: string }[];
   required?: boolean;
   showSuccessState?: boolean;
@@ -102,7 +107,7 @@ export function EnhancedFormField<
               </FormLabel>
               
               {showSuccess && (
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <CheckCircle className="h-4 w-4 text-green-500" />
               )}
               
               {showError && (
@@ -123,6 +128,33 @@ export function EnhancedFormField<
                   max={max}
                   {...props}
                 />
+              ) : type === "date" ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={`w-full justify-start text-left font-normal ${inputClass}`}
+                      type="button"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {field.value ? (
+                        format(field.value, "PPP")
+                      ) : (
+                        <span className="text-muted-foreground">{placeholder || "Select a date"}</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={(date) => {
+                        handleChange(date);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               ) : type === "textarea" ? (
                 <Textarea
                   {...field}
@@ -136,7 +168,7 @@ export function EnhancedFormField<
               ) : type === "select" ? (
                 <Select
                   onValueChange={(value) => handleChange(value)}
-                  defaultValue={field.value}
+                  defaultValue={field.value?.toString()}
                   {...props}
                 >
                   <SelectTrigger className={inputClass}>

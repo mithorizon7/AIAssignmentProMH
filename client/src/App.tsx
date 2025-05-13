@@ -15,6 +15,7 @@ import SubmissionDetail from "@/pages/submission-detail";
 import InstructorDashboard from "@/pages/instructor/dashboard";
 import AssignmentDetail from "@/pages/instructor/assignment-detail";
 import CreateAssignment from "@/pages/instructor/create-assignment";
+import EnhancedCreateAssignment from "@/pages/instructor/enhanced-create-assignment";
 import CoursesPage from "@/pages/instructor/courses";
 import CourseDetailPage from "@/pages/instructor/course-detail";
 import CourseStudentsPage from "@/pages/instructor/course-students";
@@ -83,6 +84,9 @@ function Router() {
       <Route path="/instructor/create-assignment">
         {() => <PrivateRoute component={CreateAssignment} requireRole="instructor" />}
       </Route>
+      <Route path="/instructor/enhanced-create-assignment">
+        {() => <PrivateRoute component={EnhancedCreateAssignment} requireRole="instructor" />}
+      </Route>
       <Route path="/instructor/courses">
         {() => <PrivateRoute component={CoursesPage} requireRole="instructor" />}
       </Route>
@@ -143,6 +147,9 @@ function Router() {
           }
         }}
       </Route>
+      
+      {/* UX Examples route */}
+      <Route path="/ux-examples" component={UXExamples} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />
