@@ -8,6 +8,8 @@ import { AssignmentCard } from "@/components/student/assignment-card";
 import { SubmissionHistory } from "@/components/student/submission-history";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { ClipboardList, BookOpen } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -49,9 +51,28 @@ export default function Dashboard() {
             </div>
           ) : assignments?.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-8 text-center">
-              <span className="material-icons text-4xl text-neutral-400 mb-2">assignment</span>
-              <h3 className="text-lg font-medium text-neutral-700 mb-1">No active assignments</h3>
-              <p className="text-neutral-600">No assignments are currently active. Check the 'My Assignments' page for all your assignments or contact your instructor.</p>
+              <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 mb-4">
+                <ClipboardList className="h-6 w-6 text-neutral-500" />
+              </div>
+              <h3 className="text-lg font-medium text-neutral-700 mb-2">No active assignments</h3>
+              <p className="text-neutral-600 mb-4">You don't have any active assignments at the moment.</p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate('/assignments')}
+                  className="justify-center"
+                >
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  View all assignments
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => window.location.reload()}
+                  className="justify-center"
+                >
+                  Refresh dashboard
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

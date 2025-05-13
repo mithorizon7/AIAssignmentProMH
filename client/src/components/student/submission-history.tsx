@@ -4,6 +4,8 @@ import { FeedbackCard } from "@/components/ui/feedback-card";
 import { formatDate } from "@/lib/utils/format";
 import { SubmissionWithFeedback } from "@/lib/types";
 import { useState } from "react";
+import { History, Loader2, ArrowUpCircle, FileText } from "lucide-react";
+import { useLocation } from "wouter";
 
 interface SubmissionHistoryProps {
   submissions: SubmissionWithFeedback[];
@@ -12,6 +14,7 @@ interface SubmissionHistoryProps {
 
 export function SubmissionHistory({ submissions, loading = false }: SubmissionHistoryProps) {
   const [expandedFeedbacks, setExpandedFeedbacks] = useState<Record<number, boolean>>({});
+  const [, navigate] = useLocation();
   
   const toggleFeedback = (submissionId: number) => {
     setExpandedFeedbacks(prev => ({
@@ -28,9 +31,7 @@ export function SubmissionHistory({ submissions, loading = false }: SubmissionHi
           <CardDescription>Loading your previous submissions...</CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center p-10">
-          <div className="animate-spin">
-            <span className="material-icons text-4xl text-primary">refresh</span>
-          </div>
+          <Loader2 className="h-10 w-10 text-primary animate-spin" />
         </CardContent>
       </Card>
     );
