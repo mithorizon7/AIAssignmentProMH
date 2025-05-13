@@ -131,7 +131,8 @@ export function configureAuth(app: any) {
   const isProduction = process.env.NODE_ENV === 'production';
   
   // Fix session configuration for development environment
-  const sessionOptions = {
+  // Using properly typed session options to fix TypeScript errors
+  const sessionOptions: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || 'development-secret-key-not-for-production', 
     resave: false,
     saveUninitialized: true, // Ensures session is created and cookie sent
@@ -140,7 +141,7 @@ export function configureAuth(app: any) {
       secure: false, // Set to false for development (no HTTPS required)
       httpOnly: true, // Prevents client-side JS from reading the cookie
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'lax', // Less strict for development
+      sameSite: 'lax', // Using literal type for sameSite 
       path: '/', // Accessible across the whole site
     },
     // Enable proxy support for secure cookies behind load balancers in production
@@ -149,8 +150,11 @@ export function configureAuth(app: any) {
   
   // Only use secure cookies in production
   if (isProduction) {
-    sessionOptions.cookie.secure = true;
-    sessionOptions.cookie.sameSite = 'strict';
+    if (sessionOptions.cookie) {
+      sessionOptions.cookie.secure = true;
+      // Using the type-checked constant value
+      sessionOptions.cookie.sameSite = 'strict' as const; 
+    }
   }
   
   app.use(session(sessionOptions));
@@ -738,10 +742,20 @@ export function configureAuth(app: any) {
     }
   });
 
-  // Authentication middleware
+  // Authentication middleware with enhanced logging
   const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+    console.log(`[DEBUG] Authentication check for path ${req.path}:`, {
+      isAuthenticated: req.isAuthenticated(),
+      hasSession: !!req.session,
+      hasUser: !!req.user,
+      userId: req.user?.id || 'none',
+      userRole: req.user?.role || 'none',
+      sessionId: req.sessionID || 'none'
+    });
+    
     if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: 'Unauthorized' });
+      console.error(`[WARN] Unauthorized access attempt to ${req.path}`);
+      return res.status(401).json({ message: 'Unauthorized - Please log in again' });
     }
     next();
   };
@@ -802,8 +816,10 @@ export function configureAuth(app: any) {
 
       passport.authenticate('local', (err: any, user: any, info: any) => {
         if (err) {
+          console.error('[ERROR] Authentication error:', err);
           return next(err);
         }
+        
         if (!user) {
           // Log failed authentication attempt
           logFailedAuth(
@@ -814,23 +830,58 @@ export function configureAuth(app: any) {
           );
           return res.status(401).json({ message: info.message || 'Invalid credentials' });
         }
+        
+        // Log before login
+        console.log('[DEBUG] Attempting to login user:', { 
+          userId: user.id, 
+          username: user.username, 
+          role: user.role,
+          hasSession: !!req.session
+        });
+        
         req.login(user, (err) => {
           if (err) {
+            console.error('[ERROR] Session login error:', err);
             return next(err);
           }
           
-          // Log successful authentication
-          logSuccessfulAuth(
-            user.id,
-            user.username,
-            req.ip || 'unknown',
-            req.headers['user-agent'] as string
-          );
-          
-          return res.status(200).json(user);
+          // Regenerate session to prevent session fixation
+          req.session.regenerate((err) => {
+            if (err) {
+              console.error('[ERROR] Session regeneration error:', err);
+              return next(err);
+            }
+            
+            // Save the session to store
+            req.session.save((err) => {
+              if (err) {
+                console.error('[ERROR] Session save error:', err);
+                return next(err);
+              }
+              
+              // Log after successful login
+              console.log('[DEBUG] User successfully logged in:', {
+                userId: user.id,
+                username: user.username,
+                role: user.role,
+                sessionID: req.sessionID
+              });
+              
+              // Log successful authentication
+              logSuccessfulAuth(
+                user.id,
+                user.username,
+                req.ip || 'unknown',
+                req.headers['user-agent'] as string
+              );
+              
+              return res.status(200).json(user);
+            });
+          });
         });
       })(req, res, next);
     } catch (error) {
+      console.error('[ERROR] Login error:', error);
       next(error);
     }
   });
