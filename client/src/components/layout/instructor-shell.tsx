@@ -177,7 +177,7 @@ function MobileNav() {
           </div>
         </SheetContent>
       </Sheet>
-      <div className="ml-4 text-xl font-semibold">AI Feedback Platform</div>
+      <div className="ml-4 text-xl font-semibold">Instructor Dashboard</div>
     </div>
   );
 }
@@ -192,7 +192,7 @@ export function InstructorShell({ children }: { children: ReactNode }) {
       ) : (
         <div className="flex flex-1">
           <aside className="fixed inset-y-0 left-0 z-20 hidden w-80 flex-col border-r bg-background md:flex">
-            <div className="p-6 text-xl font-semibold">AI Feedback Platform</div>
+            <div className="p-6 text-xl font-semibold">Instructor Dashboard</div>
             <Separator />
             <div className="flex-1 overflow-auto p-4">
               <NavLinks />
