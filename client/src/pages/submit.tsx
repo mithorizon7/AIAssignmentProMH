@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FileUpload } from "@/components/ui/file-upload";
-import { RichTextEditor } from "@/components/rich-text-editor";
+import { QuillEditor } from "@/components/quill-editor";
+import { QuillContent } from "@/components/quill-content";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -276,9 +277,10 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
           <CardContent className="pt-6">
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-2">Assignment Description</h3>
-              <div className="text-muted-foreground text-sm whitespace-pre-line">
-                {assignment.description}
-              </div>
+              <QuillContent 
+                content={assignment.description || ''} 
+                className="text-muted-foreground text-sm" 
+              />
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -308,7 +310,7 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
               
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes (Optional)</Label>
-                <RichTextEditor
+                <QuillEditor
                   value={notes}
                   onChange={setNotes}
                   placeholder="Add any notes or comments about your submission"

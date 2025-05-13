@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import * as SharedEnums from '@shared/enums';
 import { v4 as uuidv4 } from 'uuid';
 import { RubricCriterion, Rubric } from '@shared/schema';
+import { QuillEditor } from "@/components/quill-editor";
+import { QuillContent } from "@/components/quill-content";
 
 interface RubricBuilderProps {
   value: Rubric;
@@ -84,7 +86,10 @@ export function RubricBuilder({ value, onChange }: RubricBuilderProps) {
                         {criterion.type}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-1">{criterion.description}</p>
+                    <QuillContent 
+                      content={criterion.description} 
+                      className="text-sm text-muted-foreground mb-1" 
+                    />
                     <div className="flex gap-4 text-xs text-muted-foreground">
                       <span>Max Score: {criterion.maxScore}</span>
                       <span>Weight: {criterion.weight}x</span>
@@ -172,11 +177,11 @@ export function RubricBuilder({ value, onChange }: RubricBuilderProps) {
             
             <div className="space-y-2">
               <Label htmlFor="criterionDescription">Description</Label>
-              <Input
-                id="criterionDescription"
+              <QuillEditor
                 value={newCriterionDescription}
-                onChange={(e) => setNewCriterionDescription(e.target.value)}
+                onChange={setNewCriterionDescription}
                 placeholder="Describe what this criterion evaluates"
+                className="min-h-[150px]"
               />
             </div>
             
