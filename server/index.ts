@@ -13,20 +13,48 @@ app.use(express.urlencoded({ extended: false }));
 
 // Configure helmet security headers based on environment
 const isProduction = app.get("env") === "production";
+
+// Configure different CSP directives for production and development
+// Define type to accommodate the helmet CSP directive requirements
+type CSPDirectives = Record<string, string[]>;
+
+const productionDirectives: CSPDirectives = {
+  // Stricter CSP for production environment
+  defaultSrc: ["'self'"],
+  scriptSrc: ["'self'"],  // Remove unsafe-inline and unsafe-eval in production
+  styleSrc: ["'self'", "'unsafe-inline'"],  // Inline styles often needed for UI frameworks
+  imgSrc: ["'self'", "data:"],
+  connectSrc: ["'self'"],
+  fontSrc: ["'self'"],
+  objectSrc: ["'none'"],
+  mediaSrc: ["'self'"],
+  frameSrc: ["'none'"],
+};
+
+// Add upgrade-insecure-requests directive in production
+if (isProduction) {
+  (productionDirectives as any)["upgrade-insecure-requests"] = [];
+}
+
+const developmentDirectives: CSPDirectives = {
+  // More relaxed CSP for development environment
+  defaultSrc: ["'self'"],
+  scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],  // Allow for development tools
+  styleSrc: ["'self'", "'unsafe-inline'"],
+  imgSrc: ["'self'", "data:"],
+  connectSrc: ["'self'", "ws:"],  // Allow WebSocket for HMR
+  fontSrc: ["'self'"],
+  objectSrc: ["'none'"],
+  mediaSrc: ["'self'"],
+  frameSrc: ["'none'"],
+};
+
+const cspDirectives = isProduction ? productionDirectives : developmentDirectives;
+
 app.use(
   helmet({
     contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // For development tools
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:"],
-        connectSrc: ["'self'", isProduction ? "" : "ws:"],
-        fontSrc: ["'self'"],
-        objectSrc: ["'none'"],
-        mediaSrc: ["'self'"],
-        frameSrc: ["'none'"],
-      },
+      directives: cspDirectives,
     },
     strictTransportSecurity: isProduction
       ? {

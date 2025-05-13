@@ -40,19 +40,24 @@ describe('Helmet Security Headers', () => {
     process.env.NODE_ENV = 'production';
     
     // Get helmet middleware with CSP
+    const directives: any = {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],  // More secure without unsafe-inline
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    };
+    
+    // Add upgrade-insecure-requests in production
+    directives["upgrade-insecure-requests"] = [];
+    
     const helmetWithCSP = helmet({
       contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", "data:"],
-          connectSrc: ["'self'"],
-          fontSrc: ["'self'"],
-          objectSrc: ["'none'"],
-          mediaSrc: ["'self'"],
-          frameSrc: ["'none'"],
-        },
+        directives
       },
     });
     
