@@ -129,7 +129,7 @@ export default function Login() {
             <Separator className="my-4" />
             
             <div className="text-center mb-4">
-              <p className="text-sm text-neutral-500 mb-2">Or sign in with</p>
+              <p className="text-sm text-neutral-500 mb-2">Or sign up/sign in with</p>
               
               {/* MIT Horizon Direct OIDC Button */}
               <Button 
@@ -159,7 +159,7 @@ export default function Login() {
                 >
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-9h10v2H7v-2z"/>
                 </svg>
-                Log in with Google
+                Log in with Google or Email
               </Button>
             </div>
             
