@@ -18,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, PlayCircle, Clock, CheckCircle, Download } from "lucide-react";
+import { ChevronDown, PlayCircle, Clock, CheckCircle, Download, Link, Copy, Check } from "lucide-react";
 
 interface AssignmentDetailProps {
   id: string;
@@ -35,6 +35,7 @@ interface AssignmentDetailData {
   rubricType: string;
   createdAt: string;
   updatedAt: string;
+  shareableCode?: string;
   course?: {
     id: number;
     name: string;
@@ -73,6 +74,7 @@ export default function AssignmentDetail({ id }: AssignmentDetailProps) {
   const [studentsPage, setStudentsPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [copyLinkSuccess, setCopyLinkSuccess] = useState(false);
   
   // Fetch assignment details
   const { data: assignment, isLoading: assignmentLoading } = useQuery<AssignmentDetailData>({
@@ -102,9 +104,18 @@ export default function AssignmentDetail({ id }: AssignmentDetailProps) {
       );
       return await response.json();
     },
-    onSuccess: () => {
-      // Invalidate and refetch assignment details
-      queryClient.invalidateQueries({ queryKey: [`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/details`] });
+    onSuccess: (data) => {
+      // Update the assignment data directly in the cache
+      queryClient.setQueryData<AssignmentDetailData>(
+        [`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/details`], 
+        (oldData) => {
+          if (oldData) {
+            return { ...oldData, status: data.status };
+          }
+          return oldData;
+        }
+      );
+      
       // Also invalidate assignments list for consistency
       queryClient.invalidateQueries({ queryKey: [API_ROUTES.ASSIGNMENTS] });
       
@@ -156,6 +167,42 @@ export default function AssignmentDetail({ id }: AssignmentDetailProps) {
         variant: "destructive",
         title: "Export Failed",
         description: "There was an error exporting the grades to CSV.",
+      });
+    }
+  };
+  
+  const handleCopyShareableLink = () => {
+    if (assignment?.shareableCode) {
+      // Create the full URL for the shareable link
+      const baseUrl = window.location.origin;
+      const shareableUrl = `${baseUrl}/submit/${assignment.shareableCode}`;
+      
+      // Copy to clipboard
+      navigator.clipboard.writeText(shareableUrl)
+        .then(() => {
+          setCopyLinkSuccess(true);
+          toast({
+            title: "Link Copied",
+            description: "Shareable link has been copied to clipboard.",
+          });
+          
+          // Reset copy success state after a moment
+          setTimeout(() => {
+            setCopyLinkSuccess(false);
+          }, 2000);
+        })
+        .catch(() => {
+          toast({
+            variant: "destructive",
+            title: "Copy Failed",
+            description: "Failed to copy link to clipboard.",
+          });
+        });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "No Shareable Link",
+        description: "This assignment doesn't have a shareable code.",
       });
     }
   };
@@ -252,7 +299,29 @@ export default function AssignmentDetail({ id }: AssignmentDetailProps) {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="border-t pt-4 flex justify-end">
+            <CardFooter className="border-t pt-4 flex justify-between items-center">
+              <div className="flex items-center">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleCopyShareableLink}
+                  className="border-amber-500 text-amber-600 hover:bg-amber-50"
+                  disabled={!assignment?.shareableCode}
+                >
+                  {copyLinkSuccess ? (
+                    <Check className="mr-2 h-4 w-4 text-green-500" />
+                  ) : (
+                    <Link className="mr-2 h-4 w-4" />
+                  )}
+                  {copyLinkSuccess ? 'Copied!' : 'Copy Shareable Link'}
+                </Button>
+                {assignment?.shareableCode && (
+                  <div className="text-xs text-muted-foreground ml-3">
+                    Code: <span className="font-mono font-medium">{assignment.shareableCode}</span>
+                  </div>
+                )}
+              </div>
+              
               <Button 
                 variant="outline" 
                 size="sm" 
