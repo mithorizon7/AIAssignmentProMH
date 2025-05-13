@@ -328,7 +328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Determine content type based on file extension and MIME type
         const fileExtension = path.extname(fileName).slice(1).toLowerCase();
-        contentType = determineContentType(fileExtension, mimeType);
+        contentType = determineContentType(mimeType, fileName);
         
         // Verify that the file type is allowed
         const isAllowed = await isFileTypeAllowed(contentType, fileExtension, mimeType);
@@ -462,7 +462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Determine content type based on file extension and MIME type
         const fileExtension = path.extname(fileName).slice(1).toLowerCase();
-        contentType = determineContentType(fileExtension, mimeType);
+        contentType = determineContentType(mimeType, fileName);
         
         // Verify that the file type is allowed
         const isAllowed = await isFileTypeAllowed(contentType, fileExtension, mimeType);
