@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { AssignmentCard } from "@/components/student/assignment-card";
 import { SubmissionHistory } from "@/components/student/submission-history";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ClipboardList, BookOpen } from "lucide-react";
@@ -44,9 +45,11 @@ export default function Dashboard() {
           <h2 className="text-xl font-semibold text-neutral-800 mb-4">Active Assignments</h2>
           
           {assignmentsLoading ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children">
               {[1, 2].map((i) => (
-                <Skeleton key={i} className="h-48 rounded-lg" />
+                <div key={i} className={`animate-delay-${i * 100}`}>
+                  <SkeletonCard />
+                </div>
               ))}
             </div>
           ) : assignments?.length === 0 ? (
@@ -75,13 +78,14 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {assignments?.filter(a => a.status === 'active').map((assignment) => (
-                <AssignmentCard 
-                  key={assignment.id}
-                  assignment={assignment}
-                  latestSubmission={assignment.submissions?.[0]}
-                />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children">
+              {assignments?.filter(a => a.status === 'active').map((assignment, index) => (
+                <div key={assignment.id} className={`fade-in`} style={{animationDelay: `${index * 100}ms`}}>
+                  <AssignmentCard 
+                    assignment={assignment}
+                    latestSubmission={assignment.submissions?.[0]}
+                  />
+                </div>
               ))}
             </div>
           )}
