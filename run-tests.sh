@@ -10,14 +10,17 @@ echo "Running all tests..."
 npx vitest run --config ./test/vitest.config.ts
 
 # Run specific test categories if needed
-# echo "Running middleware tests..."
-# npx vitest run test/middleware --config ./test/vitest.config.ts
+echo "Running auth and session management tests..."
+npx vitest run test/unit/session-management.test.ts --config ./vitest.config.ts
 
-# echo "Running auth tests..."
-# npx vitest run test/auth --config ./test/vitest.config.ts
+echo "Running submission error handling tests..."
+npx vitest run test/unit/submission-error-handling.test.ts --config ./vitest.config.ts
 
-# echo "Running integration tests..."
-# npx vitest run test/integration --config ./test/vitest.config.ts
+echo "Running CSRF token tests..."
+npx vitest run test/unit/esm-csrf-token.test.ts --config ./vitest.config.ts
+
+echo "Running integration tests..."
+npx vitest run test/integration/submission-resilience.test.ts test/integration/enhanced-auth-flow.test.ts --config ./vitest.config.ts
 
 # echo "Running client tests..."
 # npx vitest run test/client --config ./test/vitest.config.ts
