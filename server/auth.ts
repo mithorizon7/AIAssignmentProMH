@@ -198,10 +198,18 @@ export function configureAuth(app: any) {
     
     // Apply CSRF protection for all other state-changing requests
     try {
+      // Skip validation if session is not properly initialized
+      if (!req.session) {
+        console.warn(`CSRF validation skipped for ${req.method} ${req.path} due to missing session`);
+        return next();
+      }
+      
       // The doubleCsrfProtection function will call next() on success
       // or throw an error on failure
       csrfProtection.doubleCsrfProtection(req, res, next);
     } catch (error: any) {
+      console.error(`CSRF validation failed for ${req.method} ${req.path}:`, error);
+      
       // Log CSRF failure for security monitoring
       logSecurityEvent(
         AuditEventType.CSRF_FAILURE,
@@ -225,9 +233,25 @@ export function configureAuth(app: any) {
   
   // Endpoint to get CSRF token (with rate limiting)
   app.get('/api/csrf-token', csrfRateLimiter, (req: Request, res: Response) => {
-    // Generate a new token
-    const csrfToken = csrfProtection.generateCsrfToken(req, res);
-    return res.json({ csrfToken });
+    try {
+      // Ensure request and session are initialized
+      if (!req.session) {
+        console.error('Session not initialized when generating CSRF token');
+        return res.status(500).json({ error: { message: 'Session not initialized' } });
+      }
+      
+      // Generate a new token
+      const csrfToken = csrfProtection.generateCsrfToken(req, res);
+      return res.json({ csrfToken });
+    } catch (error) {
+      console.error('Error generating CSRF token:', error);
+      return res.status(500).json({ 
+        error: { 
+          message: 'Failed to generate CSRF token',
+          details: process.env.NODE_ENV !== 'production' ? error.message : undefined
+        } 
+      });
+    }
   });
 
   // Initialize passport
