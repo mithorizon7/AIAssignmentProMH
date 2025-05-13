@@ -1,0 +1,198 @@
+/* Animations and Microinteractions for AIGrader
+ * These animations enhance the user experience with subtle,
+ * professional visual feedback that aligns with MIT brand standards
+ */
+
+/* Hover effect for cards */
+.card-hover {
+  @apply transition-all duration-200 ease-in-out;
+}
+.card-hover:hover {
+  @apply shadow-md transform -translate-y-0.5;
+}
+
+/* Button hover animations */
+.btn-hover-effect {
+  @apply transition-all duration-200 ease-in-out;
+}
+
+.btn-hover-effect:hover:not(:disabled) {
+  @apply transform scale-[1.02] shadow-md;
+}
+
+.btn-hover-effect:active:not(:disabled) {
+  @apply transform scale-[0.98];
+}
+
+/* Fade in animation */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Slide up animation for elements appearing on page */
+.slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Stagger children animations */
+.stagger-children > * {
+  opacity: 0;
+}
+
+.stagger-children > *:nth-child(1) {
+  animation: staggerFade 0.5s ease-out 0.1s forwards;
+}
+.stagger-children > *:nth-child(2) {
+  animation: staggerFade 0.5s ease-out 0.2s forwards;
+}
+.stagger-children > *:nth-child(3) {
+  animation: staggerFade 0.5s ease-out 0.3s forwards;
+}
+.stagger-children > *:nth-child(4) {
+  animation: staggerFade 0.5s ease-out 0.4s forwards;
+}
+.stagger-children > *:nth-child(5) {
+  animation: staggerFade 0.5s ease-out 0.5s forwards;
+}
+.stagger-children > *:nth-child(n+6) {
+  animation: staggerFade 0.5s ease-out 0.6s forwards;
+}
+
+@keyframes staggerFade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Success checkmark animation */
+.checkmark {
+  width: 24px;
+  height: 24px;
+  position: relative;
+  display: inline-block;
+  transform: rotate(45deg);
+}
+
+.checkmark-circle {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background-color: #4ade80;
+  border-radius: 50%;
+  left: 0;
+  top: 0;
+}
+
+.checkmark-check {
+  position: absolute;
+  border-right: 2px solid white;
+  border-bottom: 2px solid white;
+  width: 10px;
+  height: 16px;
+  left: 8px;
+  top: 4px;
+  animation: checkmark 0.25s ease-in-out 0.25s forwards;
+  opacity: 0;
+  transform: scaleX(-1) rotate(90deg);
+}
+
+@keyframes checkmark {
+  0% {
+    opacity: 0;
+    transform: scaleX(-1) rotate(90deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1) rotate(0deg);
+  }
+}
+
+/* Pulse effect (for notifications or emphasis) */
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(138, 26, 44, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(138, 26, 44, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(138, 26, 44, 0);
+  }
+}
+
+/* Shimmer loading animation for skeletons */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.2) 20%,
+    rgba(255, 255, 255, 0.5) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Focus ring animation */
+.focus-ring:focus-visible {
+  @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-white;
+  animation: focusPulse 1s ease-out;
+}
+
+@keyframes focusPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(138, 26, 44, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(138, 26, 44, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(138, 26, 44, 0);
+  }
+}
