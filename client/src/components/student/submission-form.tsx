@@ -185,8 +185,8 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
     if (submissionType === 'code' && !code.trim()) {
       toast({
         variant: 'destructive',
-        title: 'Code Required',
-        description: 'Please enter your code before submitting your assignment.',
+        title: 'Content Required',
+        description: 'Please enter your submission content before submitting your assignment.',
         action: (
           <Button 
             variant="outline" 
@@ -197,7 +197,7 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
             }}
           >
             <AlertCircle className="h-4 w-4 mr-1" />
-            Switch to Code Tab
+            Switch to Content Tab
           </Button>
         ),
       });
@@ -227,19 +227,42 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
             <span>Submissions allowed: Unlimited until due date</span>
           </div>
         </div>
+        
+        {/* Display assignment rubric */}
+        {assignment.rubric && assignment.rubric.criteria && assignment.rubric.criteria.length > 0 && (
+          <div className="mt-6 p-4 bg-white border border-neutral-200 rounded-md">
+            <h3 className="text-md font-medium mb-2">Grading Rubric</h3>
+            <div className="space-y-3">
+              {assignment.rubric.criteria.map((criterion, index) => (
+                <div key={criterion.id || index} className="p-3 bg-neutral-50 rounded-md">
+                  <div className="flex justify-between">
+                    <h4 className="font-medium text-sm">{criterion.name}</h4>
+                    <span className="text-sm text-neutral-600">Max: {criterion.maxScore} points</span>
+                  </div>
+                  <p className="text-sm text-neutral-700 mt-1">{criterion.description}</p>
+                </div>
+              ))}
+              {assignment.rubric.passingThreshold && (
+                <div className="text-sm text-neutral-600 mt-1">
+                  Passing threshold: {assignment.rubric.passingThreshold}%
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </CardHeader>
       
       <CardContent className="p-6">
         <div className="mb-6">
-          <h3 className="text-lg font-medium text-neutral-800 mb-2">Submit Your Assignment</h3>
+          <h3 className="text-lg font-medium text-neutral-800 mb-2">Submit Your Work</h3>
           <p className="text-neutral-600 text-sm mb-4">
-            You can upload a file or paste your code directly. You'll receive AI feedback within 60 seconds after submission.
+            You can upload a file or enter your submission directly. You'll receive AI feedback within 60 seconds after submission.
           </p>
           
           <Tabs defaultValue="file" onValueChange={(value) => setSubmissionType(value as 'file' | 'code')}>
             <TabsList className="mb-6 border-b border-neutral-200">
               <TabsTrigger value="file">Upload File</TabsTrigger>
-              <TabsTrigger value="code">Paste Code</TabsTrigger>
+              <TabsTrigger value="code">Enter Content</TabsTrigger>
             </TabsList>
             
             <TabsContent value="file" className="file-upload-area">
@@ -292,14 +315,17 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
               <CodeEditor 
                 value={code} 
                 onChange={setCode} 
-                placeholder="// Paste your code here..." 
+                placeholder="Enter your assignment content here..." 
                 height="250px"
               />
             </TabsContent>
           </Tabs>
         </div>
-        
-        <div className="mb-6">
+      </CardContent>
+      
+      <CardFooter className="flex flex-col border-t border-neutral-200 p-4">
+        {/* Add notes section at the bottom */}
+        <div className="w-full mb-6">
           <label htmlFor="notes" className="block text-sm font-medium text-neutral-700 mb-1">
             Submission Notes (optional)
           </label>
@@ -309,55 +335,55 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
             placeholder="Add any notes for your instructor..."
           />
         </div>
-      </CardContent>
-      
-      <CardFooter className="flex justify-end border-t border-neutral-200 p-4">
-        <Button 
-          onClick={handleSubmit} 
-          disabled={isPending} 
-          className={cn(
-            "px-4 py-2 min-w-[180px] relative overflow-hidden group btn-hover-effect transition-all duration-300",
-            uploadStatus === "processing" && "bg-amber-600 hover:bg-amber-700",
-            uploadStatus === "complete" && "bg-green-600 hover:bg-green-700"
-          )}
-        >
-          {isPending ? (
-            <>
-              {uploadStatus === "uploading" && (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Uploading... {uploadProgress}%
-                </>
-              )}
-              {uploadStatus === "processing" && (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processing with AI...
-                </>
-              )}
-              {uploadStatus === "complete" && (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Submission Complete
-                </>
-              )}
-              {uploadStatus === "error" && (
-                <>
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  Submission Failed
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <Upload className="h-4 w-4 mr-2 group-hover:translate-y-[-2px] transition-transform duration-300" />
-              Submit Assignment
-            </>
-          )}
-          
-          {/* Animated slide-in background on hover */}
-          <span className="absolute inset-0 bg-gradient-to-r from-primary-600 to-primary-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-        </Button>
+        
+        <div className="flex justify-end w-full">
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isPending} 
+            className={cn(
+              "px-4 py-2 min-w-[180px] relative overflow-hidden group btn-hover-effect transition-all duration-300",
+              uploadStatus === "processing" && "bg-amber-600 hover:bg-amber-700",
+              uploadStatus === "complete" && "bg-green-600 hover:bg-green-700"
+            )}
+          >
+            {isPending ? (
+              <>
+                {uploadStatus === "uploading" && (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Uploading... {uploadProgress}%
+                  </>
+                )}
+                {uploadStatus === "processing" && (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing with AI...
+                  </>
+                )}
+                {uploadStatus === "complete" && (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Submission Complete
+                  </>
+                )}
+                {uploadStatus === "error" && (
+                  <>
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Submission Failed
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 mr-2 group-hover:translate-y-[-2px] transition-transform duration-300" />
+                Submit Assignment
+              </>
+            )}
+            
+            {/* Animated slide-in background on hover */}
+            <span className="absolute inset-0 bg-gradient-to-r from-primary-600 to-primary-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+          </Button>
+        </div>
       </CardFooter>
     </Card>
   );
