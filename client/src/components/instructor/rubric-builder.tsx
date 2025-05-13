@@ -215,7 +215,7 @@ export function RubricBuilder({ value, onChange }: RubricBuilderProps) {
               className="w-full md:w-auto md:ml-auto"
             >
               <span className="material-icons-outlined text-sm mr-1">add</span>
-              Add Criterion
+              Criterion
             </Button>
           </div>
         </CardContent>

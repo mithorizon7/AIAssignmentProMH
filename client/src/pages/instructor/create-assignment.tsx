@@ -14,8 +14,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { API_ROUTES, APP_ROUTES } from "@/lib/constants";
 import { apiRequest } from "@/lib/queryClient";
@@ -354,6 +355,10 @@ export default function CreateAssignment() {
                                   {course.name} ({course.code})
                                 </SelectItem>
                               ))}
+                              <Separator className="my-1" />
+                              <SelectItem value="new" className="text-primary font-medium">
+                                + Create New Course
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <FormDescription>
