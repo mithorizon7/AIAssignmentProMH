@@ -92,19 +92,44 @@ export function SubmissionHistory({ submissions, loading = false }: SubmissionHi
           <CardDescription>View your previous submissions and AI feedback</CardDescription>
         </CardHeader>
         <CardContent className="p-8 text-center">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 mb-4">
-            <History className="h-6 w-6 text-neutral-500" />
+          <div className="flex flex-col items-center">
+            <div className="mb-6 relative">
+              <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center border border-indigo-100">
+                <History className="h-8 w-8 text-indigo-500" />
+              </div>
+              <div className="absolute -top-2 -right-2 bg-primary rounded-full p-1.5 shadow-md animate-pulse">
+                <AlertCircle className="h-4 w-4 text-white" />
+              </div>
+            </div>
+            
+            <h3 className="text-xl font-semibold text-neutral-800 mb-3">Your AI feedback journey starts here</h3>
+            <p className="text-neutral-600 mb-6 max-w-md">
+              Submit your first assignment to receive detailed AI feedback. All your submissions
+              will be tracked here so you can see your progress over time.
+            </p>
+            
+            <div className="w-full max-w-md bg-blue-50 rounded-md p-4 mb-5 text-left border border-blue-100">
+              <h4 className="font-medium text-blue-800 mb-2 flex items-center">
+                <CheckCircle className="h-4 w-4 mr-2" />
+                How it works
+              </h4>
+              <ul className="text-sm text-blue-700 space-y-2 pl-6 list-disc">
+                <li>Submit your assignment work (files, code, or text)</li>
+                <li>Our AI analyzes your submission against the rubric</li>
+                <li>Receive detailed, personalized feedback</li>
+                <li>Track your improvements across multiple submissions</li>
+              </ul>
+            </div>
+            
+            <Button 
+              onClick={() => navigate('/assignments')}
+              className="inline-flex items-center justify-center px-6 h-11 bg-gradient-to-r from-indigo-500 to-blue-500 text-white shadow-md hover:shadow-lg transition-all"
+              size="lg"
+            >
+              <ArrowUpCircle className="mr-2 h-5 w-5" />
+              Find assignments to submit
+            </Button>
           </div>
-          <h3 className="text-lg font-medium text-neutral-700 mb-2">No submission history</h3>
-          <p className="text-neutral-600 mb-4">When you submit assignments, they'll appear here with detailed AI feedback.</p>
-          <Button 
-            variant="outline" 
-            onClick={() => navigate('/assignments')}
-            className="inline-flex items-center justify-center"
-          >
-            <ArrowUpCircle className="mr-2 h-4 w-4" />
-            Find assignments to submit
-          </Button>
         </CardContent>
       </Card>
     );

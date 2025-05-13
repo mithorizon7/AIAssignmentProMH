@@ -67,28 +67,50 @@ export default function Dashboard() {
               ))}
             </div>
           ) : assignments?.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-8 text-center">
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 mb-4">
-                <ClipboardList className="h-6 w-6 text-neutral-500" />
+            <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-8 text-center max-w-2xl mx-auto fade-in">
+              <div className="relative mb-6">
+                <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
+                  <ClipboardList className="h-8 w-8 text-primary" />
+                </div>
+                <div className="absolute top-0 right-1/2 transform translate-x-12 -translate-y-1 animate-bounce delay-300">
+                  <span className="flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                  </span>
+                </div>
               </div>
-              <h3 className="text-lg font-medium text-neutral-700 mb-2">No active assignments</h3>
-              <p className="text-neutral-600 mb-4">You don't have any active assignments at the moment.</p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button 
-                  variant="outline" 
-                  onClick={() => navigate('/assignments')}
-                  className="justify-center"
-                >
-                  <BookOpen className="mr-2 h-4 w-4" />
-                  View all assignments
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => window.location.reload()}
-                  className="justify-center"
-                >
-                  Refresh dashboard
-                </Button>
+              
+              <h3 className="text-xl font-semibold text-neutral-800 mb-3">Ready to start learning?</h3>
+              <p className="text-neutral-600 mb-6 max-w-md mx-auto">
+                Your dashboard will show your active assignments and recent submissions. 
+                Discover available assignments to begin using AI-powered feedback.
+              </p>
+              
+              <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => navigate('/assignments')}
+                    className="justify-center h-11 px-6 hover:bg-blue-50 hover:text-blue-700 transition-all"
+                    size="lg"
+                  >
+                    <BookOpen className="mr-2 h-5 w-5" />
+                    Browse assignments
+                  </Button>
+                  <Button 
+                    variant="secondary"
+                    onClick={() => window.location.reload()}
+                    className="justify-center h-11 px-6 transition-all"
+                    size="lg"
+                  >
+                    <svg className="mr-2 h-5 w-5" fill="none" height="24" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                    Refresh dashboard
+                  </Button>
+                </div>
+                
+                <div className="border-t border-neutral-200 pt-5 text-sm text-neutral-500">
+                  <p>Need help? Check out our <span className="text-primary hover:underline cursor-pointer">quick start guide</span> or <span className="text-primary hover:underline cursor-pointer">contact support</span>.</p>
+                </div>
               </div>
             </div>
           ) : (
