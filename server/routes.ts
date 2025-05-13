@@ -143,7 +143,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignmentSchema = z.object({
         title: z.string().min(3),
         description: z.string().min(10),
-        courseId: z.number().int().positive(),
+        courseId: z.union([
+          z.number().int().positive(),
+          z.string().transform(val => parseInt(val))
+        ]).optional(), // Make optional for standalone assignments
         dueDate: z.string().refine(val => !isNaN(Date.parse(val)), {
           message: 'Invalid date format'
         }),
@@ -166,20 +169,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid assignment data', errors: result.error });
       }
       
-      // Check if course exists
-      const course = await storage.getCourse(courseId);
-      if (!course) {
-        return res.status(404).json({ message: 'Course not found' });
+      // Check if course exists (if courseId is provided)
+      if (courseId) {
+        const courseIdNum = typeof courseId === 'string' ? parseInt(courseId) : courseId;
+        const course = await storage.getCourse(courseIdNum);
+        if (!course) {
+          return res.status(404).json({ message: 'Course not found' });
+        }
       }
       
       // Generate a unique shareable code
       const shareableCode = generateShareableCode();
       
       // Create assignment
+      const courseIdNum = courseId ? (typeof courseId === 'string' ? parseInt(courseId) : courseId) : undefined;
       const assignment = await storage.createAssignment({
         title,
         description,
-        courseId,
+        courseId: courseIdNum, // Now properly parsed and optional
         dueDate: new Date(dueDate), // The client already sends an ISO string, so we just need a Date object
         status: 'upcoming',
         shareableCode,
