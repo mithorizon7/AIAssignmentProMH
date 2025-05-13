@@ -123,6 +123,11 @@ export function FileUpload({
                 Accepted types: {accept}
               </p>
             )}
+            {!disabled && (
+              <p className="text-xs text-muted-foreground font-medium mt-2 text-primary/80">
+                Multimodal file types coming soon!
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -138,20 +143,7 @@ export function FileUpload({
             >
               <div className="flex items-center space-x-2 truncate">
                 <div className="p-1 rounded-md bg-secondary">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="text-muted-foreground"
-                  >
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
+                  <File size={16} className="text-muted-foreground" />
                 </div>
                 <div className="truncate">
                   <p className="truncate font-medium">{file.name}</p>
@@ -170,20 +162,7 @@ export function FileUpload({
                 disabled={disabled}
                 className="h-8 w-8 flex-shrink-0"
               >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-muted-foreground"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+                <X size={16} className="text-muted-foreground" />
               </Button>
             </div>
           ))}
