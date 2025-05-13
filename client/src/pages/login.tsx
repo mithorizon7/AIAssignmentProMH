@@ -31,18 +31,35 @@ type FormData = z.infer<typeof formSchema>;
 export default function Login() {
   const { login, isLoading, isAuthenticated, user } = useAuth();
   const { toast } = useToast();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  
+  // Parse query string to get returnTo parameter if present
+  const getReturnToPath = () => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const returnTo = queryParams.get('returnTo');
+    // Ensure returnTo is safe - only relative paths allowed
+    if (returnTo && returnTo.startsWith('/') && !returnTo.includes('//')) {
+      return returnTo;
+    }
+    return null;
+  };
   
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      // Redirect based on user role
-      if (user.role === 'admin') {
-        navigate(APP_ROUTES.ADMIN_DASHBOARD);
-      } else if (user.role === 'instructor') {
-        navigate(APP_ROUTES.INSTRUCTOR_DASHBOARD);
+      // Check if there's a returnTo parameter
+      const returnTo = getReturnToPath();
+      if (returnTo) {
+        navigate(returnTo);
       } else {
-        navigate(APP_ROUTES.DASHBOARD);
+        // Default redirect based on user role
+        if (user.role === 'admin') {
+          navigate(APP_ROUTES.ADMIN_DASHBOARD);
+        } else if (user.role === 'instructor') {
+          navigate(APP_ROUTES.INSTRUCTOR_DASHBOARD);
+        } else {
+          navigate(APP_ROUTES.DASHBOARD);
+        }
       }
     }
   }, [isAuthenticated, user, navigate]);

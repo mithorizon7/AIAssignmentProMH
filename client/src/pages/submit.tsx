@@ -41,9 +41,20 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      // Encode current URL to redirect back after login
+      const returnUrl = encodeURIComponent(`/submit/${assignmentCode}`);
+      navigate(`/login?returnTo=${returnUrl}`);
+    }
+  }, [isAuthenticated, assignmentCode, navigate]);
+
   // Fetch assignment data using the code
   useEffect(() => {
     if (!match || !assignmentCode) return;
+    // Skip fetching if not authenticated
+    if (!isAuthenticated) return;
     
     const fetchAssignment = async () => {
       try {
@@ -76,7 +87,7 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
     };
     
     fetchAssignment();
-  }, [match, assignmentCode]);
+  }, [match, assignmentCode, isAuthenticated]);
   
   // Pre-fill form if user is authenticated
   useEffect(() => {
