@@ -34,26 +34,49 @@ export function RubricTester({ rubric, assignmentTitle, assignmentDescription }:
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Handle click on the dropzone to open file selector
+  const handleBrowseClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
   // Configure dropzone
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
-      'text/plain': ['.txt', '.py', '.java', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.json'],
+      'text/plain': ['.txt', '.py', '.java', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.json', '.md'],
       'application/octet-stream': ['.py', '.java', '.js', '.ts', '.jsx', '.tsx'],
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
     },
     maxSize: 10 * 1024 * 1024, // 10MB
-    multiple: false,
+    multiple: true,
     onDrop: (acceptedFiles) => {
       if (acceptedFiles && acceptedFiles.length > 0) {
+        // Set the first file for displaying in the UI
         setFile(acceptedFiles[0]);
         
-        // Read file content
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          if (e.target?.result) {
-            setCodeContent(e.target.result as string);
-          }
-        };
-        reader.readAsText(acceptedFiles[0]);
+        // Read content of all files
+        const allContents: string[] = [];
+        let filesProcessed = 0;
+        
+        acceptedFiles.forEach(file => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            if (e.target?.result) {
+              allContents.push(`File: ${file.name}\n\n${e.target.result as string}\n\n`);
+              
+              filesProcessed++;
+              if (filesProcessed === acceptedFiles.length) {
+                setCodeContent(allContents.join('----------\n\n'));
+              }
+            }
+          };
+          reader.readAsText(file);
+        });
       }
     },
     onDropRejected: (rejections) => {
@@ -84,8 +107,8 @@ export function RubricTester({ rubric, assignmentTitle, assignmentDescription }:
     if (!codeContent.trim() && !file) {
       toast({
         variant: "destructive",
-        title: "No code provided",
-        description: "Please enter code or upload a file to test.",
+        title: "No content provided",
+        description: "Please enter text or upload a file to test.",
       });
       return;
     }
@@ -236,18 +259,19 @@ Please evaluate this submission according to the above rubric criteria.
                   className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${
                     isDragActive ? "border-primary bg-primary/5" : "border-border"
                   }`}
+                  onClick={handleBrowseClick}
                 >
                   <input {...getInputProps()} ref={fileInputRef} />
                   <div className="flex flex-col items-center space-y-2">
                     <Upload className="h-10 w-10 text-muted-foreground" />
                     <h3 className="font-medium">
-                      {isDragActive ? "Drop the file here" : "Drag and drop file"}
+                      {isDragActive ? "Drop files here" : "Drag and drop files"}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      or click to select file
+                      or <span className="text-primary underline">click to select files</span>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      (Max size: 10MB)
+                      (Multiple files supported, Max size: 10MB each)
                     </p>
                   </div>
                 </div>
@@ -256,8 +280,8 @@ Please evaluate this submission according to the above rubric criteria.
 
             <TabsContent value="paste" className="space-y-4">
               <Textarea
-                placeholder="Paste your code here..."
-                className="min-h-[300px] font-mono text-sm"
+                placeholder="Paste your assignment text here..."
+                className="min-h-[300px] text-sm"
                 value={codeContent}
                 onChange={(e) => setCodeContent(e.target.value)}
               />
@@ -278,7 +302,7 @@ Please evaluate this submission according to the above rubric criteria.
                 Generating Feedback...
               </>
             ) : (
-              "Test Rubric"
+              "Evaluate with AI"
             )}
           </Button>
         ) : null}
