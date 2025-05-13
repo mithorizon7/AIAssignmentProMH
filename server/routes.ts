@@ -331,7 +331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contentType = determineContentType(mimeType, fileName);
         
         // Verify that the file type is allowed
-        const isAllowed = await isFileTypeAllowed(contentType, fileExtension, mimeType);
+        const isAllowed = await storage.checkFileTypeEnabled(mimeType, fileExtension, mimeType);
         if (!isAllowed) {
           return res.status(400).json({ 
             message: `File type ${fileExtension} (${mimeType}) is not allowed`,
@@ -465,7 +465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contentType = determineContentType(mimeType, fileName);
         
         // Verify that the file type is allowed
-        const isAllowed = await isFileTypeAllowed(contentType, fileExtension, mimeType);
+        const isAllowed = await storage.checkFileTypeEnabled(mimeType, fileExtension, mimeType);
         if (!isAllowed) {
           return res.status(400).json({ 
             message: `File type ${fileExtension} (${mimeType}) is not allowed`,
