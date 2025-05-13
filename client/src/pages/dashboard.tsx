@@ -7,9 +7,9 @@ import { AppShell } from "@/components/layout/app-shell";
 import { AssignmentCard } from "@/components/student/assignment-card";
 import { SubmissionHistory } from "@/components/student/submission-history";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { ClipboardList, BookOpen } from "lucide-react";
 
 export default function Dashboard() {
@@ -47,8 +47,22 @@ export default function Dashboard() {
           {assignmentsLoading ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children">
               {[1, 2].map((i) => (
-                <div key={i} className={`animate-delay-${i * 100}`}>
-                  <SkeletonCard />
+                <div key={i} style={{animationDelay: `${i * 100}ms`}}>
+                  <Card className="overflow-hidden shimmer h-48">
+                    <CardContent className="p-5">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-start">
+                          <Skeleton className="h-6 w-3/4" />
+                          <Skeleton className="h-5 w-16 rounded-full" />
+                        </div>
+                        <Skeleton className="h-4 w-1/2" />
+                        <div className="flex">
+                          <Skeleton className="h-4 w-4 mr-2 rounded-full" />
+                          <Skeleton className="h-4 w-32" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               ))}
             </div>

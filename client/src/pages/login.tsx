@@ -18,6 +18,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Separator } from "@/components/ui/separator";
+import { Loader2, LogIn, Check, User, Lock } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters long"),
@@ -65,8 +67,8 @@ export default function Login() {
     <div className="flex min-h-screen bg-gray-50">
       {/* Left side - login form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center px-6 py-12 lg:px-12">
-        <div className="mx-auto w-full max-w-md">
-          <div className="mb-8">
+        <div className="mx-auto w-full max-w-md slide-up">
+          <div className="mb-8 fade-in" style={{animationDelay: "100ms"}}>
             <h1 className="text-3xl font-bold tracking-tight text-mit-red mb-2">
               AI Feedback Platform
             </h1>
@@ -75,8 +77,8 @@ export default function Login() {
             </p>
           </div>
           
-          <Card className="border border-gray-200 shadow-sm">
-            <CardContent className="pt-6">
+          <Card className="border border-gray-200 shadow-sm overflow-hidden">
+            <CardContent className="pt-6 fade-in" style={{animationDelay: "200ms"}}>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                   <FormField
@@ -86,12 +88,17 @@ export default function Login() {
                       <FormItem>
                         <FormLabel className="text-gray-800 font-medium">Username</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="Enter your username" 
-                            {...field} 
-                            disabled={isLoading}
-                            className="border-gray-300 focus:border-mit-red focus:ring-mit-red/20"
-                          />
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                              <User className="h-4 w-4" />
+                            </div>
+                            <Input 
+                              placeholder="Enter your username" 
+                              {...field} 
+                              disabled={isLoading}
+                              className="border-gray-300 focus-ring pl-10 transition-all duration-200 focus:border-mit-red focus:ring-mit-red/20"
+                            />
+                          </div>
                         </FormControl>
                         <FormMessage className="text-red-600" />
                       </FormItem>
@@ -105,13 +112,18 @@ export default function Login() {
                       <FormItem>
                         <FormLabel className="text-gray-800 font-medium">Password</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="Enter your password" 
-                            {...field} 
-                            disabled={isLoading}
-                            className="border-gray-300 focus:border-mit-red focus:ring-mit-red/20"
-                          />
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                              <Lock className="h-4 w-4" />
+                            </div>
+                            <Input 
+                              type="password" 
+                              placeholder="Enter your password" 
+                              {...field} 
+                              disabled={isLoading}
+                              className="border-gray-300 focus-ring pl-10 transition-all duration-200 focus:border-mit-red focus:ring-mit-red/20"
+                            />
+                          </div>
                         </FormControl>
                         <FormMessage className="text-red-600" />
                       </FormItem>
@@ -120,15 +132,23 @@ export default function Login() {
                   
                   <Button 
                     type="submit" 
-                    className="w-full bg-mit-red hover:bg-mit-red/90 text-white border-0" 
+                    className={cn(
+                      "w-full bg-mit-red hover:bg-mit-red/90 text-white border-0 mt-4 btn-hover-effect transition-all",
+                      isLoading && "opacity-90"
+                    )}
                     disabled={isLoading}
                   >
                     {isLoading ? (
                       <>
-                        <span className="material-icons animate-spin mr-2">refresh</span>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         Logging in...
                       </>
-                    ) : 'Sign In'}
+                    ) : (
+                      <>
+                        <LogIn className="h-4 w-4 mr-2" />
+                        Sign In
+                      </>
+                    )}
                   </Button>
                 </form>
               </Form>
