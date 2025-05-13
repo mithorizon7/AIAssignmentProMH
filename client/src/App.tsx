@@ -27,6 +27,7 @@ import AdminDashboard from "@/pages/admin/dashboard";
 import UsersPage from "@/pages/admin/users";
 import SystemConfigPage from "@/pages/admin/system-config";
 import LogsPage from "@/pages/admin/logs";
+import UXExamples from "@/pages/ux-examples";
 import { AuthProvider, useAuth } from "./lib/auth";
 
 function PrivateRoute({ component: Component, requireRole, ...rest }: any) {

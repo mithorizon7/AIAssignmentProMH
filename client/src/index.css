@@ -116,6 +116,35 @@
     @apply bg-transparent border-2 border-primary text-primary rounded px-5 py-2.5 font-semibold text-base hover:bg-primary hover:text-primary-foreground transition-colors duration-200;
   }
   
+  /* Enhanced MIT-branded focus states */
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  .react-datepicker-wrapper input:focus-visible,
+  button:focus-visible,
+  a:focus-visible,
+  *[role="button"]:focus-visible,
+  *[tabindex="0"]:focus-visible {
+    @apply outline-none ring-2 ring-primary/80 ring-offset-1 transition-shadow;
+  }
+  
+  /* Inline validation styling */
+  .form-field-error {
+    @apply border-red-500 bg-red-50;
+  }
+  
+  .form-field-success {
+    @apply border-green-500 bg-green-50/50;
+  }
+  
+  .form-error-message {
+    @apply text-red-600 text-xs mt-1 flex items-center gap-1;
+  }
+  
+  .form-success-message {
+    @apply text-green-600 text-xs mt-1 flex items-center gap-1;
+  }
+  
   /* MIT-style card styling */
   .mit-card {
     @apply bg-white rounded shadow-sm border-0 overflow-hidden;
