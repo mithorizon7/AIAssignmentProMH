@@ -845,6 +845,9 @@ export function configureAuth(app: any) {
             return next(err);
           }
           
+          // Store user data to be restored after session regeneration
+          const userData = user;
+          
           // Regenerate session to prevent session fixation
           req.session.regenerate((err) => {
             if (err) {
@@ -852,30 +855,38 @@ export function configureAuth(app: any) {
               return next(err);
             }
             
-            // Save the session to store
-            req.session.save((err) => {
-              if (err) {
-                console.error('[ERROR] Session save error:', err);
-                return next(err);
+            // Re-login the user after session regeneration
+            req.login(userData, (loginErr) => {
+              if (loginErr) {
+                console.error('[ERROR] Re-login error after session regeneration:', loginErr);
+                return next(loginErr);
               }
               
-              // Log after successful login
-              console.log('[DEBUG] User successfully logged in:', {
-                userId: user.id,
-                username: user.username,
-                role: user.role,
-                sessionID: req.sessionID
+              // Save the session to store
+              req.session.save((saveErr) => {
+                if (saveErr) {
+                  console.error('[ERROR] Session save error:', saveErr);
+                  return next(saveErr);
+                }
+                
+                // Log after successful login
+                console.log('[DEBUG] User successfully logged in:', {
+                  userId: userData.id,
+                  username: userData.username,
+                  role: userData.role,
+                  sessionID: req.sessionID
+                });
+                
+                // Log successful authentication
+                logSuccessfulAuth(
+                  userData.id,
+                  userData.username,
+                  req.ip || 'unknown',
+                  req.headers['user-agent'] as string
+                );
+                
+                return res.status(200).json(userData);
               });
-              
-              // Log successful authentication
-              logSuccessfulAuth(
-                user.id,
-                user.username,
-                req.ip || 'unknown',
-                req.headers['user-agent'] as string
-              );
-              
-              return res.status(200).json(user);
             });
           });
         });
@@ -912,51 +923,83 @@ export function configureAuth(app: any) {
     const isAuth0User = user?.auth0Sub || false;
     const isMitHorizonUser = user?.mitHorizonSub || false;
 
-    req.logout(() => {
-      // Log the logout event if the user was authenticated
-      if (userId && username) {
-        logLogout(userId, username, ipAddress);
+    req.logout((logoutErr) => {
+      if (logoutErr) {
+        console.error('[ERROR] Logout error:', logoutErr);
+        return res.status(500).json({ message: 'Error during logout process' });
       }
       
-      // If user was authenticated via Auth0 and Auth0 is configured,
-      // redirect to Auth0 logout URL to complete SSO logout
-      if (isAuth0User && process.env.AUTH0_DOMAIN && process.env.AUTH0_CLIENT_ID) {
-        const loginPageUrl = getLoginPageUrl();
-        console.log(`[INFO] Redirecting to Auth0 logout URL with returnTo: ${loginPageUrl}`);
+      // Destroy the session to ensure complete cleanup
+      if (req.session) {
+        req.session.destroy((destroyErr) => {
+          if (destroyErr) {
+            console.error('[ERROR] Session destruction error:', destroyErr);
+            // Continue with logout even if session destruction fails
+          }
+          
+          // Log the logout event if the user was authenticated
+          if (userId && username) {
+            logLogout(userId, username, ipAddress);
+          }
+          
+          // Clear cookie
+          res.clearCookie('connect.sid');
+          
+          // If user was authenticated via Auth0 and Auth0 is configured,
+          // redirect to Auth0 logout URL to complete SSO logout
+          if (isAuth0User && process.env.AUTH0_DOMAIN && process.env.AUTH0_CLIENT_ID) {
+            const loginPageUrl = getLoginPageUrl();
+            console.log(`[INFO] Redirecting to Auth0 logout URL with returnTo: ${loginPageUrl}`);
+            
+            const auth0LogoutUrl = `https://${process.env.AUTH0_DOMAIN}/v2/logout?client_id=${
+              process.env.AUTH0_CLIENT_ID
+            }&returnTo=${encodeURIComponent(loginPageUrl)}`;
+            
+            return res.status(200).json({ 
+              message: 'Logged out successfully',
+              redirect: true,
+              redirectUrl: auth0LogoutUrl
+            });
+          }
+          
+          // If user was authenticated via MIT Horizon and MIT Horizon is configured,
+          // redirect to MIT Horizon logout URL to complete SSO logout
+          if (isMitHorizonUser && process.env.MIT_HORIZON_OIDC_ISSUER_URL && process.env.MIT_HORIZON_OIDC_CLIENT_ID) {
+            const loginPageUrl = getLoginPageUrl();
+            console.log(`[INFO] Redirecting to MIT Horizon logout URL with returnTo: ${loginPageUrl}`);
+            
+            const mitHorizonLogoutUrl = `${process.env.MIT_HORIZON_OIDC_ISSUER_URL}v2/logout?client_id=${
+              process.env.MIT_HORIZON_OIDC_CLIENT_ID
+            }&returnTo=${encodeURIComponent(loginPageUrl)}`;
+            
+            return res.status(200).json({ 
+              message: 'Logged out successfully',
+              redirect: true,
+              redirectUrl: mitHorizonLogoutUrl
+            });
+          }
+          
+          // Standard logout for non-SSO users
+          res.status(200).json({ 
+            message: 'Logged out successfully',
+            redirect: false
+          });
+        });
+      } else {
+        // No active session to destroy
+        console.log('[WARN] Logout called without an active session');
         
-        const auth0LogoutUrl = `https://${process.env.AUTH0_DOMAIN}/v2/logout?client_id=${
-          process.env.AUTH0_CLIENT_ID
-        }&returnTo=${encodeURIComponent(loginPageUrl)}`;
+        // Log the logout event if the user was authenticated
+        if (userId && username) {
+          logLogout(userId, username, ipAddress);
+        }
         
-        return res.status(200).json({ 
+        // Standard logout response
+        res.status(200).json({ 
           message: 'Logged out successfully',
-          redirect: true,
-          redirectUrl: auth0LogoutUrl
+          redirect: false
         });
       }
-      
-      // If user was authenticated via MIT Horizon and MIT Horizon is configured,
-      // redirect to MIT Horizon logout URL to complete SSO logout
-      if (isMitHorizonUser && process.env.MIT_HORIZON_OIDC_ISSUER_URL && process.env.MIT_HORIZON_OIDC_CLIENT_ID) {
-        const loginPageUrl = getLoginPageUrl();
-        console.log(`[INFO] Redirecting to MIT Horizon logout URL with returnTo: ${loginPageUrl}`);
-        
-        const mitHorizonLogoutUrl = `${process.env.MIT_HORIZON_OIDC_ISSUER_URL}v2/logout?client_id=${
-          process.env.MIT_HORIZON_OIDC_CLIENT_ID
-        }&returnTo=${encodeURIComponent(loginPageUrl)}`;
-        
-        return res.status(200).json({ 
-          message: 'Logged out successfully',
-          redirect: true,
-          redirectUrl: mitHorizonLogoutUrl
-        });
-      }
-      
-      // Standard logout for non-SSO users
-      res.status(200).json({ 
-        message: 'Logged out successfully',
-        redirect: false
-      });
     });
   });
 
