@@ -88,7 +88,7 @@ export function ShareableLink({ assignmentId, shareableCode }: ShareableLinkProp
       </div>
       
       <p className="text-sm text-muted-foreground">
-        Share this link with students who need to submit this assignment. No login required.
+        Share this link with students who need to submit this assignment. Authentication required.
       </p>
     </div>
   );

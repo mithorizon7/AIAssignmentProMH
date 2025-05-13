@@ -1,6 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import passport from 'passport';
+
+// Extend express-session types to include our custom properties
+declare module 'express-session' {
+  interface SessionData {
+    returnTo?: string;
+  }
+}
 import { Strategy as LocalStrategy } from 'passport-local';
 import { Strategy as Auth0Strategy } from 'passport-auth0';
 import { Strategy as OIDCStrategy } from 'passport-openidconnect';

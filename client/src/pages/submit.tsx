@@ -156,8 +156,8 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
       if (submitType === 'code') formData.append('code', codeContent);
       if (submitType === 'file' && file) formData.append('file', file);
       
-      // Send submission
-      const response = await fetch('/api/anonymous-submissions', {
+      // Send submission (now using authenticated endpoint)
+      const response = await fetch('/api/submissions', {
         method: 'POST',
         body: formData,
       });

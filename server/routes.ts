@@ -339,7 +339,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user is authenticated
       const isAuthenticated = req.isAuthenticated();
       
-      // Return assignment with an authentication status flag
+      // If user is not authenticated, they will be redirected to login
+      // from the client side, and then back to the submission page
+      
+      // Return assignment with authentication status flag set to true (always require auth)
       res.json({
         id: assignment.id,
         title: assignment.title,
@@ -349,7 +352,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         courseName: course.name,
         dueDate: assignment.dueDate,
         shareableCode: assignment.shareableCode,
-        requiresAuth: true, // Flag indicating authentication is required
+        requiresAuth: true, // Always require authentication for submissions
         isAuthenticated: isAuthenticated // Flag indicating if user is already authenticated
       });
     } catch (error) {

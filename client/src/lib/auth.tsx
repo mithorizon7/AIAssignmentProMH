@@ -68,6 +68,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
   }, [navigate]);
 
+  // Helper function to get the returnTo parameter from URL
+  const getReturnToPath = () => {
+    try {
+      const queryParams = new URLSearchParams(window.location.search);
+      const returnTo = queryParams.get('returnTo');
+      // Ensure returnTo is safe - only relative paths allowed
+      if (returnTo && returnTo.startsWith('/') && !returnTo.includes('//')) {
+        return returnTo;
+      }
+    } catch (error) {
+      console.error('Error parsing returnTo parameter:', error);
+    }
+    return null;
+  };
+
   const login = async (username: string, password: string) => {
     setIsLoading(true);
     
@@ -77,13 +92,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       setUser(userData);
       
-      // Redirect based on user role
-      if (userData.role === 'admin') {
-        navigate(APP_ROUTES.ADMIN_DASHBOARD);
-      } else if (userData.role === 'instructor') {
-        navigate(APP_ROUTES.INSTRUCTOR_DASHBOARD);
+      // Check if there's a returnTo parameter in the URL
+      const returnTo = getReturnToPath();
+      if (returnTo) {
+        // Use the returnTo path for redirection after successful login
+        console.log('[INFO] Redirecting to returnTo URL after login:', returnTo);
+        navigate(returnTo);
       } else {
-        navigate(APP_ROUTES.DASHBOARD);
+        // Default redirect based on user role
+        if (userData.role === 'admin') {
+          navigate(APP_ROUTES.ADMIN_DASHBOARD);
+        } else if (userData.role === 'instructor') {
+          navigate(APP_ROUTES.INSTRUCTOR_DASHBOARD);
+        } else {
+          navigate(APP_ROUTES.DASHBOARD);
+        }
       }
       
       toast({
