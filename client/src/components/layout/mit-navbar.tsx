@@ -71,12 +71,12 @@ export function MITNavbar() {
       <div className="bg-white text-gray-900 border-b border-gray-200">
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
-            {/* Logo with two-tone coloring */}
+            {/* Logo with Academus branding */}
             <div className="flex-shrink-0">
               <Link href={getRootPath()}>
-                <span className="font-bold text-2xl cursor-pointer tracking-tight">
-                  <span className="text-[#8a1a2c]">AI Feedback</span>{" "}
-                  <span className="text-gray-900">Platform</span>
+                <span className="font-bold text-2xl cursor-pointer tracking-tight flex items-center">
+                  <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-8 mr-2" />
+                  <span className="text-gray-900">Academus</span>
                 </span>
               </Link>
             </div>
