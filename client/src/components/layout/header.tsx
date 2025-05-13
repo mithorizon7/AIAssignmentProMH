@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
 import { getUserInitials } from "@/lib/utils/format";
+import { Menu, Bell, HelpCircle } from 'lucide-react';
 
 export function Header() {
   const { user } = useAuth();
@@ -15,8 +16,8 @@ export function Header() {
       <div className="flex items-center">
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetTrigger asChild>
-            <button className="md:hidden mr-2 text-neutral-700">
-              <span className="material-icons">menu</span>
+            <button className="md:hidden mr-2 text-neutral-700 p-1">
+              <Menu size={24} />
             </button>
           </SheetTrigger>
           <SheetContent side="left" className="p-0 w-64">
@@ -29,10 +30,10 @@ export function Header() {
       
       <div className="flex items-center space-x-4">
         <button className="p-2 rounded-full hover:bg-neutral-100" aria-label="Notifications">
-          <span className="material-icons">notifications</span>
+          <Bell size={20} />
         </button>
         <button className="p-2 rounded-full hover:bg-neutral-100" aria-label="Help">
-          <span className="material-icons">help</span>
+          <HelpCircle size={20} />
         </button>
         <div className="md:hidden flex items-center">
           <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center">
