@@ -105,6 +105,15 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Run database migrations to ensure all required columns exist
+  try {
+    await runMigrations();
+    console.log('[Startup] Database migrations completed successfully');
+  } catch (error) {
+    console.error('[Startup] Error running database migrations:', error);
+    console.log('[Startup] Continuing application startup despite migration error');
+  }
+
   const server = await registerRoutes(app);
 
   // importantly only setup vite in development and after

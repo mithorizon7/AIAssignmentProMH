@@ -259,39 +259,72 @@ export class DatabaseStorage implements IStorage {
 
   async createSubmission(insertSubmission: InsertSubmission): Promise<Submission> {
     try {
-      // Create a new object with only the known fields to avoid column errors
-      const safeSubmission = {
+      // Check if the columns we need exist first
+      const columnsQuery = `
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'submissions' 
+        AND column_name IN ('mime_type', 'file_size', 'content_type');
+      `;
+      
+      const result = await db.execute(columnsQuery);
+      const existingColumns = result.rows.map(row => row.column_name);
+      
+      // Create a new object with only the known fields based on what columns exist
+      const safeSubmission: Record<string, any> = {
         assignmentId: insertSubmission.assignmentId,
         userId: insertSubmission.userId,
         fileUrl: insertSubmission.fileUrl,
         fileName: insertSubmission.fileName,
         content: insertSubmission.content,
         notes: insertSubmission.notes,
-        status: insertSubmission.status,
+        status: insertSubmission.status || 'pending',
       };
       
+      // Only include the optional columns if they exist in the database
+      if (existingColumns.includes('mime_type') && insertSubmission.mimeType) {
+        safeSubmission.mimeType = insertSubmission.mimeType;
+      }
+      
+      if (existingColumns.includes('file_size') && insertSubmission.fileSize) {
+        safeSubmission.fileSize = insertSubmission.fileSize;
+      }
+      
+      if (existingColumns.includes('content_type') && insertSubmission.contentType) {
+        safeSubmission.contentType = insertSubmission.contentType;
+      }
+      
       const [submission] = await db.insert(submissions).values(safeSubmission).returning();
+      console.log(`[INFO] Submission created successfully: ${submission.id}`);
       return submission;
     } catch (error) {
-      console.error("Error creating submission:", error);
+      console.error("[ERROR] Error creating submission:", error);
       
       // Fallback approach if there's a schema issue
-      const sql = `
-        INSERT INTO submissions (assignment_id, user_id, file_url, file_name, content, notes, status)
-        VALUES (
-          ${insertSubmission.assignmentId}, 
-          ${insertSubmission.userId}, 
-          ${insertSubmission.fileUrl ? `'${insertSubmission.fileUrl}'` : 'NULL'},
-          ${insertSubmission.fileName ? `'${insertSubmission.fileName}'` : 'NULL'},
-          ${insertSubmission.content ? `'${insertSubmission.content}'` : 'NULL'},
-          ${insertSubmission.notes ? `'${insertSubmission.notes}'` : 'NULL'},
-          '${insertSubmission.status || 'pending'}'
-        )
-        RETURNING *;
-      `;
-      
-      const result = await db.execute(sql);
-      return result.rows[0] as Submission;
+      try {
+        const sql = `
+          INSERT INTO submissions (assignment_id, user_id, file_url, file_name, content, notes, status)
+          VALUES (
+            ${insertSubmission.assignmentId}, 
+            ${insertSubmission.userId}, 
+            ${insertSubmission.fileUrl ? `'${insertSubmission.fileUrl.replace(/'/g, "''")}'` : 'NULL'},
+            ${insertSubmission.fileName ? `'${insertSubmission.fileName.replace(/'/g, "''")}'` : 'NULL'},
+            ${insertSubmission.content ? `'${insertSubmission.content.replace(/'/g, "''")}'` : 'NULL'},
+            ${insertSubmission.notes ? `'${insertSubmission.notes.replace(/'/g, "''")}'` : 'NULL'},
+            '${insertSubmission.status || 'pending'}'
+          )
+          RETURNING *;
+        `;
+        
+        console.log("[INFO] Using fallback SQL for submission creation");
+        const result = await db.execute(sql);
+        const submission = result.rows[0] as Submission;
+        console.log(`[INFO] Submission created successfully with fallback: ${submission.id}`);
+        return submission;
+      } catch (fallbackError) {
+        console.error("[ERROR] Fallback submission creation also failed:", fallbackError);
+        throw new Error(`Failed to create submission: ${fallbackError.message}`);
+      }
     }
   }
 
@@ -336,6 +369,13 @@ export class DatabaseStorage implements IStorage {
 
   async updateSubmissionStatus(id: number, status: string): Promise<Submission> {
     try {
+      // First, validate the submission exists
+      const existingSubmission = await this.getSubmission(id);
+      if (!existingSubmission) {
+        throw new Error(`Submission with ID ${id} not found`);
+      }
+      
+      // Update with proper error handling
       const [submission] = await db.update(submissions)
         .set({ 
           status: status as any,
@@ -343,23 +383,31 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(submissions.id, id))
         .returning();
+        
+      console.log(`[INFO] Updated submission ${id} status to ${status}`);
       return submission;
     } catch (error) {
-      console.error("Error updating submission status:", error);
+      console.error(`[ERROR] Error updating submission ${id} status to ${status}:`, error);
       
       // Fallback approach with raw SQL if there's a schema issue
       try {
-        const sql = `
+        console.log(`[INFO] Using fallback SQL approach for submission ${id} status update`);
+        const safeSql = `
           UPDATE submissions 
-          SET status = '${status}', updated_at = NOW() 
+          SET status = '${status.replace(/'/g, "''")}', updated_at = NOW() 
           WHERE id = ${id}
           RETURNING *;
         `;
         
-        const result = await db.execute(sql);
+        const result = await db.execute(safeSql);
+        if (result.rows.length === 0) {
+          throw new Error(`Submission with ID ${id} not found`);
+        }
+        
+        console.log(`[INFO] Successfully updated submission ${id} status with fallback approach`);
         return result.rows[0] as Submission;
-      } catch (innerError) {
-        console.error("Fallback query for submission status update also failed:", innerError);
+      } catch (innerError: any) {
+        console.error(`[ERROR] Fallback query for submission ${id} status update also failed:`, innerError);
         throw new Error(`Failed to update submission status: ${innerError.message}`);
       }
     }

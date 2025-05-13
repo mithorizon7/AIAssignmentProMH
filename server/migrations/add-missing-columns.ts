@@ -89,12 +89,6 @@ export async function runMigrations() {
   }
 }
 
-// If this file is run directly
-if (require.main === module) {
-  runMigrations()
-    .then(() => process.exit(0))
-    .catch((error) => {
-      console.error('Migration failed:', error);
-      process.exit(1);
-    });
-}
+// We don't need to run this file directly in this case
+// as it will be imported by the server during startup
+// Just export the runMigrations function for use in server/index.ts
