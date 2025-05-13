@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
+import { QuillContent } from "@/components/quill-content";
 
 // Type definitions for better type safety
 type AssignmentStatus = "active" | "completed" | "upcoming";
@@ -237,9 +238,9 @@ export default function CourseDetailPage({ id }: { id: string }) {
                             <h3 className="font-semibold">{assignment.title}</h3>
                             {renderStatusBadge(assignment.status)}
                           </div>
-                          <p className="text-sm text-muted-foreground line-clamp-1">
-                            {assignment.description}
-                          </p>
+                          <div className="text-sm text-muted-foreground line-clamp-1">
+                            <QuillContent content={assignment.description} />
+                          </div>
                         </div>
                         
                         <div className="flex flex-col gap-1 sm:items-end">
