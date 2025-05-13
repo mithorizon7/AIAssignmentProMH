@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Create a focused test module for the security validation logic
-describe('Security Environment Variable Validation', () => {
+/**
+ * This module specifically tests the security validator function in isolation
+ * from actual implementation. This allows us to test edge cases and validation 
+ * logic without needing to mock or import the actual auth module.
+ * 
+ * For integration testing with the auth module, see test/auth/security-validation.test.ts
+ */
+describe('Security Environment Variable Validator (Unit)', () => {
   // Store original environment and console methods
   const originalEnv = { ...process.env };
   let mockConsoleError: any;
@@ -27,6 +33,7 @@ describe('Security Environment Variable Validation', () => {
   });
 
   // Create the validation function to test in isolation
+  // This is a generic implementation for testing validation logic without importing the auth module
   const validateSecurityEnvVars = () => {
     if (!process.env.SESSION_SECRET) {
       if (process.env.NODE_ENV === 'production') {
@@ -55,93 +62,66 @@ describe('Security Environment Variable Validation', () => {
     }
   };
 
-  it('should throw an error if SESSION_SECRET is not set in production', () => {
-    // Set production environment
-    process.env.NODE_ENV = 'production';
+  describe('SESSION_SECRET validation', () => {
+    it('should throw an error if not set in production', () => {
+      process.env.NODE_ENV = 'production';
+      expect(() => validateSecurityEnvVars()).toThrow(/SESSION_SECRET.*not set/);
+    });
     
-    // Expect validation to throw an error
-    expect(() => validateSecurityEnvVars()).toThrow(/SESSION_SECRET.*not set/);
+    it('should exit process if not set in development', () => {
+      process.env.NODE_ENV = 'development';
+      validateSecurityEnvVars();
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        'SESSION_SECRET environment variable is not set',
+        expect.any(String)
+      );
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+    });
+    
+    it('should warn if too short', () => {
+      process.env.SESSION_SECRET = 'short';
+      process.env.CSRF_SECRET = 'a'.repeat(32); // valid CSRF_SECRET to avoid that error
+      validateSecurityEnvVars();
+      expect(mockConsoleWarn).toHaveBeenCalledWith(
+        'Security Warning:',
+        expect.stringContaining('SESSION_SECRET is too weak')
+      );
+    });
   });
   
-  it('should exit process if SESSION_SECRET is not set in development', () => {
-    // Set development environment
-    process.env.NODE_ENV = 'development';
+  describe('CSRF_SECRET validation', () => {
+    it('should throw an error if not set in production', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.SESSION_SECRET = 'a'.repeat(32);
+      expect(() => validateSecurityEnvVars()).toThrow(/CSRF_SECRET.*not set/);
+    });
     
-    // Run validation
-    validateSecurityEnvVars();
+    it('should exit process if not set in development', () => {
+      process.env.NODE_ENV = 'development';
+      process.env.SESSION_SECRET = 'a'.repeat(32);
+      validateSecurityEnvVars();
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        'CSRF_SECRET environment variable is not set',
+        expect.any(String)
+      );
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+    });
     
-    // Check console error and process exit
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      'SESSION_SECRET environment variable is not set',
-      expect.any(String)
-    );
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
-  });
-  
-  it('should warn if SESSION_SECRET is too short', () => {
-    // Set a short secret
-    process.env.SESSION_SECRET = 'short';
-    process.env.CSRF_SECRET = 'a'.repeat(32); // valid CSRF_SECRET to avoid that error
-    
-    // Run validation
-    validateSecurityEnvVars();
-    
-    // Check for warning
-    expect(mockConsoleWarn).toHaveBeenCalledWith(
-      'Security Warning:',
-      expect.stringContaining('SESSION_SECRET is too weak')
-    );
-  });
-  
-  it('should throw an error if CSRF_SECRET is not set in production', () => {
-    // Set production environment and SESSION_SECRET
-    process.env.NODE_ENV = 'production';
-    process.env.SESSION_SECRET = 'a'.repeat(32);
-    
-    // Expect validation to throw an error
-    expect(() => validateSecurityEnvVars()).toThrow(/CSRF_SECRET.*not set/);
-  });
-  
-  it('should exit process if CSRF_SECRET is not set in development', () => {
-    // Set development environment and SESSION_SECRET
-    process.env.NODE_ENV = 'development';
-    process.env.SESSION_SECRET = 'a'.repeat(32);
-    
-    // Run validation
-    validateSecurityEnvVars();
-    
-    // Check console error and process exit
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      'CSRF_SECRET environment variable is not set',
-      expect.any(String)
-    );
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
-  });
-  
-  it('should warn if CSRF_SECRET is too short', () => {
-    // Set a short csrf secret
-    process.env.SESSION_SECRET = 'a'.repeat(32); // valid SESSION_SECRET
-    process.env.CSRF_SECRET = 'short';
-    
-    // Run validation
-    validateSecurityEnvVars();
-    
-    // Check for warning
-    expect(mockConsoleWarn).toHaveBeenCalledWith(
-      'Security Warning:',
-      expect.stringContaining('CSRF_SECRET is too weak')
-    );
+    it('should warn if too short', () => {
+      process.env.SESSION_SECRET = 'a'.repeat(32); // valid SESSION_SECRET
+      process.env.CSRF_SECRET = 'short';
+      validateSecurityEnvVars();
+      expect(mockConsoleWarn).toHaveBeenCalledWith(
+        'Security Warning:',
+        expect.stringContaining('CSRF_SECRET is too weak')
+      );
+    });
   });
   
   it('should pass validation with proper secrets', () => {
-    // Set proper secrets
     process.env.SESSION_SECRET = 'a'.repeat(32);
     process.env.CSRF_SECRET = 'b'.repeat(32);
-    
-    // Run validation
     validateSecurityEnvVars();
-    
-    // Expect no console errors or process exit
     expect(mockConsoleError).not.toHaveBeenCalled();
     expect(mockProcessExit).not.toHaveBeenCalled();
   });

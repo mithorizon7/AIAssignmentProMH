@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 
+/**
+ * This module tests the security validation as it integrates with the auth module.
+ * It verifies that validation happens during the auth module initialization.
+ * 
+ * For unit testing of just the validation logic, see test/unit/security-validator.test.ts
+ */
+
 // Mocks for required modules
 vi.mock('express-session', () => {
   return {
@@ -55,7 +62,7 @@ vi.mock('../../server/db', () => {
   };
 });
 
-describe('Auth Security Validation', () => {
+describe('Auth Module Security Validation (Integration)', () => {
   let mockConsoleError: any;
   let mockConsoleWarn: any;
   let mockProcessExit: any;
@@ -77,67 +84,59 @@ describe('Auth Security Validation', () => {
     vi.resetModules();
   });
 
-  it('should throw an error if SESSION_SECRET is not set in production', async () => {
-    // Set production environment
-    process.env.NODE_ENV = 'production';
+  describe('Auth module initialization security checks', () => {
+    it('validates SESSION_SECRET during module initialization in production', async () => {
+      process.env.NODE_ENV = 'production';
+      
+      await expect(async () => {
+        await import('../../server/auth');
+      }).rejects.toThrow(/SESSION_SECRET.*not set/);
+    });
     
-    // Import auth module should trigger validation
-    await expect(async () => {
+    it('validates CSRF_SECRET during module initialization in production', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.SESSION_SECRET = 'a'.repeat(32);
+      
+      await expect(async () => {
+        await import('../../server/auth');
+      }).rejects.toThrow(/CSRF_SECRET.*not set/);
+    });
+    
+    it('logs errors and exits when secrets are missing in development', async () => {
+      process.env.NODE_ENV = 'development';
+      
       await import('../../server/auth');
-    }).rejects.toThrow(/SESSION_SECRET.*not set/);
+      
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        expect.stringContaining('SESSION_SECRET'),
+        expect.any(String)
+      );
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+    });
   });
   
-  it('should exit process if SESSION_SECRET is not set in development', async () => {
-    // Set development environment
-    process.env.NODE_ENV = 'development';
+  describe('Auth module initialization with valid configuration', () => {
+    it('successfully initializes with valid security configuration', async () => {
+      process.env.SESSION_SECRET = 'a'.repeat(32);
+      process.env.CSRF_SECRET = 'b'.repeat(32);
+      
+      const authModule = await import('../../server/auth');
+      
+      expect(authModule).toHaveProperty('configureAuth');
+      expect(mockProcessExit).not.toHaveBeenCalled();
+    });
     
-    // Import auth module
-    await import('../../server/auth');
-    
-    // Check console error and process exit
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      expect.stringContaining('SESSION_SECRET'),
-      expect.any(String)
-    );
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
-  });
-  
-  it('should warn if SESSION_SECRET is too short', async () => {
-    // Set a short secret
-    process.env.SESSION_SECRET = 'short';
-    process.env.CSRF_SECRET = 'a'.repeat(32); // valid CSRF_SECRET to avoid that error
-    
-    // Import auth module
-    await import('../../server/auth');
-    
-    // Check for warning
-    expect(mockConsoleWarn).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.stringContaining('SESSION_SECRET is too weak')
-    );
-  });
-  
-  it('should throw an error if CSRF_SECRET is not set in production', async () => {
-    // Set production environment and SESSION_SECRET
-    process.env.NODE_ENV = 'production';
-    process.env.SESSION_SECRET = 'a'.repeat(32);
-    
-    // Import auth module should trigger validation
-    await expect(async () => {
-      await import('../../server/auth');
-    }).rejects.toThrow(/CSRF_SECRET.*not set/);
-  });
-  
-  it('should pass validation with proper secrets', async () => {
-    // Set proper secrets
-    process.env.SESSION_SECRET = 'a'.repeat(32);
-    process.env.CSRF_SECRET = 'b'.repeat(32);
-    
-    // Import auth module
-    const authModule = await import('../../server/auth');
-    
-    // Expect the module to export configureAuth
-    expect(authModule).toHaveProperty('configureAuth');
-    expect(mockProcessExit).not.toHaveBeenCalled();
+    it('warns about weak secrets but still initializes', async () => {
+      process.env.SESSION_SECRET = 'short'; // weak secret
+      process.env.CSRF_SECRET = 'b'.repeat(32); // valid secret
+      
+      const authModule = await import('../../server/auth');
+      
+      expect(mockConsoleWarn).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.stringContaining('SESSION_SECRET is too weak')
+      );
+      expect(authModule).toHaveProperty('configureAuth');
+    });
   });
 });
