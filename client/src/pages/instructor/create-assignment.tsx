@@ -93,15 +93,10 @@ export default function CreateAssignment() {
     try {
       setCreatingCourse(true);
       
-      const response = await fetch(API_ROUTES.COURSES, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: newCourseName,
-          code: newCourseCode,
-        }),
+      // Use apiRequest from queryClient to properly handle CSRF tokens and authentication
+      const response = await apiRequest('POST', API_ROUTES.COURSES, {
+        name: newCourseName,
+        code: newCourseCode,
       });
       
       if (!response.ok) {
@@ -155,14 +150,8 @@ export default function CreateAssignment() {
         } : undefined,
       };
       
-      // Send request to create assignment
-      const response = await fetch(API_ROUTES.ASSIGNMENTS, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      // Send request to create assignment using apiRequest helper
+      const response = await apiRequest('POST', API_ROUTES.ASSIGNMENTS, payload);
       
       if (!response.ok) {
         throw new Error(`Failed to create assignment: ${response.statusText}`);
