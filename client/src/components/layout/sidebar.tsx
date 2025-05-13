@@ -3,10 +3,19 @@ import { USER_ROLES, APP_ROUTES } from "@/lib/constants";
 import { getUserInitials } from "@/lib/utils/format";
 import { Link, useLocation } from "wouter";
 import { Separator } from "@/components/ui/separator";
+import { 
+  LayoutDashboard, 
+  FileText, 
+  History, 
+  Settings, 
+  Users, 
+  BarChart, 
+  LogOut 
+} from "lucide-react";
 
 interface SidebarLinkProps {
   href: string;
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   active?: boolean;
 }
@@ -21,7 +30,7 @@ const SidebarLink = ({ href, icon, label, active }: SidebarLinkProps) => (
             : "text-neutral-700 hover:bg-neutral-100"
         }`}
       >
-        <span className="material-icons mr-3" aria-hidden="true">{icon}</span>
+        <div className="mr-3" aria-hidden="true">{icon}</div>
         <span className="font-medium">{label}</span>
       </a>
     </Link>
@@ -63,25 +72,25 @@ export function Sidebar() {
           <ul className="space-y-2">
             <SidebarLink 
               href={APP_ROUTES.DASHBOARD} 
-              icon="dashboard" 
+              icon={<LayoutDashboard size={20} />} 
               label="Dashboard" 
               active={location === APP_ROUTES.DASHBOARD}
             />
             <SidebarLink 
               href={APP_ROUTES.ASSIGNMENTS} 
-              icon="assignment" 
+              icon={<FileText size={20} />} 
               label="My Assignments" 
               active={location === APP_ROUTES.ASSIGNMENTS}
             />
             <SidebarLink 
               href={APP_ROUTES.SUBMISSION_HISTORY} 
-              icon="history" 
+              icon={<History size={20} />} 
               label="Submission History" 
               active={location === APP_ROUTES.SUBMISSION_HISTORY}
             />
             <SidebarLink 
               href="/settings" 
-              icon="settings" 
+              icon={<Settings size={20} />} 
               label="Settings" 
               active={location === "/settings"}
             />
@@ -95,31 +104,31 @@ export function Sidebar() {
           <ul className="space-y-2">
             <SidebarLink 
               href={APP_ROUTES.INSTRUCTOR_DASHBOARD} 
-              icon="dashboard" 
+              icon={<LayoutDashboard size={20} />} 
               label="Dashboard" 
               active={location === APP_ROUTES.INSTRUCTOR_DASHBOARD}
             />
             <SidebarLink 
               href="/instructor/students" 
-              icon="people" 
+              icon={<Users size={20} />} 
               label="Students" 
               active={location === "/instructor/students"}
             />
             <SidebarLink 
               href="/instructor/assignments" 
-              icon="assignment" 
+              icon={<FileText size={20} />} 
               label="Assignments" 
               active={location === "/instructor/assignments"}
             />
             <SidebarLink 
               href="/instructor/analytics" 
-              icon="analytics" 
+              icon={<BarChart size={20} />} 
               label="Analytics" 
               active={location === "/instructor/analytics"}
             />
             <SidebarLink 
               href="/instructor/settings" 
-              icon="settings" 
+              icon={<Settings size={20} />} 
               label="Settings" 
               active={location === "/instructor/settings"}
             />
@@ -133,7 +142,7 @@ export function Sidebar() {
           onClick={() => logout()} 
           className="flex items-center text-neutral-700 hover:text-neutral-900"
         >
-          <span className="material-icons mr-2">logout</span>
+          <LogOut size={18} className="mr-2" />
           <span>Logout</span>
         </button>
       </div>
