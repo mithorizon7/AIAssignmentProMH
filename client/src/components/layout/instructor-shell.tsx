@@ -123,10 +123,12 @@ function UserMenu() {
             <AvatarFallback>{userInitials}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col items-start">
-            <span className="text-sm font-medium">{user?.username || "Instructor"}</span>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-medium">{user?.username || "Instructor"}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+            </div>
             <span className="text-xs text-muted-foreground capitalize">{user?.role || "instructor"}</span>
           </div>
-          <ChevronDown className="h-4 w-4 ml-auto shrink-0 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="start" forceMount>
@@ -175,7 +177,7 @@ function MobileNav() {
           </div>
         </SheetContent>
       </Sheet>
-      <div className="ml-4 text-xl font-semibold">Instructor Panel</div>
+      <div className="ml-4 text-xl font-semibold">AI Feedback Platform</div>
     </div>
   );
 }
@@ -190,7 +192,7 @@ export function InstructorShell({ children }: { children: ReactNode }) {
       ) : (
         <div className="flex flex-1">
           <aside className="fixed inset-y-0 left-0 z-20 hidden w-80 flex-col border-r bg-background md:flex">
-            <div className="p-6 text-xl font-semibold">Instructor Panel</div>
+            <div className="p-6 text-xl font-semibold">AI Feedback Platform</div>
             <Separator />
             <div className="flex-1 overflow-auto p-4">
               <NavLinks />
