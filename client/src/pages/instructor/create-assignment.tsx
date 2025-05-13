@@ -607,8 +607,8 @@ export default function CreateAssignment() {
                 </CardHeader>
                 <CardContent>
                   <RubricBuilder 
-                    value={rubric} 
-                    onChange={setRubric} 
+                    rubric={rubric} 
+                    setRubric={setRubric} 
                   />
                 </CardContent>
               </Card>

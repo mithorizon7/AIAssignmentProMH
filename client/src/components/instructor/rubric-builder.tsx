@@ -22,7 +22,8 @@ export function RubricBuilder({ rubric, setRubric }: RubricBuilderProps) {
           name: "",
           description: "",
           weight: 10,
-          type: "code_quality"
+          type: "code_quality",
+          maxScore: 100
         },
       ],
     }));
@@ -93,7 +94,7 @@ export function RubricBuilder({ rubric, setRubric }: RubricBuilderProps) {
           {rubric.criteria.map((criterion, index) => (
             <Card key={criterion.id} className="overflow-hidden scale-in" style={{animationDelay: `${index * 50}ms`}}>
               <CardContent className="p-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-3">
                   <div>
                     <label htmlFor={`criterion-${criterion.id}-name`} className="text-sm font-medium mb-1 block">
                       Criterion Name
@@ -107,7 +108,21 @@ export function RubricBuilder({ rubric, setRubric }: RubricBuilderProps) {
                     />
                   </div>
                   <div>
-                    <label htmlFor={`criterion-${criterion.id}-type`} className="text-sm font-medium mb-1 block">
+                    <label htmlFor={`criterion-${criterion.id}-maxScore`} className="text-sm font-medium mb-1 block">
+                      Max Score
+                    </label>
+                    <Input
+                      id={`criterion-${criterion.id}-maxScore`}
+                      type="number"
+                      min={1}
+                      max={1000}
+                      value={criterion.maxScore}
+                      onChange={(e) => handleCriterionChange(criterion.id, "maxScore", e.target.value)}
+                      className="field-focus-animation"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor={`criterion-${criterion.id}-weight`} className="text-sm font-medium mb-1 block">
                       Weight (%)
                     </label>
                     <Input
