@@ -6,6 +6,7 @@ import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { errorHandler, notFoundHandler, logger } from "./lib/error-handler";
+import { runMigrations } from "./migrations/add-missing-columns";
 
 const app = express();
 app.use(express.json());
