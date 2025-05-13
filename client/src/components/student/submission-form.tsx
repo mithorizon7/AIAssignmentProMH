@@ -65,8 +65,20 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
     },
     onSuccess: (data) => {
       toast({
-        title: 'Assignment Submitted',
-        description: 'Your assignment has been submitted successfully. AI feedback will be generated shortly.',
+        title: 'Assignment Submitted Successfully',
+        description: 'Your assignment has been received. AI feedback will be available shortly.',
+        variant: 'default',
+        duration: 5000,
+        action: (
+          <Button variant="outline" size="sm" onClick={() => {
+            if (onSubmissionComplete) {
+              onSubmissionComplete(data);
+            }
+          }}>
+            <CheckCircle className="h-4 w-4 mr-1" />
+            View
+          </Button>
+        ),
       });
       
       queryClient.invalidateQueries({ queryKey: [API_ROUTES.SUBMISSIONS] });
@@ -84,8 +96,16 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
     onError: (error) => {
       toast({
         variant: 'destructive',
-        title: 'Submission Failed',
-        description: error instanceof Error ? error.message : 'An error occurred while submitting your assignment',
+        title: 'Submission Error',
+        description: error instanceof Error 
+          ? error.message 
+          : 'There was a problem submitting your assignment. Please try again.',
+        duration: 7000,
+        action: (
+          <Button variant="outline" size="sm" onClick={() => handleSubmit()}>
+            Try Again
+          </Button>
+        ),
       });
     }
   });
@@ -94,8 +114,18 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
     if (submissionType === 'file' && !file) {
       toast({
         variant: 'destructive',
-        title: 'Missing File',
-        description: 'Please upload a file before submitting',
+        title: 'File Required',
+        description: 'Please upload a file to submit your assignment.',
+        action: (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => document.querySelector('.file-upload-area')?.scrollIntoView({behavior: 'smooth'})}
+          >
+            <AlertCircle className="h-4 w-4 mr-1" />
+            Show
+          </Button>
+        ),
       });
       return;
     }
@@ -103,8 +133,21 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
     if (submissionType === 'code' && !code.trim()) {
       toast({
         variant: 'destructive',
-        title: 'Missing Code',
-        description: 'Please enter your code before submitting',
+        title: 'Code Required',
+        description: 'Please enter your code before submitting your assignment.',
+        action: (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              const element = document.querySelector('[data-value="code"]') as HTMLElement;
+              if (element) element.click();
+            }}
+          >
+            <AlertCircle className="h-4 w-4 mr-1" />
+            Switch to Code Tab
+          </Button>
+        ),
       });
       return;
     }
@@ -147,12 +190,12 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
               <TabsTrigger value="code">Paste Code</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="file">
+            <TabsContent value="file" className="file-upload-area">
               <FileUpload 
-                onFileSelected={setFile} 
-                selectedFile={file}
+                onValueChange={(files) => setFile(files.length > 0 ? files[0] : null)}
                 accept=".py,.java,.cpp,.ipynb,.zip,.js,.ts,.html,.css,.md,.txt"
                 maxSize={10 * 1024 * 1024}
+                maxFiles={1}
               />
             </TabsContent>
             
@@ -180,13 +223,22 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
       </CardContent>
       
       <CardFooter className="flex justify-end border-t border-neutral-200 p-4">
-        <Button onClick={handleSubmit} disabled={isPending}>
+        <Button 
+          onClick={handleSubmit} 
+          disabled={isPending} 
+          className="px-4 py-2 min-w-[160px]"
+        >
           {isPending ? (
             <>
-              <span className="material-icons animate-spin mr-2">refresh</span>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               Submitting...
             </>
-          ) : 'Submit Assignment'}
+          ) : (
+            <>
+              <Upload className="h-4 w-4 mr-2" />
+              Submit Assignment
+            </>
+          )}
         </Button>
       </CardFooter>
     </Card>
