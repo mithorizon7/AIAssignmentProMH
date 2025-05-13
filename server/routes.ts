@@ -188,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description,
         courseId: courseIdNum, // Now properly parsed and optional
         dueDate: new Date(dueDate), // The client already sends an ISO string, so we just need a Date object
-        status: 'upcoming',
+        status: 'active', // Setting to active by default so students can submit immediately
         shareableCode,
         rubric: rubric ? JSON.stringify(rubric) : null,
       });
