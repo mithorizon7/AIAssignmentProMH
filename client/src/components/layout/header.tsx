@@ -20,12 +20,12 @@ export function Header() {
               <Menu size={24} />
             </button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64">
+          <SheetContent side="left" className="p-0 w-80">
             <Sidebar />
           </SheetContent>
         </Sheet>
         
-        <div className="md:hidden text-lg font-medium text-primary">AI Feedback Tool</div>
+        <div className="md:hidden text-lg font-medium text-primary">Academus</div>
       </div>
       
       <div className="flex items-center space-x-4">

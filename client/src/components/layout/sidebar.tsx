@@ -22,7 +22,7 @@ const SidebarLink = ({ href, icon, label, active }: SidebarLinkProps) => (
         }`}
       >
         <span className="material-icons mr-3" aria-hidden="true">{icon}</span>
-        <span>{label}</span>
+        <span className="font-medium">{label}</span>
       </a>
     </Link>
   </li>
