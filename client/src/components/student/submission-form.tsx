@@ -20,6 +20,7 @@ import { API_ROUTES } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Calendar, Clock, RefreshCw, Loader2, Upload, AlertCircle, CheckCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface SubmissionFormProps {
   assignment: Assignment;
@@ -31,6 +32,8 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
   const [file, setFile] = useState<File | null>(null);
   const [code, setCode] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "processing" | "complete" | "error">("idle");
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -50,18 +53,56 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
         formData.append('notes', notes);
       }
       
-      const response = await fetch(`${API_ROUTES.SUBMISSIONS}`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-      });
+      // Set status to uploading before making the request
+      setUploadStatus("uploading");
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to submit assignment');
+      // Create a progress tracker
+      let uploadComplete = false;
+      const progressInterval = setInterval(() => {
+        if (!uploadComplete) {
+          setUploadProgress(prev => {
+            // Simulate progress that slows down as it approaches 90%
+            // Real implementation would use fetch with XMLHttpRequest for actual progress
+            const increment = Math.max(1, Math.floor((100 - prev) / 10));
+            const newProgress = Math.min(90, prev + increment);
+            return newProgress;
+          });
+        }
+      }, 300);
+      
+      try {
+        const response = await fetch(`${API_ROUTES.SUBMISSIONS}`, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+        
+        // Upload is complete
+        uploadComplete = true;
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          setUploadStatus("error");
+          throw new Error(errorData.message || 'Failed to submit assignment');
+        }
+        
+        // Set status to processing while waiting for AI analysis
+        setUploadStatus("processing");
+        
+        const data = await response.json();
+        
+        // On successful response, set status to complete
+        setUploadStatus("complete");
+        
+        return data;
+      } catch (error) {
+        uploadComplete = true;
+        clearInterval(progressInterval);
+        setUploadStatus("error");
+        throw error;
       }
-      
-      return await response.json();
     },
     onSuccess: (data) => {
       toast({
@@ -88,12 +129,19 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
         onSubmissionComplete(data);
       }
       
-      // Clear form
-      setFile(null);
-      setCode('');
-      setNotes('');
+      // Reset to idle state after a delay to allow seeing the complete status
+      setTimeout(() => {
+        // Clear form
+        setFile(null);
+        setCode('');
+        setNotes('');
+        setUploadStatus("idle");
+        setUploadProgress(0);
+      }, 2000);
     },
     onError: (error) => {
+      // Error status is already set in the mutation function
+      
       toast({
         variant: 'destructive',
         title: 'Submission Error',
@@ -102,7 +150,11 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
           : 'There was a problem submitting your assignment. Please try again.',
         duration: 7000,
         action: (
-          <Button variant="outline" size="sm" onClick={() => handleSubmit()}>
+          <Button variant="outline" size="sm" onClick={() => {
+            setUploadStatus("idle");
+            setUploadProgress(0);
+            handleSubmit();
+          }}>
             Try Again
           </Button>
         ),
@@ -193,10 +245,47 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
             <TabsContent value="file" className="file-upload-area">
               <FileUpload 
                 onValueChange={(files) => setFile(files.length > 0 ? files[0] : null)}
-                accept=".py,.java,.cpp,.ipynb,.zip,.js,.ts,.html,.css,.md,.txt"
+                accept=".py,.java,.cpp,.ipynb,.zip,.js,.ts,.html,.css,.md,.txt,.pdf,.jpg,.jpeg,.png,.csv,.mp4,.mp3,.doc,.docx"
                 maxSize={10 * 1024 * 1024}
                 maxFiles={1}
+                processingStatus={isPending ? uploadStatus : "idle"}
+                processingProgress={uploadProgress}
+                showPreviews={true}
+                disabled={isPending}
+                className="transition-all duration-300"
               />
+              
+              {/* Additional multimodal info */}
+              <div className="mt-4 text-sm text-neutral-600 bg-blue-50 border border-blue-100 rounded-md p-3 slide-in-right" style={{animationDelay: "100ms"}}>
+                <h4 className="font-medium text-blue-800 mb-1">Multimodal File Support</h4>
+                <p className="mb-2">This assignment supports a wide range of file types with Gemini's advanced multimodal analysis capabilities:</p>
+                <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <li className="flex items-center">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 mr-1"></span>
+                    Images: JPG, PNG, GIF
+                  </li>
+                  <li className="flex items-center">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 mr-1"></span>
+                    Code: Python, Java, JavaScript
+                  </li>
+                  <li className="flex items-center">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 mr-1"></span>
+                    Documents: PDF, Word, Text
+                  </li>
+                  <li className="flex items-center">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 mr-1"></span>
+                    Data: CSV, Excel, JSON
+                  </li>
+                  <li className="flex items-center">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 mr-1"></span>
+                    Audio/Video: MP3, MP4
+                  </li>
+                  <li className="flex items-center">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 mr-1"></span>
+                    Archives: ZIP (multiple files)
+                  </li>
+                </ul>
+              </div>
             </TabsContent>
             
             <TabsContent value="code">
@@ -226,19 +315,48 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
         <Button 
           onClick={handleSubmit} 
           disabled={isPending} 
-          className="px-4 py-2 min-w-[160px]"
+          className={cn(
+            "px-4 py-2 min-w-[180px] relative overflow-hidden group btn-hover-effect transition-all duration-300",
+            uploadStatus === "processing" && "bg-amber-600 hover:bg-amber-700",
+            uploadStatus === "complete" && "bg-green-600 hover:bg-green-700"
+          )}
         >
           {isPending ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Submitting...
+              {uploadStatus === "uploading" && (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading... {uploadProgress}%
+                </>
+              )}
+              {uploadStatus === "processing" && (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing with AI...
+                </>
+              )}
+              {uploadStatus === "complete" && (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Submission Complete
+                </>
+              )}
+              {uploadStatus === "error" && (
+                <>
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Submission Failed
+                </>
+              )}
             </>
           ) : (
             <>
-              <Upload className="h-4 w-4 mr-2" />
+              <Upload className="h-4 w-4 mr-2 group-hover:translate-y-[-2px] transition-transform duration-300" />
               Submit Assignment
             </>
           )}
+          
+          {/* Animated slide-in background on hover */}
+          <span className="absolute inset-0 bg-gradient-to-r from-primary-600 to-primary-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
         </Button>
       </CardFooter>
     </Card>

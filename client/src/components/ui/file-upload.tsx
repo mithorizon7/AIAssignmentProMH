@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Upload, X, File, Image, FileCode, FileText, Video, Music, PieChart, FileJson } from "lucide-react";
+import { Upload, X, File, Image, FileCode, FileText, Video, Music, PieChart, FileJson, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 
@@ -181,35 +181,99 @@ export function FileUpload({
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       {files.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-4">
           {files.map((file, index) => (
             <div
               key={index}
-              className="flex items-center justify-between p-2 border rounded-md text-sm"
+              className="flex flex-col border rounded-md text-sm overflow-hidden transition-all duration-300 hover:shadow-sm scale-in"
+              style={{animationDelay: `${index * 50}ms`}}
             >
-              <div className="flex items-center space-x-2 truncate">
-                <div className="p-1 rounded-md bg-secondary">
-                  <File size={16} className="text-muted-foreground" />
+              {/* File Preview Section */}
+              {showPreviews && filePreviews[file.name] && file.type.startsWith('image/') && (
+                <div className="border-b relative overflow-hidden bg-neutral-50">
+                  <img 
+                    src={filePreviews[file.name]} 
+                    alt={file.name}
+                    className="w-full h-36 object-contain"
+                  />
                 </div>
-                <div className="truncate">
-                  <p className="truncate font-medium">{file.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatSize(file.size)}
-                  </p>
+              )}
+              
+              {/* File Info Section */}
+              <div className="flex items-center justify-between p-3">
+                <div className="flex items-center space-x-2 truncate">
+                  <div className="p-1.5 rounded-md bg-secondary">
+                    {getFileIcon(file)}
+                  </div>
+                  <div className="truncate">
+                    <p className="truncate font-medium">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatSize(file.size)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  {/* Processing status indicators */}
+                  {processingStatus !== "idle" && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="mr-2">
+                            {processingStatus === "uploading" && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 flex items-center">
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Uploading
+                              </span>
+                            )}
+                            {processingStatus === "processing" && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 flex items-center">
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Processing
+                              </span>
+                            )}
+                            {processingStatus === "complete" && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 flex items-center">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Complete
+                              </span>
+                            )}
+                            {processingStatus === "error" && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 flex items-center">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Error
+                              </span>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {processingStatus === "uploading" && `Uploading: ${processingProgress}%`}
+                          {processingStatus === "processing" && "AI is analyzing your file"}
+                          {processingStatus === "complete" && "Processing complete"}
+                          {processingStatus === "error" && "Error processing file"}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(index);
+                    }}
+                    disabled={disabled || processingStatus === "uploading" || processingStatus === "processing"}
+                    className="h-8 w-8 flex-shrink-0"
+                  >
+                    <X size={16} className="text-muted-foreground" />
+                  </Button>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeFile(index);
-                }}
-                disabled={disabled}
-                className="h-8 w-8 flex-shrink-0"
-              >
-                <X size={16} className="text-muted-foreground" />
-              </Button>
+              
+              {/* Progress bar for processing */}
+              {processingStatus === "uploading" && (
+                <Progress value={processingProgress} className="h-1 rounded-none" />
+              )}
             </div>
           ))}
         </div>
