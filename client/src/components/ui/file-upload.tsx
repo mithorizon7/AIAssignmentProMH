@@ -1,8 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Upload, X, File } from "lucide-react";
+import { Upload, X, File, Image, FileCode, FileText, Video, Music, PieChart, FileJson } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Progress } from "@/components/ui/progress";
 
 export interface FileUploadProps {
   onValueChange: (files: File[]) => void;
@@ -11,6 +13,9 @@ export interface FileUploadProps {
   maxSize?: number;
   accept?: string;
   className?: string;
+  showPreviews?: boolean;
+  processingStatus?: "idle" | "uploading" | "processing" | "complete" | "error";
+  processingProgress?: number;
 }
 
 export function FileUpload({
@@ -20,9 +25,35 @@ export function FileUpload({
   maxSize = 5 * 1024 * 1024, // 5MB default
   accept,
   className,
+  showPreviews = true,
+  processingStatus = "idle",
+  processingProgress = 0,
 }: FileUploadProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [filePreviews, setFilePreviews] = useState<{[key: string]: string}>({});
+
+  // Generate file previews when files change
+  const generatePreviews = useCallback((fileList: File[]) => {
+    const previews: {[key: string]: string} = {};
+    
+    fileList.forEach(file => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setFilePreviews(prev => ({
+            ...prev,
+            [file.name]: reader.result as string
+          }));
+        };
+        reader.readAsDataURL(file);
+      }
+      // For other preview types we could add handlers here
+      // PDF previews, text file contents, etc.
+    });
+    
+    return previews;
+  }, []);
 
   const onDrop = useCallback(
     (acceptedFiles: File[], rejectedFiles: any[]) => {
@@ -51,8 +82,13 @@ export function FileUpload({
       const newFiles = acceptedFiles.slice(0, maxFiles);
       setFiles(newFiles);
       onValueChange(newFiles);
+
+      // Generate previews for the accepted files
+      if (showPreviews) {
+        generatePreviews(newFiles);
+      }
     },
-    [maxFiles, maxSize, onValueChange]
+    [maxFiles, maxSize, onValueChange, showPreviews, generatePreviews]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -81,10 +117,20 @@ export function FileUpload({
   });
 
   const removeFile = (index: number) => {
+    const fileToRemove = files[index];
     const newFiles = [...files];
     newFiles.splice(index, 1);
     setFiles(newFiles);
     onValueChange(newFiles);
+    
+    // Remove preview if it exists
+    if (fileToRemove && filePreviews[fileToRemove.name]) {
+      setFilePreviews(prev => {
+        const newPreviews = { ...prev };
+        delete newPreviews[fileToRemove.name];
+        return newPreviews;
+      });
+    }
   };
 
   return (
@@ -179,4 +225,37 @@ function formatSize(bytes: number): string {
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
+
+// Helper to get the file type icon
+function getFileIcon(file: File) {
+  const extension = file.name.split('.').pop()?.toLowerCase() || '';
+  const type = file.type;
+  
+  if (type.startsWith('image/')) {
+    return <Image size={16} className="text-blue-600" />;
+  } else if (type.startsWith('video/')) {
+    return <Video size={16} className="text-purple-600" />;
+  } else if (type.startsWith('audio/')) {
+    return <Music size={16} className="text-amber-600" />;
+  } else if (type.startsWith('text/')) {
+    return <FileText size={16} className="text-gray-600" />;
+  } else if (['application/pdf'].includes(type)) {
+    return <FileText size={16} className="text-red-600" />;
+  } else if (['application/json'].includes(type) || extension === 'json') {
+    return <FileJson size={16} className="text-green-600" />;
+  } else if ([
+    'application/javascript', 
+    'application/typescript',
+    'application/x-python',
+    'text/x-python',
+    'application/x-java',
+    'text/x-java'
+  ].includes(type) || ['js', 'ts', 'py', 'java', 'c', 'cpp', 'html', 'css'].includes(extension)) {
+    return <FileCode size={16} className="text-indigo-600" />;
+  } else if (['csv', 'xls', 'xlsx', 'numbers'].includes(extension)) {
+    return <PieChart size={16} className="text-emerald-600" />;
+  }
+  
+  return <File size={16} className="text-muted-foreground" />;
 }
