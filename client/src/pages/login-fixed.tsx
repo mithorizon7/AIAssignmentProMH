@@ -137,15 +137,11 @@ export default function Login() {
                 className="w-full border-2 border-mit-red hover:bg-mit-red/10 mb-3"
                 onClick={() => window.location.href = '/api/auth/horizon/login'}
               >
-                <svg 
-                  className="h-5 w-5 mr-2" 
-                  fill="none" 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  viewBox="0 0 512 512"
-                >
-                  <rect width="512" height="512" fill="#A31F34" rx="15%"/>
-                  <path fill="#fff" d="M157 291v-70h-35v-28h106v28h-36v70h-35m24-119V76h32l18 66 17-66h33v96h-30v-69l-19 69h-21l-18-69v69h-12"/>
-                </svg>
+                <img 
+                  src="/mit_logo_micro_rgb_mit-red.png" 
+                  alt="MIT Logo" 
+                  className="h-5 w-auto mr-2" 
+                />
                 Log in with MIT Horizon
               </Button>
               
