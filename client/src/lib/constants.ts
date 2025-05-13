@@ -17,6 +17,7 @@ export const APP_ROUTES = {
   ASSIGNMENTS: '/assignments',
   SUBMISSION: (id: string | number) => `/submission/${id}`,
   SUBMISSIONS: '/submissions',
+  SUBMISSION_HISTORY: '/history',
   INSTRUCTOR_DASHBOARD: '/instructor/dashboard',
   INSTRUCTOR_ASSIGNMENT: (id: string | number) => `/instructor/assignment/${id}`,
   INSTRUCTOR_CREATE_ASSIGNMENT: '/instructor/create-assignment',

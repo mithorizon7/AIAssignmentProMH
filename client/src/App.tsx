@@ -12,6 +12,7 @@ import Login from "@/pages/login-fixed";
 import Dashboard from "@/pages/dashboard";
 import Assignments from "@/pages/assignments";
 import SubmissionDetail from "@/pages/submission-detail";
+import SubmissionHistory from "@/pages/submission-history";
 import InstructorDashboard from "@/pages/instructor/dashboard";
 import AssignmentDetail from "@/pages/instructor/assignment-detail";
 import CreateAssignment from "@/pages/instructor/create-assignment";
@@ -72,6 +73,9 @@ function Router() {
       </Route>
       <Route path="/submission/:id">
         {(params) => <PrivateRoute component={SubmissionDetail} id={params.id} />}
+      </Route>
+      <Route path="/history">
+        {() => <PrivateRoute component={SubmissionHistory} />}
       </Route>
       
       {/* Instructor Routes */}

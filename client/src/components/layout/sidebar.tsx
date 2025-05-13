@@ -74,10 +74,10 @@ export function Sidebar() {
               active={location === APP_ROUTES.ASSIGNMENTS}
             />
             <SidebarLink 
-              href="/history" 
+              href={APP_ROUTES.SUBMISSION_HISTORY} 
               icon="history" 
               label="Submission History" 
-              active={location === "/history"}
+              active={location === APP_ROUTES.SUBMISSION_HISTORY}
             />
             <SidebarLink 
               href="/settings" 
