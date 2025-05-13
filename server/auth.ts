@@ -130,23 +130,30 @@ export function configureAuth(app: any) {
   // Configure express-session with enhanced security
   const isProduction = process.env.NODE_ENV === 'production';
   
-  app.use(
-    session({
-      secret: process.env.SESSION_SECRET!, // No fallback - we've already validated this exists
-      resave: false,
-      saveUninitialized: true, // Changed to true to ensure session is always initialized
-      store: sessionStore,
-      cookie: {
-        secure: isProduction, // Requires HTTPS in production
-        httpOnly: true, // Prevents client-side JS from reading the cookie
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-        sameSite: isProduction ? 'strict' : 'lax', // Stricter in production
-        path: '/', // Restrict cookie to specific path
-      },
-      // Enable proxy support for secure cookies behind load balancers
-      proxy: isProduction
-    })
-  );
+  // Fix session configuration for development environment
+  const sessionOptions = {
+    secret: process.env.SESSION_SECRET || 'development-secret-key-not-for-production', 
+    resave: false,
+    saveUninitialized: true, // Ensures session is created and cookie sent
+    store: sessionStore,
+    cookie: {
+      secure: false, // Set to false for development (no HTTPS required)
+      httpOnly: true, // Prevents client-side JS from reading the cookie
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: 'lax', // Less strict for development
+      path: '/', // Accessible across the whole site
+    },
+    // Enable proxy support for secure cookies behind load balancers in production
+    proxy: isProduction
+  };
+  
+  // Only use secure cookies in production
+  if (isProduction) {
+    sessionOptions.cookie.secure = true;
+    sessionOptions.cookie.sameSite = 'strict';
+  }
+  
+  app.use(session(sessionOptions));
   
   // Set appropriate security headers
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -696,22 +703,38 @@ export function configureAuth(app: any) {
     console.log('[INFO] MIT Horizon OIDC not configured, skipping MIT Horizon OIDC strategy setup');
   }
 
-  // Configure passport serialization
+  // Configure passport serialization with better error handling
   passport.serializeUser((user: any, done) => {
+    if (!user || !user.id) {
+      console.error('[ERROR] Failed to serialize user - invalid user object:', user);
+      return done(new Error('Invalid user object during serialization'));
+    }
+    console.log('[DEBUG] Serializing user ID:', user.id);
     done(null, user.id);
   });
 
   passport.deserializeUser(async (id: number, done) => {
+    if (!id) {
+      console.error('[ERROR] Failed to deserialize user - no ID provided');
+      return done(new Error('No user ID provided for deserialization'));
+    }
+
     try {
+      console.log(`[DEBUG] Deserializing user ID: ${id}`);
       const user = await storage.getUser(id);
+      
       if (!user) {
-        return done(new Error('User not found'));
+        console.error(`[ERROR] User with ID ${id} not found during deserialization`);
+        return done(null, false);
       }
+      
       // Remove password from the user object
       const { password: _, ...userWithoutPassword } = user;
+      console.log(`[DEBUG] Successfully deserialized user ${user.username} (ID: ${user.id})`);
       done(null, userWithoutPassword);
     } catch (error) {
-      done(error);
+      console.error(`[ERROR] Error deserializing user ID ${id}:`, error);
+      done(null, false);
     }
   });
 
