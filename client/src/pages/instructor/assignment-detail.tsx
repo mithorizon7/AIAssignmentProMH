@@ -259,7 +259,7 @@ export default function AssignmentDetail({ id }: AssignmentDetailProps) {
                 onClick={handleExportCsv}
                 className="text-primary border-primary"
               >
-                <span className="material-icons text-sm mr-2">file_download</span>
+                <Download className="mr-2 h-4 w-4" />
                 Export Grades (CSV)
               </Button>
             </CardFooter>
