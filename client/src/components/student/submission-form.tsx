@@ -19,6 +19,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { API_ROUTES } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Calendar, Clock, RefreshCw, Loader2, Upload, AlertCircle, CheckCircle } from "lucide-react";
 
 interface SubmissionFormProps {
   assignment: Assignment;
@@ -118,16 +119,16 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
         <CardDescription>{assignment.description}</CardDescription>
         
         <div className="flex flex-wrap gap-4 text-sm mt-4">
-          <div className="flex items-center">
-            <span className="material-icons text-neutral-500 mr-1">calendar_today</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-neutral-50 rounded-md">
+            <Calendar className="h-4 w-4 text-neutral-500" />
             <span>Due: {formatDate(assignment.dueDate)}</span>
           </div>
-          <div className="flex items-center">
-            <span className="material-icons text-neutral-500 mr-1">access_time</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-neutral-50 rounded-md">
+            <Clock className="h-4 w-4 text-neutral-500" />
             <span>Time remaining: {formatTimeRemaining(assignment.dueDate)}</span>
           </div>
-          <div className="flex items-center">
-            <span className="material-icons text-neutral-500 mr-1">refresh</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-neutral-50 rounded-md">
+            <RefreshCw className="h-4 w-4 text-neutral-500" />
             <span>Submissions allowed: Unlimited until due date</span>
           </div>
         </div>

@@ -44,10 +44,20 @@ export function SubmissionHistory({ submissions, loading = false }: SubmissionHi
           <CardTitle>Submission History</CardTitle>
           <CardDescription>View your previous submissions and AI feedback</CardDescription>
         </CardHeader>
-        <CardContent className="p-10 text-center">
-          <span className="material-icons text-4xl text-neutral-400 mb-2">history</span>
-          <h3 className="text-lg font-medium text-neutral-700 mb-1">No submissions yet</h3>
-          <p className="text-neutral-600">Select an active assignment from above to submit your work and receive AI feedback</p>
+        <CardContent className="p-8 text-center">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 mb-4">
+            <History className="h-6 w-6 text-neutral-500" />
+          </div>
+          <h3 className="text-lg font-medium text-neutral-700 mb-2">No submission history</h3>
+          <p className="text-neutral-600 mb-4">When you submit assignments, they'll appear here with detailed AI feedback.</p>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/assignments')}
+            className="inline-flex items-center justify-center"
+          >
+            <ArrowUpCircle className="mr-2 h-4 w-4" />
+            Find assignments to submit
+          </Button>
         </CardContent>
       </Card>
     );
@@ -105,20 +115,22 @@ export function SubmissionHistory({ submissions, loading = false }: SubmissionHi
                 <div className="bg-blue-50 rounded-lg p-4 mb-4">
                   <div className="flex justify-between items-center">
                     <h4 className="font-medium text-neutral-800">AI Feedback</h4>
-                    <span className="text-xs text-neutral-500 flex items-center">
-                      <span className="material-icons animate-spin mr-1">refresh</span>
+                    <span className="text-xs text-blue-600 flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100">
+                      <Loader2 className="h-3 w-3 animate-spin" />
                       Processing...
                     </span>
                   </div>
+                  <p className="text-xs text-neutral-500 mt-2">Your feedback is being generated and will appear here shortly.</p>
                 </div>
               ) : (
                 <div className="bg-amber-50 rounded-lg p-4 mb-4">
                   <div className="flex justify-between items-center">
                     <h4 className="font-medium text-neutral-800">AI Feedback</h4>
-                    <span className="text-xs text-neutral-500">
+                    <span className="text-xs text-amber-600 px-2 py-1 rounded-full bg-amber-100">
                       Feedback unavailable
                     </span>
                   </div>
+                  <p className="text-xs text-neutral-500 mt-2">There was an issue generating feedback for this submission.</p>
                 </div>
               )
             )}
@@ -126,14 +138,22 @@ export function SubmissionHistory({ submissions, loading = false }: SubmissionHi
             {/* Submission File/Content Link */}
             <div className="bg-white border border-neutral-200 rounded-lg p-3 flex justify-between items-center">
               <div className="flex items-center">
-                <span className="material-icons text-neutral-400 mr-2">
-                  {submission.fileName ? 'description' : 'code'}
-                </span>
+                <FileText className="h-5 w-5 text-neutral-400 mr-2" />
                 <span className="text-sm text-neutral-700">
                   {submission.fileName || 'Code submission'}
                 </span>
               </div>
-              <Button variant="ghost" size="sm" className="text-primary hover:text-primary-dark">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-primary hover:text-primary-dark hover:bg-primary-50 transition-colors"
+                onClick={() => {
+                  // In a real implementation, this would download or view the submission
+                  // For now, we'll just show the action with a toast
+                  window.alert(`${submission.fileName ? 'Downloading' : 'Viewing'} submission: ${submission.fileName || 'Code content'}`);
+                }}
+              >
+                <FileText className="h-4 w-4 mr-1" />
                 {submission.fileName ? 'Download' : 'View'}
               </Button>
             </div>
