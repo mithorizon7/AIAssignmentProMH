@@ -847,7 +847,7 @@ export function configureAuth(app: any) {
 
 // Helper function to hash passwords
 async function hashPassword(password: string): Promise<string> {
-  const saltRounds = 10;
+  const saltRounds = 12; // Increased to 12 rounds for enhanced security
   return bcrypt.hash(password, saltRounds);
 }
 
