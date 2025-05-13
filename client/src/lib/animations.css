@@ -1,172 +1,40 @@
-/* Animations and Microinteractions for AIGrader
- * These animations enhance the user experience with subtle,
- * professional visual feedback that aligns with MIT brand standards
- */
+/* Base animations for the application */
 
-/* Hover effect for cards */
-.card-hover {
-  @apply transition-all duration-200 ease-in-out;
-}
-.card-hover:hover {
-  @apply shadow-md transform -translate-y-0.5;
-}
-
-/* Button hover animations */
-.btn-hover-effect {
-  @apply transition-all duration-200 ease-in-out;
-}
-
-.btn-hover-effect:hover:not(:disabled) {
-  @apply transform scale-[1.02] shadow-md;
-}
-
-.btn-hover-effect:active:not(:disabled) {
-  @apply transform scale-[0.98];
-}
-
-/* Fade in animation */
 .fade-in {
-  animation: fadeIn 0.3s ease-in-out;
+  animation: fadeIn 0.5s ease-in-out forwards;
+  opacity: 0;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* Slide up animation for elements appearing on page */
 .slide-up {
-  animation: slideUp 0.4s ease-out;
+  animation: slideUp 0.5s ease-out forwards;
+  opacity: 0;
+  transform: translateY(20px);
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.slide-in-right {
+  animation: slideInRight 0.5s ease-out forwards;
+  opacity: 0;
+  transform: translateX(20px);
 }
 
-/* Stagger children animations */
 .stagger-children > * {
+  animation: fadeIn 0.5s ease-in-out forwards;
   opacity: 0;
 }
 
-.stagger-children > *:nth-child(1) {
-  animation: staggerFade 0.5s ease-out 0.1s forwards;
-}
-.stagger-children > *:nth-child(2) {
-  animation: staggerFade 0.5s ease-out 0.2s forwards;
-}
-.stagger-children > *:nth-child(3) {
-  animation: staggerFade 0.5s ease-out 0.3s forwards;
-}
-.stagger-children > *:nth-child(4) {
-  animation: staggerFade 0.5s ease-out 0.4s forwards;
-}
-.stagger-children > *:nth-child(5) {
-  animation: staggerFade 0.5s ease-out 0.5s forwards;
-}
-.stagger-children > *:nth-child(n+6) {
-  animation: staggerFade 0.5s ease-out 0.6s forwards;
-}
-
-/* Animation delay utility classes */
-.animate-delay-100 {
-  animation-delay: 100ms;
-}
-.animate-delay-200 {
-  animation-delay: 200ms;
-}
-.animate-delay-300 {
-  animation-delay: 300ms;
-}
-.animate-delay-400 {
-  animation-delay: 400ms;
-}
-.animate-delay-500 {
-  animation-delay: 500ms;
-}
-
-@keyframes staggerFade {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Success checkmark animation */
-.checkmark {
-  width: 24px;
-  height: 24px;
-  position: relative;
-  display: inline-block;
-  transform: rotate(45deg);
-}
-
-.checkmark-circle {
-  position: absolute;
-  width: 24px;
-  height: 24px;
-  background-color: #4ade80;
-  border-radius: 50%;
-  left: 0;
-  top: 0;
-}
-
-.checkmark-check {
-  position: absolute;
-  border-right: 2px solid white;
-  border-bottom: 2px solid white;
-  width: 10px;
-  height: 16px;
-  left: 8px;
-  top: 4px;
-  animation: checkmark 0.25s ease-in-out 0.25s forwards;
+.scale-in {
+  animation: scaleIn 0.3s ease-out forwards;
+  transform: scale(0.95);
   opacity: 0;
-  transform: scaleX(-1) rotate(90deg);
 }
 
-@keyframes checkmark {
-  0% {
-    opacity: 0;
-    transform: scaleX(-1) rotate(90deg);
-  }
-  100% {
-    opacity: 1;
-    transform: scaleX(1) rotate(0deg);
-  }
+.btn-hover-effect:hover {
+  transform: translateY(-1px);
+  transition: transform 0.2s ease;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
 }
 
-/* Pulse effect (for notifications or emphasis) */
-.pulse {
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(138, 26, 44, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(138, 26, 44, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(138, 26, 44, 0);
-  }
-}
-
-/* Shimmer loading animation for skeletons */
+/* Shimmer loading effect */
 .shimmer {
   position: relative;
   overflow: hidden;
@@ -190,26 +58,51 @@
   animation: shimmer 2s infinite;
 }
 
+/* Keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
-  }
-}
-
-/* Focus ring animation */
-.focus-ring:focus-visible {
-  @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-white;
-  animation: focusPulse 1s ease-out;
-}
-
-@keyframes focusPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(138, 26, 44, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 8px rgba(138, 26, 44, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(138, 26, 44, 0);
   }
 }
