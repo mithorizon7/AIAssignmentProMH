@@ -335,14 +335,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSubmissionStatus(id: number, status: string): Promise<Submission> {
-    const [submission] = await db.update(submissions)
-      .set({ 
-        status: status as any,
-        updatedAt: new Date()
-      })
-      .where(eq(submissions.id, id))
-      .returning();
-    return submission;
+    try {
+      const [submission] = await db.update(submissions)
+        .set({ 
+          status: status as any,
+          updatedAt: new Date()
+        })
+        .where(eq(submissions.id, id))
+        .returning();
+      return submission;
+    } catch (error) {
+      console.error("Error updating submission status:", error);
+      
+      // Fallback approach with raw SQL if there's a schema issue
+      try {
+        const sql = `
+          UPDATE submissions 
+          SET status = '${status}', updated_at = NOW() 
+          WHERE id = ${id}
+          RETURNING *;
+        `;
+        
+        const result = await db.execute(sql);
+        return result.rows[0] as Submission;
+      } catch (innerError) {
+        console.error("Fallback query for submission status update also failed:", innerError);
+        throw new Error(`Failed to update submission status: ${innerError.message}`);
+      }
+    }
   }
 
   async getLatestSubmission(userId: number, assignmentId: number): Promise<Submission | undefined> {
@@ -364,16 +384,15 @@ export class DatabaseStorage implements IStorage {
       try {
         const sql = `
           SELECT * FROM submissions 
-          WHERE user_id = ${userId} 
-          AND assignment_id = ${assignmentId}
+          WHERE user_id = ${userId} AND assignment_id = ${assignmentId}
           ORDER BY created_at DESC
           LIMIT 1;
         `;
         
         const result = await db.execute(sql);
-        return result.rows[0] as Submission | undefined;
+        return result.rows[0] as Submission;
       } catch (innerError) {
-        console.error("Fallback query also failed:", innerError);
+        console.error("Fallback query for latest submission also failed:", innerError);
         return undefined;
       }
     }
