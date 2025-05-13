@@ -139,7 +139,7 @@ Please evaluate this submission according to the above rubric criteria.
       <CardHeader className="pb-3">
         <CardTitle>Test Your Rubric</CardTitle>
         <CardDescription>
-          Test your rubric by submitting code and seeing how the AI evaluates it
+          Test your rubric by submitting a sample assignment and seeing how the AI evaluates it
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -207,7 +207,7 @@ Please evaluate this submission according to the above rubric criteria.
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="upload">Upload File</TabsTrigger>
-              <TabsTrigger value="paste">Paste Code</TabsTrigger>
+              <TabsTrigger value="paste">Paste Text</TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload" className="space-y-4">

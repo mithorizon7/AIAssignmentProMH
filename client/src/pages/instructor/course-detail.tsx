@@ -52,12 +52,12 @@ interface Course {
   assignments: Assignment[];
 }
 
-export default function CourseDetailPage() {
+export default function CourseDetailPage({ id }: { id: string }) {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<string>("all");
   
-  // Extract course ID from URL
-  const courseId = parseInt(window.location.pathname.split("/").pop() || "0");
+  // Get course ID from the route parameter
+  const courseId = parseInt(id);
   
   // Fetch course details
   const { data: course, isLoading } = useQuery<Course>({
