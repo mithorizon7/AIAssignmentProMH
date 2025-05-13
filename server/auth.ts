@@ -8,6 +8,20 @@ declare module 'express-session' {
     returnTo?: string;
   }
 }
+
+// Extend Express namespace to define User properties
+declare global {
+  namespace Express {
+    interface User {
+      id: number;
+      username: string;
+      email?: string;
+      role: string;
+      name?: string;
+      // Add other commonly used User properties here
+    }
+  }
+}
 import { Strategy as LocalStrategy } from 'passport-local';
 import { Strategy as Auth0Strategy } from 'passport-auth0';
 import { Strategy as OIDCStrategy } from 'passport-openidconnect';
