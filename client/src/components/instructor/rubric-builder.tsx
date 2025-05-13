@@ -54,7 +54,7 @@ export function RubricBuilder({ value, onChange }: RubricBuilderProps) {
     });
   };
   
-  const handleUpdatePassingThreshold = (threshold: number) => {
+  const handleUpdatePassingThreshold = (threshold: number | undefined) => {
     onChange({
       ...value,
       passingThreshold: threshold
@@ -113,20 +113,40 @@ export function RubricBuilder({ value, onChange }: RubricBuilderProps) {
               </div>
               
               <div className="flex items-center gap-4 p-3 border rounded-md">
-                <Label htmlFor="passingThreshold" className="whitespace-nowrap">
-                  Passing Threshold (%)
-                </Label>
-                <div className="flex-1">
-                  <Input
-                    id="passingThreshold"
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={value.passingThreshold || 60}
-                    onChange={(e) => handleUpdatePassingThreshold(parseInt(e.target.value))}
-                    className="w-20"
+                <div className="flex items-center gap-2">
+                  <input
+                    id="enablePassingThreshold"
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    checked={value.passingThreshold !== undefined}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        handleUpdatePassingThreshold(60); // Default value
+                      } else {
+                        handleUpdatePassingThreshold(undefined);
+                      }
+                    }}
                   />
+                  <Label htmlFor="enablePassingThreshold" className="whitespace-nowrap">
+                    Enable Passing Threshold
+                  </Label>
                 </div>
+                {value.passingThreshold !== undefined && (
+                  <div className="flex items-center gap-2 ml-2">
+                    <Label htmlFor="passingThreshold" className="whitespace-nowrap">
+                      Threshold (%)
+                    </Label>
+                    <Input
+                      id="passingThreshold"
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={value.passingThreshold}
+                      onChange={(e) => handleUpdatePassingThreshold(parseInt(e.target.value))}
+                      className="w-20"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           ) : (

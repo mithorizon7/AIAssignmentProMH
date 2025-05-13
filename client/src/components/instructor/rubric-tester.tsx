@@ -137,7 +137,7 @@ Please evaluate this submission according to the above rubric criteria.
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle>Test Rubric</CardTitle>
+        <CardTitle>Test Your Rubric</CardTitle>
         <CardDescription>
           Test your rubric by submitting code and seeing how the AI evaluates it
         </CardDescription>

@@ -596,7 +596,7 @@ export default function CreateAssignment() {
                           <li>Higher weight criteria have more impact on final score</li>
                           <li>Include criteria for both technical correctness and code quality</li>
                           <li>The AI uses these criteria to structure its feedback</li>
-                          <li>Use the "Test Rubric" feature below to see how the AI will apply your rubric</li>
+                          <li>Use the "Test Your Rubric" feature below to see how the AI will apply your rubric</li>
                         </ul>
                       </>
                     } />
