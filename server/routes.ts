@@ -312,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Lookup assignment by shareable code (no auth required) - with rate limiting
+  // Lookup assignment by shareable code - with rate limiting
   app.get('/api/assignments/code/:code', defaultRateLimiter, async (req: Request, res: Response) => {
     try {
       const code = req.params.code;
@@ -336,15 +336,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Course not found for this assignment' });
       }
       
-      // Return limited information about the assignment (for public access)
+      // Check if user is authenticated
+      const isAuthenticated = req.isAuthenticated();
+      
+      // Return assignment with an authentication status flag
       res.json({
         id: assignment.id,
         title: assignment.title,
         description: assignment.description,
+        courseId: assignment.courseId,
         courseCode: course.code,
         courseName: course.name,
         dueDate: assignment.dueDate,
-        shareableCode: assignment.shareableCode
+        shareableCode: assignment.shareableCode,
+        requiresAuth: true, // Flag indicating authentication is required
+        isAuthenticated: isAuthenticated // Flag indicating if user is already authenticated
       });
     } catch (error) {
       console.error('Error looking up assignment by code:', error);
