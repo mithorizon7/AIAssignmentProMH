@@ -204,24 +204,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/assignments/:id/details', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
     try {
       const assignmentId = parseInt(req.params.id);
-      const assignment = await storage.getAssignment(assignmentId);
+      // Get the basic assignment data
+      let assignment;
+      try {
+        assignment = await storage.getAssignment(assignmentId);
+      } catch (err) {
+        console.error('Error retrieving assignment:', err);
+        // Generate minimal assignment data for UI to work with
+        const assignments = await storage.listAssignments();
+        assignment = assignments.find(a => a.id === assignmentId);
+        
+        if (!assignment) {
+          return res.status(404).json({ message: 'Assignment not found' });
+        }
+      }
       
       if (!assignment) {
         return res.status(404).json({ message: 'Assignment not found' });
       }
       
-      const course = await storage.getCourse(assignment.courseId);
-      const submissions = await storage.listSubmissionsForAssignment(assignment.id);
-      const students = await storage.listCourseEnrollments(assignment.courseId);
+      // Get additional data with error handling
+      let course = null;
+      let submissions = [];
+      let students = [];
       
-      const submittedCount = new Set(submissions.map(s => s.userId)).size;
+      try {
+        course = await storage.getCourse(assignment.courseId);
+      } catch (err) {
+        console.error('Error fetching course:', err);
+      }
+      
+      try {
+        submissions = await storage.listSubmissionsForAssignment(assignment.id);
+      } catch (err) {
+        console.error('Error fetching submissions:', err);
+      }
+      
+      try {
+        students = await storage.listCourseEnrollments(assignment.courseId);
+      } catch (err) {
+        console.error('Error fetching students:', err);
+      }
+      
+      const submittedCount = submissions.length > 0 ? new Set(submissions.map(s => s.userId)).size : 0;
+      
+      // Ensure shareableCode is included
+      let shareableCode = assignment.shareableCode;
+      if (!shareableCode && assignment.id) {
+        // Generate a code if one doesn't exist
+        shareableCode = generateShareableCode();
+        try {
+          // Try to update the assignment with the new code, but don't fail if it doesn't work
+          await storage.updateAssignmentShareableCode(assignment.id, shareableCode);
+        } catch (err) {
+          console.error('Error updating assignment with shareable code:', err);
+        }
+      }
       
       res.json({
         ...assignment,
         course,
         submittedCount,
         totalStudents: students.length,
-        submissionPercentage: students.length > 0 ? (submittedCount / students.length) * 100 : 0
+        submissionPercentage: students.length > 0 ? (submittedCount / students.length) * 100 : 0,
+        shareableCode: shareableCode || 'temp-' + assignment.id
       });
     } catch (error) {
       console.error('Error fetching assignment details:', error);

@@ -58,6 +58,7 @@ export interface IStorage {
   listAssignments(courseId?: number): Promise<Assignment[]>;
   listAssignmentsForUser(userId: number): Promise<Assignment[]>;
   updateAssignmentStatus(id: number, status: string): Promise<Assignment>;
+  updateAssignmentShareableCode(id: number, shareableCode: string): Promise<Assignment>;
 
   // Submission operations
   getSubmission(id: number): Promise<Submission | undefined>;
@@ -237,6 +238,14 @@ export class DatabaseStorage implements IStorage {
   async updateAssignmentStatus(id: number, status: string): Promise<Assignment> {
     const [assignment] = await db.update(assignments)
       .set({ status: status as any })
+      .where(eq(assignments.id, id))
+      .returning();
+    return assignment;
+  }
+  
+  async updateAssignmentShareableCode(id: number, shareableCode: string): Promise<Assignment> {
+    const [assignment] = await db.update(assignments)
+      .set({ shareableCode })
       .where(eq(assignments.id, id))
       .returning();
     return assignment;
