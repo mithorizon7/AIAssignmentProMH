@@ -75,7 +75,7 @@ export function MITNavbar() {
             <div className="flex-shrink-0">
               <Link href={getRootPath()}>
                 <span className="font-bold text-2xl cursor-pointer tracking-tight flex items-center">
-                  <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-8 mr-2" />
+                  <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-12 mr-3" />
                   <span className="text-gray-900">Academus</span>
                 </span>
               </Link>

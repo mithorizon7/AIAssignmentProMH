@@ -131,7 +131,7 @@ export function MITFooter() {
         <div className="mt-12 pt-8 border-t border-mit-silver-gray/20">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center mb-4 md:mb-0">
-              <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-8 mr-2" />
+              <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-10 mr-3" />
               <span className="text-black font-bold text-xl">
                 Academus
               </span>
