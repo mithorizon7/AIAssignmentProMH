@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { FeedbackCard } from '../../client/src/components/ui/feedback-card';
 import { Feedback } from '../../client/src/lib/types';
+import React from 'react';
 
 // Mock formatProcessingTime from utils
 vi.mock('../../client/src/lib/utils/format', () => ({

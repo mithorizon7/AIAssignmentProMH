@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { RubricBuilder } from '../../client/src/components/instructor/rubric-builder';
-import { Rubric } from '@shared/schema';
+import { Rubric } from '../../shared/schema';
+import React from 'react';
 
 // Mock Lucide icons
 vi.mock('lucide-react', () => ({
