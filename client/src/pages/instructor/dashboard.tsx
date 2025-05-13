@@ -207,7 +207,10 @@ export default function InstructorDashboard() {
       <div className="space-y-8 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Instructor Dashboard</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+              <span className="text-[#8a1a2c]">Instructor</span>{" "}
+              <span className="text-black">Dashboard</span>
+            </h1>
             <p className="text-muted-foreground mt-1">
               Monitor student progress across large classes
             </p>

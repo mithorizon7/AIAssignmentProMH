@@ -130,7 +130,10 @@ export default function AnalyticsPage() {
     <InstructorShell>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            <span className="text-[#8a1a2c]">Performance</span>{" "}
+            <span className="text-black">Analytics</span>
+          </h1>
           <p className="text-muted-foreground">
             Analyze student performance and submission patterns
           </p>

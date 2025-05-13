@@ -131,12 +131,13 @@ export function MITFooter() {
         <div className="mt-12 pt-8 border-t border-mit-silver-gray/20">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center mb-4 md:mb-0">
-              <span className="text-mit-red font-bold text-xl">
-                AI Feedback <span className="text-black">Platform</span>
+              <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-8 mr-2" />
+              <span className="text-black font-bold text-xl">
+                Academus
               </span>
             </div>
             <p className="text-sm text-gray-600">
-              &copy; {new Date().getFullYear()} AI Feedback Platform. All rights reserved.
+              &copy; {new Date().getFullYear()} Academus. All rights reserved.
             </p>
           </div>
         </div>

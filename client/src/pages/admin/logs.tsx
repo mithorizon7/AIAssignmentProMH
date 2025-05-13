@@ -336,7 +336,10 @@ export default function LogsPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Logs & Monitoring</h2>
+            <h2 className="text-3xl font-bold tracking-tight">
+            <span className="text-[#8a1a2c]">System</span>{" "}
+            <span className="text-black">Monitoring</span>
+          </h2>
             <p className="text-muted-foreground">
               View system logs, audit trail, and performance metrics
             </p>

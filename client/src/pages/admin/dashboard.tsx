@@ -126,7 +126,10 @@ export default function AdminDashboard() {
     <AdminShell>
       <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Admin Dashboard</h2>
+          <h2 className="text-3xl font-bold tracking-tight">
+            <span className="text-[#8a1a2c]">Admin</span>{" "}
+            <span className="text-black">Dashboard</span>
+          </h2>
           <p className="text-muted-foreground">
             Monitor system health, user activities, and configuration
           </p>
