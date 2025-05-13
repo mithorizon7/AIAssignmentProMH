@@ -620,6 +620,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get course by ID with its assignments
+  app.get('/api/courses/:id', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const courseId = parseInt(req.params.id);
+      
+      if (isNaN(courseId)) {
+        return res.status(400).json({ message: 'Invalid course ID' });
+      }
+      
+      // Get the course
+      const course = await storage.getCourse(courseId);
+      
+      if (!course) {
+        return res.status(404).json({ message: 'Course not found' });
+      }
+      
+      // Get assignments for this course
+      const assignments = await storage.listAssignments(courseId);
+      
+      // Return course with assignments
+      res.json({
+        ...course,
+        assignments
+      });
+    } catch (error) {
+      console.error('Error fetching course details:', error);
+      res.status(500).json({ message: 'Failed to fetch course details' });
+    }
+  });
+  
   // Create course (instructor only)
   app.post('/api/courses', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
     try {
