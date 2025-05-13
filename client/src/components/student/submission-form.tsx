@@ -11,7 +11,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { FileUpload } from "@/components/ui/file-upload";
-import { CodeEditor } from "@/components/ui/code-editor";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { Assignment, Submission } from "@/lib/types";
 import { formatDate, formatTimeRemaining } from "@/lib/utils/format";
@@ -28,7 +27,7 @@ interface SubmissionFormProps {
 }
 
 export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionFormProps) {
-  const [submissionType, setSubmissionType] = useState<'file' | 'code'>('file');
+  const [submissionType, setSubmissionType] = useState<'file' | 'text'>('file');
   const [file, setFile] = useState<File | null>(null);
   const [code, setCode] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -45,7 +44,7 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
       
       if (submissionType === 'file' && file) {
         formData.append('file', file);
-      } else if (submissionType === 'code') {
+      } else if (submissionType === 'text') {
         formData.append('code', code);
       }
       
@@ -182,7 +181,7 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
       return;
     }
     
-    if (submissionType === 'code' && !code.trim()) {
+    if (submissionType === 'text' && !code.trim()) {
       toast({
         variant: 'destructive',
         title: 'Content Required',
@@ -192,7 +191,7 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
             variant="outline" 
             size="sm" 
             onClick={() => {
-              const element = document.querySelector('[data-value="code"]') as HTMLElement;
+              const element = document.querySelector('[data-value="text"]') as HTMLElement;
               if (element) element.click();
             }}
           >
@@ -259,10 +258,10 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
             You can upload a file or enter your submission directly. You'll receive AI feedback within 60 seconds after submission.
           </p>
           
-          <Tabs defaultValue="file" onValueChange={(value) => setSubmissionType(value as 'file' | 'code')}>
+          <Tabs defaultValue="file" onValueChange={(value) => setSubmissionType(value as 'file' | 'text')}>
             <TabsList className="mb-6 border-b border-neutral-200">
               <TabsTrigger value="file">Upload File</TabsTrigger>
-              <TabsTrigger value="code">Enter Content</TabsTrigger>
+              <TabsTrigger value="text">Enter Content</TabsTrigger>
             </TabsList>
             
             <TabsContent value="file" className="file-upload-area">
@@ -311,12 +310,12 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
               </div>
             </TabsContent>
             
-            <TabsContent value="code">
-              <CodeEditor 
+            <TabsContent value="text">
+              <RichTextEditor 
                 value={code} 
                 onChange={setCode} 
-                placeholder="Enter your assignment content here..." 
-                height="250px"
+                placeholder="Enter your assignment content here..."
+                className="min-h-[250px]"
               />
             </TabsContent>
           </Tabs>

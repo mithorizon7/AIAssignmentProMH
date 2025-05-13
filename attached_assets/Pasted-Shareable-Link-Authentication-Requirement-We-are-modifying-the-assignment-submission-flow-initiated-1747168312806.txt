@@ -1,0 +1,56 @@
+Shareable Link Authentication Requirement
+
+We are modifying the assignment submission flow initiated by a shareable link. Instead of allowing anonymous submissions, students clicking a shareable link will now be required to log in or sign up. Once authenticated, they should be automatically enrolled in the relevant course (if not already) and then taken directly to the assignment submission page. This ensures all submissions are tied to registered users and simplifies data management.
+
+Directions for AI Coder:
+
+Modify /api/assignments/code/:code Endpoint (Server-Side - AIGrader/server/routes.ts):
+
+This endpoint currently fetches and returns limited public assignment details.
+Change: It should still fetch assignment details by code but primarily serve to identify the target assignment before redirecting to a login/signup flow if the user is not authenticated.
+On the client-side, if a user is not authenticated when trying to access a /submit/:code page, they should be redirected to the login page, perhaps with a query parameter indicating the original shareableCode or assignmentId they were trying to access (e.g., /login?returnTo=/submit/YOUR_CODE or /login?assignmentCode=YOUR_CODE).
+Update Client-Side Routing/Page Logic for /submit/:code:
+
+The page component that handles the /submit/:code route needs to:
+Check if the user is authenticated.
+If not authenticated, redirect to the login/signup page. The shareableCode (or the fetched assignmentId) should be passed along (e.g., via query params or route state) so that after successful login/signup, the user can be redirected back to the correct assignment submission page.
+If authenticated, proceed to load the assignment details and submission form as usual (but now using the authenticated user's context).
+Remove/Deprecate /api/anonymous-submissions Endpoint (Server-Side - AIGrader/server/routes.ts):
+
+This endpoint will no longer be used as all submissions will come from authenticated users.
+All submissions should now go through the existing authenticated endpoint, likely POST /api/submissions.
+Modify Authenticated Submission Endpoint (POST /api/submissions in AIGrader/server/routes.ts):
+
+This endpoint already assumes an authenticated user (req.user).
+Add Logic for Auto-Enrollment (if necessary):
+When a newly signed-up (or newly logged-in) user accesses an assignment via a shareable link and then submits, we need to ensure they are enrolled in the course associated with that assignment.
+After successful login/signup and redirection to the assignment, when they submit to POST /api/submissions:
+Retrieve the assignmentId.
+Get the courseId from the assignment.
+Check if the authenticated userId is already enrolled in that courseId using storage.getEnrollment(userId, courseId).
+If not enrolled, call storage.createEnrollment({ userId, courseId }). This is crucial for linking the user to the course and ensuring the assignment appears on their dashboard later.
+The logic for creating a temporary user from the old anonymous flow can be removed. User creation will now be handled by the standard registration/SSO processes.
+Post-Authentication Redirect Logic (Client-Side & Server-Side AIGrader/server/auth.ts):
+
+When a user logs in or signs up (especially if they were redirected from attempting to access a shareable link), the system needs to redirect them back to the intended assignment submission page.
+Client-Side: Store the target URL (e.g., /submit/YOUR_CODE) before redirecting to login. After successful login, use this stored URL to redirect the user.
+Server-Side (Auth Callbacks): The successRedirect in Passport authentication strategies (e.g., in /api/auth-sso/callback or /api/auth/horizon/callback in AIGrader/server/auth.ts) might need to be more dynamic to handle a returnTo parameter passed from the client's login initiation. Instead of always redirecting to /dashboard, it should redirect to the returnTo URL if present and valid, otherwise default to /dashboard.
+Update User Interface (Client-Side):
+
+The page accessed via /submit/:code should no longer ask for name/email if the new flow requires login first. It should directly present the assignment details and submission interface to an authenticated user. If the user lands here unauthenticated, they are redirected to login.
+Key Files to Modify:
+
+Server-Side:
+
+AIGrader/server/routes.ts:
+Modify GET /api/assignments/code/:code.
+Remove or heavily refactor/deprecate POST /api/anonymous-submissions.
+Ensure POST /api/submissions includes or is preceded by an enrollment check/creation step for the authenticated user for the specific assignment's course.
+AIGrader/server/auth.ts: Adjust successRedirect logic in authentication callbacks to handle returnTo parameters for a seamless experience after login/signup.
+AIGrader/server/storage.ts: Ensure createEnrollment and getEnrollment are robust.
+Client-Side (Conceptual - files depend on your exact structure):
+
+Component handling /submit/:code (e.g., SubmitByCodePage.tsx).
+Login/Signup page components to handle returnTo logic.
+Relevant service/API call functions for fetching assignment by code and submitting assignments.
+This change will centralize user data capture through the standard authentication system, ensuring all interactions are associated with registered users.
