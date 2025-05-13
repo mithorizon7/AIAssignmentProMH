@@ -55,11 +55,34 @@ export default function InstructorDashboard() {
     },
   });
 
-  // Fetch assignments for selected course
-  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
-    queryKey: [`${API_ROUTES.COURSES}/${selectedCourse}/assignments`],
+  // Define types for assignments and course details
+  interface Assignment {
+    id: number;
+    title: string;
+    description: string;
+    courseId: number;
+    dueDate: string;
+    status: string;
+    shareableCode: string;
+    rubric: string | null;
+  }
+  
+  interface CourseDetails {
+    id: number;
+    name: string;
+    code: string;
+    description: string | null;
+    assignments: Assignment[];
+  }
+
+  // Fetch course details with assignments
+  const { data: courseDetails, isLoading: assignmentsLoading } = useQuery<CourseDetails>({
+    queryKey: [`${API_ROUTES.COURSES}/${selectedCourse}`],
     enabled: !!selectedCourse,
   });
+
+  // Extract assignments from course details
+  const assignments = courseDetails?.assignments || [];
   
   // Fetch dashboard stats for the selected course/assignment
   interface Stats {
