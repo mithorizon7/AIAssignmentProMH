@@ -458,8 +458,89 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFeedback(insertFeedback: InsertFeedback): Promise<Feedback> {
-    const result = await db.insert(feedback).values(insertFeedback).returning();
-    return result[0];
+    try {
+      // Helper function to ensure arrays are properly formatted
+      const ensureArray = (input: any): string[] => {
+        if (Array.isArray(input)) {
+          return input;
+        } else if (input && typeof input === 'object' && 'length' in input) {
+          // Convert array-like objects to actual arrays
+          return Array.from(input as any);
+        } else if (typeof input === 'string') {
+          try {
+            const parsed = JSON.parse(input);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [input];
+          }
+        }
+        return [];
+      };
+      
+      // Create a properly formatted feedback object with validated arrays
+      const validatedFeedback = {
+        ...insertFeedback,
+        strengths: ensureArray(insertFeedback.strengths),
+        improvements: ensureArray(insertFeedback.improvements),
+        suggestions: ensureArray(insertFeedback.suggestions),
+      };
+      
+      console.log('[INFO] Creating feedback with validated data structure');
+      const result = await db.insert(feedback).values(validatedFeedback).returning();
+      return result[0];
+    } catch (error: any) {
+      console.error('[ERROR] Error creating feedback:', error);
+      
+      // Try a fallback approach with direct SQL if needed
+      try {
+        console.log('[INFO] Attempting fallback SQL for feedback creation');
+        
+        // Convert arrays to JSON strings for SQL insertion
+        const strengths = JSON.stringify(
+          Array.isArray(insertFeedback.strengths) ? insertFeedback.strengths : []
+        );
+        const improvements = JSON.stringify(
+          Array.isArray(insertFeedback.improvements) ? insertFeedback.improvements : []
+        );
+        const suggestions = JSON.stringify(
+          Array.isArray(insertFeedback.suggestions) ? insertFeedback.suggestions : []
+        );
+        
+        const sql = `
+          INSERT INTO feedback (
+            submission_id, strengths, improvements, suggestions, 
+            overall_feedback, score, criteria_scores, criteria_feedback,
+            feedback_type, token_count, model_name, created_at, updated_at
+          )
+          VALUES (
+            ${insertFeedback.submissionId},
+            '${strengths.replace(/'/g, "''")}',
+            '${improvements.replace(/'/g, "''")}',
+            '${suggestions.replace(/'/g, "''")}',
+            ${insertFeedback.overallFeedback ? `'${insertFeedback.overallFeedback.replace(/'/g, "''")}'` : 'NULL'},
+            ${insertFeedback.score || 'NULL'},
+            ${insertFeedback.criteriaScores ? `'${JSON.stringify(insertFeedback.criteriaScores).replace(/'/g, "''")}'` : 'NULL'},
+            ${insertFeedback.criteriaFeedback ? `'${JSON.stringify(insertFeedback.criteriaFeedback).replace(/'/g, "''")}'` : 'NULL'},
+            ${insertFeedback.feedbackType ? `'${insertFeedback.feedbackType}'` : 'NULL'},
+            ${insertFeedback.tokenCount || 'NULL'},
+            ${insertFeedback.modelName ? `'${insertFeedback.modelName}'` : 'NULL'},
+            NOW(),
+            NOW()
+          )
+          RETURNING *;
+        `;
+        
+        const result = await db.execute(sql);
+        if (result.rows.length === 0) {
+          throw new Error('Failed to create feedback with fallback SQL');
+        }
+        
+        return result.rows[0] as Feedback;
+      } catch (fallbackError: any) {
+        console.error('[ERROR] Fallback feedback creation also failed:', fallbackError);
+        throw new Error(`Failed to create feedback: ${error.message}`);
+      }
+    }
   }
 
   // System Settings operations
@@ -522,43 +603,147 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertFileTypeSetting(setting: InsertFileTypeSetting): Promise<FileTypeSetting> {
-    // Try to find existing setting
-    const filters = [];
-    filters.push(eq(fileTypeSettings.contentType, setting.contentType));
-    filters.push(eq(fileTypeSettings.context, setting.context));
-    
-    if (setting.contextId) {
-      filters.push(eq(fileTypeSettings.contextId, setting.contextId));
-    } else {
-      filters.push(sql`${fileTypeSettings.contextId} IS NULL`);
-    }
-    
-    const result = await db.select()
-      .from(fileTypeSettings)
-      .where(and(...filters));
-    
-    const existingSetting = result[0];
-    
-    if (existingSetting) {
-      // Update existing setting
-      const updateResult = await db.update(fileTypeSettings)
-        .set({
-          enabled: setting.enabled,
-          extensions: setting.extensions,
-          mimeTypes: setting.mimeTypes,
-          maxSize: setting.maxSize,
-          updatedAt: new Date(),
-          updatedBy: setting.updatedBy
-        })
-        .where(eq(fileTypeSettings.id, existingSetting.id))
-        .returning();
-      return updateResult[0];
-    } else {
-      // Insert new setting
-      const insertResult = await db.insert(fileTypeSettings)
-        .values(setting)
-        .returning();
-      return insertResult[0];
+    try {
+      // Helper function to ensure arrays are properly formatted
+      const ensureArray = (input: any): string[] => {
+        if (Array.isArray(input)) {
+          return input;
+        } else if (input && typeof input === 'object' && 'length' in input) {
+          // Convert array-like objects to actual arrays
+          return Array.from(input as any);
+        } else if (typeof input === 'string') {
+          try {
+            const parsed = JSON.parse(input);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [input];
+          }
+        }
+        return [];
+      };
+      
+      // Try to find existing setting with proper filtering
+      const filters = [];
+      filters.push(eq(fileTypeSettings.contentType, setting.contentType));
+      filters.push(eq(fileTypeSettings.context, setting.context));
+      
+      if (setting.contextId) {
+        filters.push(eq(fileTypeSettings.contextId, setting.contextId));
+      } else {
+        filters.push(sql`${fileTypeSettings.contextId} IS NULL`);
+      }
+      
+      const result = await db.select()
+        .from(fileTypeSettings)
+        .where(and(...filters));
+      
+      const existingSetting = result[0];
+      
+      // Ensure arrays are properly formatted
+      const validatedSetting = {
+        ...setting,
+        extensions: ensureArray(setting.extensions),
+        mimeTypes: ensureArray(setting.mimeTypes),
+      };
+      
+      if (existingSetting) {
+        // Update existing setting
+        console.log('[INFO] Updating existing file type setting');
+        const updateResult = await db.update(fileTypeSettings)
+          .set({
+            enabled: validatedSetting.enabled,
+            extensions: validatedSetting.extensions,
+            mimeTypes: validatedSetting.mimeTypes,
+            maxSize: validatedSetting.maxSize,
+            updatedAt: new Date(),
+            updatedBy: validatedSetting.updatedBy
+          })
+          .where(eq(fileTypeSettings.id, existingSetting.id))
+          .returning();
+        return updateResult[0];
+      } else {
+        // Insert new setting
+        console.log('[INFO] Creating new file type setting');
+        const insertResult = await db.insert(fileTypeSettings)
+          .values([validatedSetting])
+          .returning();
+        return insertResult[0];
+      }
+    } catch (error: any) {
+      console.error('[ERROR] Error upserting file type setting:', error);
+      
+      // Fallback approach with raw SQL if needed
+      try {
+        console.log('[INFO] Attempting fallback SQL for file type setting upsert');
+        
+        // First check if the setting exists
+        const checkSql = `
+          SELECT id FROM file_type_settings 
+          WHERE content_type = '${setting.contentType}' 
+          AND context = '${setting.context}'
+          ${setting.contextId ? `AND context_id = ${setting.contextId}` : 'AND context_id IS NULL'};
+        `;
+        
+        const checkResult = await db.execute(checkSql);
+        const existingId = checkResult.rows[0]?.id;
+        
+        const extensions = JSON.stringify(
+          Array.isArray(setting.extensions) ? setting.extensions : []
+        );
+        
+        const mimeTypes = JSON.stringify(
+          Array.isArray(setting.mimeTypes) ? setting.mimeTypes : []
+        );
+        
+        let sql;
+        if (existingId) {
+          // Update
+          sql = `
+            UPDATE file_type_settings
+            SET 
+              enabled = ${setting.enabled || false},
+              extensions = '${extensions.replace(/'/g, "''")}',
+              mime_types = '${mimeTypes.replace(/'/g, "''")}',
+              max_size = ${setting.maxSize || 'NULL'},
+              updated_at = NOW(),
+              updated_by = ${setting.updatedBy || 'NULL'}
+            WHERE id = ${existingId}
+            RETURNING *;
+          `;
+        } else {
+          // Insert
+          sql = `
+            INSERT INTO file_type_settings (
+              content_type, context, context_id, enabled, extensions,
+              mime_types, max_size, created_at, updated_at, created_by, updated_by
+            )
+            VALUES (
+              '${setting.contentType}',
+              '${setting.context}',
+              ${setting.contextId || 'NULL'},
+              ${setting.enabled || false},
+              '${extensions.replace(/'/g, "''")}',
+              '${mimeTypes.replace(/'/g, "''")}',
+              ${setting.maxSize || 'NULL'},
+              NOW(),
+              NOW(),
+              ${setting.createdBy || 'NULL'},
+              ${setting.updatedBy || 'NULL'}
+            )
+            RETURNING *;
+          `;
+        }
+        
+        const result = await db.execute(sql);
+        if (result.rows.length === 0) {
+          throw new Error('Failed to upsert file type setting with fallback SQL');
+        }
+        
+        return result.rows[0] as FileTypeSetting;
+      } catch (fallbackError: any) {
+        console.error('[ERROR] Fallback file type setting upsert also failed:', fallbackError);
+        throw new Error(`Failed to upsert file type setting: ${error.message}`);
+      }
     }
   }
 
