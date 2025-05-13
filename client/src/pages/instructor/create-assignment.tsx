@@ -26,6 +26,7 @@ import { RubricTester } from "@/components/instructor/rubric-tester";
 import { ShareableLink } from "@/components/instructor/shareable-link";
 import { TooltipInfo } from "@/components/ui/tooltip-info";
 import { RichTextEditor } from "@/components/rich-text-editor";
+import { QuillContent } from "@/components/quill-content";
 
 // Create a schema for assignment creation
 const assignmentSchema = z.object({
@@ -58,7 +59,7 @@ export default function CreateAssignment() {
   });
   
   // Fetch courses for the dropdown
-  const { data: courses = [] } = useQuery({
+  const { data: courses = [] } = useQuery<any[]>({
     queryKey: [API_ROUTES.COURSES],
   });
   
@@ -142,9 +143,9 @@ export default function CreateAssignment() {
                 </div>
                 <div>
                   <h3 className="font-medium">Description</h3>
-                  <div 
-                    className="text-sm text-neutral-600 prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ __html: createdAssignment.description }}
+                  <QuillContent 
+                    content={createdAssignment.description}
+                    className="text-sm text-neutral-600"
                   />
                 </div>
                 <div className="flex flex-wrap gap-4">
@@ -161,9 +162,9 @@ export default function CreateAssignment() {
                 {createdAssignment.instructorContext && (
                   <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
                     <h3 className="font-medium text-amber-800">Instructor-Only Context (Hidden from Students)</h3>
-                    <div 
-                      className="text-sm text-amber-700 prose prose-sm max-w-none prose-amber"
-                      dangerouslySetInnerHTML={{ __html: createdAssignment.instructorContext }}
+                    <QuillContent 
+                      content={createdAssignment.instructorContext}
+                      className="text-sm text-amber-700"
                     />
                   </div>
                 )}
