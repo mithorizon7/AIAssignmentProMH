@@ -190,7 +190,8 @@ export function configureAuth(app: any) {
       '/api/auth/logout', 
       '/api/csrf-token',
       '/api/auth-sso/callback', // Skip for Auth0 callback
-      '/api/auth/horizon/callback' // Skip for MIT Horizon OIDC callback
+      '/api/auth/horizon/callback', // Skip for MIT Horizon OIDC callback
+      '/api/test-rubric' // Skip for rubric testing to help instructors test their rubrics
     ];
     if (skipCsrfForRoutes.includes(req.path)) {
       return next();
@@ -243,12 +244,12 @@ export function configureAuth(app: any) {
       // Generate a new token
       const csrfToken = csrfProtection.generateCsrfToken(req, res);
       return res.json({ csrfToken });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating CSRF token:', error);
       return res.status(500).json({ 
         error: { 
           message: 'Failed to generate CSRF token',
-          details: process.env.NODE_ENV !== 'production' ? error.message : undefined
+          details: process.env.NODE_ENV !== 'production' && error.message ? error.message : undefined
         } 
       });
     }

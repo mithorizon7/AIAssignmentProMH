@@ -34,7 +34,10 @@ import { QuillContent } from "@/components/quill-content";
 const assignmentSchema = z.object({
   title: z.string().min(3, { message: "Title must be at least 3 characters" }),
   description: z.string().min(10, { message: "Description must be at least 10 characters" }),
-  courseId: z.string().optional().transform(val => val ? parseInt(val) : undefined),
+  courseId: z.union([
+    z.string().transform(val => val ? parseInt(val) : undefined), 
+    z.number()
+  ]).optional(),
   dueDate: z.date({ required_error: "Please select a due date" }),
   instructorContext: z.string().optional(),
 });
