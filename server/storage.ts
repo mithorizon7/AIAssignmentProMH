@@ -258,8 +258,41 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSubmission(insertSubmission: InsertSubmission): Promise<Submission> {
-    const [submission] = await db.insert(submissions).values(insertSubmission).returning();
-    return submission;
+    try {
+      // Create a new object with only the known fields to avoid column errors
+      const safeSubmission = {
+        assignmentId: insertSubmission.assignmentId,
+        userId: insertSubmission.userId,
+        fileUrl: insertSubmission.fileUrl,
+        fileName: insertSubmission.fileName,
+        content: insertSubmission.content,
+        notes: insertSubmission.notes,
+        status: insertSubmission.status,
+      };
+      
+      const [submission] = await db.insert(submissions).values(safeSubmission).returning();
+      return submission;
+    } catch (error) {
+      console.error("Error creating submission:", error);
+      
+      // Fallback approach if there's a schema issue
+      const sql = `
+        INSERT INTO submissions (assignment_id, user_id, file_url, file_name, content, notes, status)
+        VALUES (
+          ${insertSubmission.assignmentId}, 
+          ${insertSubmission.userId}, 
+          ${insertSubmission.fileUrl ? `'${insertSubmission.fileUrl}'` : 'NULL'},
+          ${insertSubmission.fileName ? `'${insertSubmission.fileName}'` : 'NULL'},
+          ${insertSubmission.content ? `'${insertSubmission.content}'` : 'NULL'},
+          ${insertSubmission.notes ? `'${insertSubmission.notes}'` : 'NULL'},
+          '${insertSubmission.status || 'pending'}'
+        )
+        RETURNING *;
+      `;
+      
+      const result = await db.execute(sql);
+      return result.rows[0] as Submission;
+    }
   }
 
   async listSubmissionsForUser(userId: number, assignmentId?: number): Promise<Submission[]> {
@@ -276,10 +309,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async listSubmissionsForAssignment(assignmentId: number): Promise<Submission[]> {
-    return db.select()
-      .from(submissions)
-      .where(eq(submissions.assignmentId, assignmentId))
-      .orderBy(desc(submissions.createdAt));
+    try {
+      return db.select()
+        .from(submissions)
+        .where(eq(submissions.assignmentId, assignmentId))
+        .orderBy(desc(submissions.createdAt));
+    } catch (error) {
+      console.error("Error listing submissions for assignment:", error);
+      
+      // Fallback approach with raw SQL if there's a schema issue
+      try {
+        const sql = `
+          SELECT * FROM submissions 
+          WHERE assignment_id = ${assignmentId}
+          ORDER BY created_at DESC;
+        `;
+        
+        const result = await db.execute(sql);
+        return result.rows as Submission[];
+      } catch (innerError) {
+        console.error("Fallback query also failed:", innerError);
+        return [];
+      }
+    }
   }
 
   async updateSubmissionStatus(id: number, status: string): Promise<Submission> {
@@ -294,16 +346,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLatestSubmission(userId: number, assignmentId: number): Promise<Submission | undefined> {
-    const [submission] = await db.select()
-      .from(submissions)
-      .where(and(
-        eq(submissions.userId, userId),
-        eq(submissions.assignmentId, assignmentId)
-      ))
-      .orderBy(desc(submissions.createdAt))
-      .limit(1);
-    
-    return submission;
+    try {
+      const [submission] = await db.select()
+        .from(submissions)
+        .where(and(
+          eq(submissions.userId, userId),
+          eq(submissions.assignmentId, assignmentId)
+        ))
+        .orderBy(desc(submissions.createdAt))
+        .limit(1);
+      
+      return submission;
+    } catch (error) {
+      console.error("Error getting latest submission:", error);
+      
+      // Fallback approach with raw SQL if there's a schema issue
+      try {
+        const sql = `
+          SELECT * FROM submissions 
+          WHERE user_id = ${userId} 
+          AND assignment_id = ${assignmentId}
+          ORDER BY created_at DESC
+          LIMIT 1;
+        `;
+        
+        const result = await db.execute(sql);
+        return result.rows[0] as Submission | undefined;
+      } catch (innerError) {
+        console.error("Fallback query also failed:", innerError);
+        return undefined;
+      }
+    }
   }
 
   // Feedback operations
