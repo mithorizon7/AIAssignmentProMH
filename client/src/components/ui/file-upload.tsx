@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Upload, X, File } from "lucide-react";
 
 export interface FileUploadProps {
   onValueChange: (files: File[]) => void;
@@ -103,21 +104,7 @@ export function FileUpload({
 
         <div className="flex flex-col items-center gap-3">
           <div className="p-2 rounded-full bg-secondary/50">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-muted-foreground"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
+            <Upload className="h-6 w-6 text-muted-foreground" />
           </div>
           <div className="space-y-1">
             <p className="text-sm font-medium">
