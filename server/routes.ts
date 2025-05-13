@@ -228,6 +228,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to fetch assignment details' });
     }
   });
+  
+  // Update assignment status (instructor only)
+  app.patch('/api/assignments/:id/status', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
+    try {
+      const assignmentId = parseInt(req.params.id);
+      
+      if (isNaN(assignmentId)) {
+        return res.status(400).json({ message: 'Invalid assignment ID' });
+      }
+      
+      // Validate request
+      const statusSchema = z.object({
+        status: z.enum(['active', 'upcoming', 'completed'])
+      });
+      
+      const result = statusSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: 'Invalid status value', errors: result.error });
+      }
+      
+      const { status } = result.data;
+      
+      // Check if assignment exists
+      const assignment = await storage.getAssignment(assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ message: 'Assignment not found' });
+      }
+      
+      // Update assignment status
+      const updatedAssignment = await storage.updateAssignmentStatus(assignmentId, status);
+      
+      res.json(updatedAssignment);
+    } catch (error) {
+      console.error('Error updating assignment status:', error);
+      res.status(500).json({ message: 'Failed to update assignment status' });
+    }
+  });
 
   // Lookup assignment by shareable code (no auth required) - with rate limiting
   app.get('/api/assignments/code/:code', defaultRateLimiter, async (req: Request, res: Response) => {

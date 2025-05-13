@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { API_ROUTES, USER_ROLES } from "@/lib/constants";
 import { AppShell } from "@/components/layout/app-shell";
@@ -12,26 +12,75 @@ import { formatDate } from "@/lib/utils/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown, PlayCircle, Clock, CheckCircle, Download } from "lucide-react";
 
 interface AssignmentDetailProps {
   id: string;
 }
 
+interface AssignmentDetailData {
+  id: number;
+  title: string;
+  description: string;
+  courseId: number;
+  dueDate: string;
+  status: 'upcoming' | 'active' | 'completed';
+  rubric: any;
+  rubricType: string;
+  createdAt: string;
+  updatedAt: string;
+  course?: {
+    id: number;
+    name: string;
+    code: string;
+  };
+  submittedCount: number;
+  totalStudents: number;
+  submissionPercentage: number;
+}
+
+interface StudentProgressData {
+  students: any[];
+  totalCount: number;
+  totalPages: number;
+}
+
+interface AnalyticsData {
+  assignmentStats: {
+    submittedCount: number;
+    inProgressCount: number;
+    notStartedCount: number;
+    totalCount: number;
+    submissionPercentage: number;
+  };
+  submissionTimeline: any[];
+  avgFeedbackTime: number;
+  avgRevisionsPerStudent: number;
+  avgImprovementPercentage: number;
+}
+
 export default function AssignmentDetail({ id }: AssignmentDetailProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const assignmentId = parseInt(id);
   const [studentsPage, setStudentsPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   
   // Fetch assignment details
-  const { data: assignment, isLoading: assignmentLoading } = useQuery({
+  const { data: assignment, isLoading: assignmentLoading } = useQuery<AssignmentDetailData>({
     queryKey: [`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/details`],
   });
   
   // Fetch student progress for this assignment
-  const { data: studentProgressData, isLoading: studentsLoading } = useQuery({
+  const { data: studentProgressData, isLoading: studentsLoading } = useQuery<StudentProgressData>({
     queryKey: [
       `${API_ROUTES.STUDENTS}/progress/${assignmentId}`, 
       { page: studentsPage, search: searchQuery, status: statusFilter }
@@ -39,9 +88,44 @@ export default function AssignmentDetail({ id }: AssignmentDetailProps) {
   });
   
   // Fetch analytics data for this assignment
-  const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
+  const { data: analyticsData, isLoading: analyticsLoading } = useQuery<AnalyticsData>({
     queryKey: [`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/analytics`],
   });
+  
+  // Mutation to update assignment status
+  const updateStatusMutation = useMutation({
+    mutationFn: async (newStatus: string) => {
+      const response = await apiRequest(
+        'PATCH', 
+        `${API_ROUTES.ASSIGNMENTS}/${assignmentId}/status`, 
+        { status: newStatus }
+      );
+      return await response.json();
+    },
+    onSuccess: () => {
+      // Invalidate and refetch assignment details
+      queryClient.invalidateQueries({ queryKey: [`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/details`] });
+      // Also invalidate assignments list for consistency
+      queryClient.invalidateQueries({ queryKey: [API_ROUTES.ASSIGNMENTS] });
+      
+      toast({
+        title: "Status updated",
+        description: "Assignment status has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: "Failed to update assignment status.",
+      });
+      console.error("Error updating assignment status:", error);
+    }
+  });
+  
+  const handleStatusChange = (newStatus: string) => {
+    updateStatusMutation.mutate(newStatus);
+  };
   
   const handleExportCsv = async () => {
     try {
@@ -94,20 +178,66 @@ export default function AssignmentDetail({ id }: AssignmentDetailProps) {
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
-                  <CardTitle className="text-xl">{assignment?.title}</CardTitle>
-                  <CardDescription>{assignment?.description}</CardDescription>
+                  <CardTitle className="text-xl">{assignment?.title || ''}</CardTitle>
+                  <CardDescription>{assignment?.description || ''}</CardDescription>
                 </div>
-                <Badge variant={assignment?.status === 'active' ? 'success' : 'secondary'}>
-                  {assignment?.status === 'active' ? 'Active' : 
-                   assignment?.status === 'completed' ? 'Completed' : 'Upcoming'}
-                </Badge>
+                <div className="flex items-center space-x-2">
+                  <Badge 
+                    className={`${
+                      assignment?.status === 'active' 
+                        ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                        : assignment?.status === 'completed' 
+                          ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' 
+                          : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                    }`}
+                  >
+                    {assignment?.status === 'active' ? 'Active' : 
+                     assignment?.status === 'completed' ? 'Completed' : 'Upcoming'}
+                  </Badge>
+                  
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="ml-2">
+                        Change Status <ChevronDown className="ml-1 h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => handleStatusChange('upcoming')}
+                        className="flex items-center cursor-pointer"
+                        disabled={assignment?.status === 'upcoming'}
+                      >
+                        <Clock className="mr-2 h-4 w-4 text-amber-500" />
+                        <span>Mark as Upcoming</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleStatusChange('active')}
+                        className="flex items-center cursor-pointer"
+                        disabled={assignment?.status === 'active'}
+                      >
+                        <PlayCircle className="mr-2 h-4 w-4 text-green-500" />
+                        <span>Mark as Active</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleStatusChange('completed')}
+                        className="flex items-center cursor-pointer"
+                        disabled={assignment?.status === 'completed'}
+                      >
+                        <CheckCircle className="mr-2 h-4 w-4 text-blue-500" />
+                        <span>Mark as Completed</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="flex flex-col space-y-1">
                   <span className="text-sm text-neutral-500">Course</span>
-                  <span className="font-medium">{assignment?.course?.name} ({assignment?.course?.code})</span>
+                  <span className="font-medium">
+                    {assignment?.course?.name ? `${assignment.course.name} (${assignment.course.code})` : 'No course assigned'}
+                  </span>
                 </div>
                 <div className="flex flex-col space-y-1">
                   <span className="text-sm text-neutral-500">Due Date</span>
@@ -155,7 +285,7 @@ export default function AssignmentDetail({ id }: AssignmentDetailProps) {
           {/* Analytics Panel */}
           <div>
             <AnalyticsPanel 
-              data={analyticsData || {
+              data={analyticsData ? analyticsData : {
                 assignmentStats: { 
                   submittedCount: 0, 
                   inProgressCount: 0, 
@@ -167,7 +297,7 @@ export default function AssignmentDetail({ id }: AssignmentDetailProps) {
                 avgFeedbackTime: 0,
                 avgRevisionsPerStudent: 0,
                 avgImprovementPercentage: 0
-              }} 
+              }}
               loading={analyticsLoading}
             />
           </div>
