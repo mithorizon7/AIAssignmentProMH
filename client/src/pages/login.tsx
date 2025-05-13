@@ -172,6 +172,54 @@ export default function Login() {
               
               <div className="mt-6">
                 <Separator />
+                
+                <div className="mt-4 space-y-4">
+                  {/* MIT Horizon Direct OIDC Button */}
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-2 border-mit-red hover:bg-mit-red/10"
+                    onClick={() => {
+                      // Add returnTo parameter if present in current URL
+                      const returnTo = getReturnToPath();
+                      const loginUrl = returnTo 
+                        ? `/api/auth/horizon/login?returnTo=${encodeURIComponent(returnTo)}` 
+                        : '/api/auth/horizon/login';
+                      window.location.href = loginUrl;
+                    }}
+                  >
+                    <img 
+                      src="/mit_logo_micro_rgb_mit-red.png" 
+                      alt="MIT Logo" 
+                      className="h-5 w-auto mr-2" 
+                    />
+                    Log in with institutional account
+                  </Button>
+                  
+                  {/* Auth0 SSO Button */}
+                  <Button 
+                    variant="outline" 
+                    className="w-full border border-gray-200 hover:bg-gray-50"
+                    onClick={() => {
+                      // Add returnTo parameter if present in current URL
+                      const returnTo = getReturnToPath();
+                      const loginUrl = returnTo 
+                        ? `/api/auth-sso/login?returnTo=${encodeURIComponent(returnTo)}` 
+                        : '/api/auth-sso/login';
+                      window.location.href = loginUrl;
+                    }}
+                  >
+                    <svg 
+                      className="h-5 w-5 mr-2" 
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path d="M21.35 11.1H12.18V13.83H18.69C18.36 17.64 15.19 19.27 12.19 19.27C8.36 19.27 5.22 16.25 5.22 12.21C5.22 8.17 8.36 5.15 12.19 5.15C15.14 5.15 16.89 7.26 16.89 7.26L19.05 5.05C19.05 5.05 16.5 2.1 12.03 2.1C6.24 2.1 2 7.17 2 12.21C2 17.1 5.98 22.3 12.2 22.3C17.92 22.3 21.59 18.43 21.59 13.45C21.59 12.23 21.35 11.1 21.35 11.1Z" />
+                    </svg>
+                    Log in with SSO
+                  </Button>
+                </div>
+                
                 <p className="text-center text-sm text-gray-500 mt-4">
                   This is a secure login for authorized university personnel and students.
                 </p>
