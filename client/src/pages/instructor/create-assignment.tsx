@@ -9,6 +9,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -46,6 +47,10 @@ export default function CreateAssignment() {
   const [submitting, setSubmitting] = useState(false);
   const [rubric, setRubric] = useState<Rubric>({ criteria: [], passingThreshold: 60 });
   const [createdAssignment, setCreatedAssignment] = useState<any>(null);
+  const [showCourseDialog, setShowCourseDialog] = useState(false);
+  const [newCourseName, setNewCourseName] = useState('');
+  const [newCourseCode, setNewCourseCode] = useState('');
+  const [creatingCourse, setCreatingCourse] = useState(false);
   const queryClient = useQueryClient();
   
   // Form validation and state
@@ -63,6 +68,74 @@ export default function CreateAssignment() {
   const { data: courses = [] } = useQuery<any[]>({
     queryKey: [API_ROUTES.COURSES],
   });
+  
+  // Handle course select change to detect when "Create New Course" is selected
+  const handleCourseSelectChange = (value: string) => {
+    if (value === 'new') {
+      setShowCourseDialog(true);
+      return;
+    }
+    
+    form.setValue('courseId', parseInt(value));
+  };
+  
+  // Handle new course creation
+  const handleCreateCourse = async () => {
+    if (!newCourseName.trim() || !newCourseCode.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide both a course name and code",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      setCreatingCourse(true);
+      
+      const response = await fetch(API_ROUTES.COURSES, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newCourseName,
+          code: newCourseCode,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to create course: ${response.statusText}`);
+      }
+      
+      const course = await response.json();
+      
+      // Update the courses list
+      queryClient.invalidateQueries({ queryKey: [API_ROUTES.COURSES] });
+      
+      // Set the new course as selected
+      form.setValue('courseId', course.id.toString());
+      
+      // Reset and close dialog
+      setNewCourseName('');
+      setNewCourseCode('');
+      setShowCourseDialog(false);
+      
+      toast({
+        title: "Course Created",
+        description: `Successfully created course: ${course.name}`,
+      });
+    } catch (error) {
+      console.error('Error creating course:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create course. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingCourse(false);
+    }
+  };
   
   // Handle form submission
   const handleSubmit = async (values: AssignmentFormValues) => {
@@ -152,7 +225,10 @@ export default function CreateAssignment() {
                 <div className="flex flex-wrap gap-4">
                   <div>
                     <h3 className="font-medium">Due Date</h3>
-                    <p className="text-sm">{new Date(createdAssignment.dueDate).toLocaleDateString()}</p>
+                    <p className="text-sm">
+                      {new Date(createdAssignment.dueDate).toLocaleDateString()} at {new Date(createdAssignment.dueDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      <span className="ml-1 text-xs text-muted-foreground">({Intl.DateTimeFormat().resolvedOptions().timeZone})</span>
+                    </p>
                   </div>
                   <div>
                     <h3 className="font-medium">Status</h3>
@@ -341,7 +417,7 @@ export default function CreateAssignment() {
                             } />
                           </div>
                           <Select 
-                            onValueChange={field.onChange} 
+                            onValueChange={handleCourseSelectChange} 
                             defaultValue={field.value?.toString()}
                           >
                             <FormControl>
@@ -361,6 +437,46 @@ export default function CreateAssignment() {
                               </SelectItem>
                             </SelectContent>
                           </Select>
+                          
+                          {/* Course Creation Dialog */}
+                          <Dialog open={showCourseDialog} onOpenChange={setShowCourseDialog}>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Create New Course</DialogTitle>
+                                <DialogDescription>
+                                  Add a new course to assign this assignment to.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="grid gap-4 py-4">
+                                <div className="grid gap-2">
+                                  <Label htmlFor="courseName">Course Name</Label>
+                                  <Input
+                                    id="courseName"
+                                    value={newCourseName}
+                                    onChange={(e) => setNewCourseName(e.target.value)}
+                                    placeholder="Introduction to Programming"
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="courseCode">Course Code</Label>
+                                  <Input
+                                    id="courseCode"
+                                    value={newCourseCode}
+                                    onChange={(e) => setNewCourseCode(e.target.value)}
+                                    placeholder="CS101"
+                                  />
+                                </div>
+                              </div>
+                              <DialogFooter>
+                                <Button variant="outline" onClick={() => setShowCourseDialog(false)}>
+                                  Cancel
+                                </Button>
+                                <Button onClick={handleCreateCourse} disabled={creatingCourse}>
+                                  {creatingCourse ? 'Creating...' : 'Create Course'}
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
                           <FormDescription>
                             The course this assignment belongs to
                           </FormDescription>
@@ -390,35 +506,82 @@ export default function CreateAssignment() {
                               </>
                             } />
                           </div>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn(
-                                    "pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                  )}
-                                >
-                                  {field.value ? (
-                                    format(field.value, "PPP")
-                                  ) : (
-                                    <span>Pick a date</span>
-                                  )}
-                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                disabled={(date) => date < new Date()}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <div className="space-y-2">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                      "pl-3 text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                  >
+                                    {field.value ? (
+                                      format(field.value, "PPP")
+                                    ) : (
+                                      <span>Pick a date</span>
+                                    )}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  disabled={(date) => date < new Date()}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            
+                            <div className="flex items-center gap-2">
+                              <div className="grid grid-cols-2 gap-2 flex-1">
+                                <div className="flex items-center gap-1 border rounded-md px-3 py-1">
+                                  <span className="text-muted-foreground text-sm">Time:</span>
+                                  <select
+                                    className="flex-1 bg-transparent focus:outline-none"
+                                    value={field.value.getHours()}
+                                    onChange={(e) => {
+                                      const newDate = new Date(field.value);
+                                      newDate.setHours(parseInt(e.target.value));
+                                      field.onChange(newDate);
+                                    }}
+                                  >
+                                    {Array.from({length: 24}, (_, i) => (
+                                      <option key={i} value={i}>
+                                        {i.toString().padStart(2, '0')}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <span>:</span>
+                                  <select
+                                    className="flex-1 bg-transparent focus:outline-none"
+                                    value={field.value.getMinutes()}
+                                    onChange={(e) => {
+                                      const newDate = new Date(field.value);
+                                      newDate.setMinutes(parseInt(e.target.value));
+                                      field.onChange(newDate);
+                                    }}
+                                  >
+                                    {[0, 15, 30, 45].map((minute) => (
+                                      <option key={minute} value={minute}>
+                                        {minute.toString().padStart(2, '0')}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="flex items-center border rounded-md px-3 py-1">
+                                  <Clock className="h-4 w-4 mr-1 text-muted-foreground" />
+                                  <span className="text-sm text-muted-foreground">
+                                    Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                           <FormDescription>
                             Deadline for submission
                           </FormDescription>
