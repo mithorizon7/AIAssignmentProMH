@@ -8,6 +8,30 @@ vi.mock('../../client/src/lib/utils/format', () => ({
   formatProcessingTime: vi.fn().mockReturnValue('2.5 seconds'),
 }));
 
+// Mock Lucide icons
+vi.mock('lucide-react', () => ({
+  CheckCircle: () => <div data-testid="check-circle-icon" />,
+  AlertTriangle: () => <div data-testid="alert-triangle-icon" />,
+  Lightbulb: () => <div data-testid="lightbulb-icon" />,
+  ChevronDown: () => <div data-testid="chevron-down-icon" />,
+  ChevronUp: () => <div data-testid="chevron-up-icon" />,
+  Clock: () => <div data-testid="clock-icon" />,
+  Bot: () => <div data-testid="bot-icon" />
+}));
+
+// Mock UI components
+vi.mock('@/components/ui/progress', () => ({
+  Progress: ({ value, className, indicatorClassName }) => (
+    <div data-testid="progress-bar" data-value={value} className={className} data-indicator-class={indicatorClassName} />
+  )
+}));
+
+vi.mock('@/components/ui/badge', () => ({
+  Badge: ({ children, className }) => (
+    <div data-testid="badge" className={className}>{children}</div>
+  )
+}));
+
 describe('FeedbackCard Component', () => {
   // Sample feedback data for testing
   const mockFeedback: Feedback = {
@@ -20,6 +44,10 @@ describe('FeedbackCard Component', () => {
     score: 85,
     processingTime: 2500,
     createdAt: new Date().toISOString(),
+    criteriaScores: [
+      { criteriaId: 'Code Quality', score: 90, feedback: 'Excellent code quality' },
+      { criteriaId: 'Documentation', score: 75, feedback: 'Good documentation, could be more detailed' }
+    ]
   };
 
   describe('Collapsed state', () => {
@@ -56,7 +84,7 @@ describe('FeedbackCard Component', () => {
       expect(screen.getByText('AI Feedback')).toBeInTheDocument();
       expect(screen.getByText('Generated in 2.5 seconds')).toBeInTheDocument();
       
-      // Check sections are visible
+      // Check sections are visible with new styling
       expect(screen.getByText('Strengths')).toBeInTheDocument();
       expect(screen.getByText('Areas for Improvement')).toBeInTheDocument();
       expect(screen.getByText('Suggestions')).toBeInTheDocument();
@@ -67,6 +95,28 @@ describe('FeedbackCard Component', () => {
       expect(screen.getByText('Could improve citations')).toBeInTheDocument();
       expect(screen.getByText('Consider expanding on section 2')).toBeInTheDocument();
       expect(screen.getByText('Overall good work with room for improvement')).toBeInTheDocument();
+      
+      // Check score badge is displayed
+      expect(screen.getByText('Score:')).toBeInTheDocument();
+      expect(screen.getByText('85%')).toBeInTheDocument();
+    });
+    
+    it('should render criteria scores when provided', () => {
+      render(<FeedbackCard feedback={mockFeedback} expanded={true} />);
+      
+      // Check criteria section title is visible
+      expect(screen.getByText('Assessment by Criteria')).toBeInTheDocument();
+      
+      // Check criteria items are visible
+      expect(screen.getByText('Code Quality')).toBeInTheDocument();
+      expect(screen.getByText('Documentation')).toBeInTheDocument();
+      expect(screen.getByText('90%')).toBeInTheDocument();
+      expect(screen.getByText('75%')).toBeInTheDocument();
+      expect(screen.getByText('Excellent code quality')).toBeInTheDocument();
+      expect(screen.getByText('Good documentation, could be more detailed')).toBeInTheDocument();
+      
+      // Check progress bars exist
+      expect(screen.getAllByTestId('progress-bar').length).toBe(2);
     });
     
     it('should handle toggle callback when provided', () => {
@@ -104,6 +154,7 @@ describe('FeedbackCard Component', () => {
         strengths: [],
         improvements: [],
         suggestions: [],
+        criteriaScores: []
       };
       
       render(<FeedbackCard feedback={emptyFeedback} expanded={true} />);
@@ -112,6 +163,7 @@ describe('FeedbackCard Component', () => {
       expect(screen.queryByText('Strengths')).not.toBeInTheDocument();
       expect(screen.queryByText('Areas for Improvement')).not.toBeInTheDocument();
       expect(screen.queryByText('Suggestions')).not.toBeInTheDocument();
+      expect(screen.queryByText('Assessment by Criteria')).not.toBeInTheDocument();
       
       // Summary should still be visible
       expect(screen.getByText('Summary')).toBeInTheDocument();
@@ -127,6 +179,38 @@ describe('FeedbackCard Component', () => {
       
       // Summary section should not be visible
       expect(screen.queryByText('Summary')).not.toBeInTheDocument();
+    });
+    
+    it('should handle missing criteriaScores gracefully', () => {
+      const feedbackWithoutCriteria: Feedback = {
+        ...mockFeedback,
+        criteriaScores: undefined
+      };
+      
+      render(<FeedbackCard feedback={feedbackWithoutCriteria} expanded={true} />);
+      
+      // Criteria section should not be visible
+      expect(screen.queryByText('Assessment by Criteria')).not.toBeInTheDocument();
+    });
+  });
+  
+  describe('UI interaction for long summaries', () => {
+    it('should truncate long summaries and show More/Less buttons', () => {
+      const longSummaryFeedback: Feedback = {
+        ...mockFeedback,
+        summary: 'A'.repeat(300) // Create a string longer than 200 characters
+      };
+      
+      render(<FeedbackCard feedback={longSummaryFeedback} expanded={true} />);
+      
+      // Check More button exists
+      expect(screen.getByText('More')).toBeInTheDocument();
+      
+      // Click More to expand
+      fireEvent.click(screen.getByText('More'));
+      
+      // Now Less button should be visible
+      expect(screen.getByText('Less')).toBeInTheDocument();
     });
   });
 });
