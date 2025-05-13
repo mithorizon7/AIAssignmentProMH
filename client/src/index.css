@@ -138,4 +138,88 @@
   .category-label {
     @apply text-primary text-sm font-semibold;
   }
+  
+  /* QuillJS styling */
+  .quill-container {
+    @apply border border-input;
+  }
+  
+  .quill-container .ql-toolbar {
+    @apply border-b border-input bg-muted px-3 py-2 flex flex-wrap items-center gap-0.5;
+  }
+  
+  .quill-container .ql-container {
+    @apply font-sans text-base;
+  }
+  
+  .quill-container .ql-editor {
+    @apply min-h-[150px] max-h-[400px] overflow-y-auto p-4 prose prose-sm max-w-none focus:outline-none;
+  }
+  
+  .quill-container .ql-editor p, 
+  .quill-container .ql-editor ol, 
+  .quill-container .ql-editor ul, 
+  .quill-container .ql-editor pre, 
+  .quill-container .ql-editor blockquote {
+    @apply my-1 mx-0;
+  }
+  
+  .quill-container .ql-editor h1, 
+  .quill-container .ql-editor h2, 
+  .quill-container .ql-editor h3 {
+    @apply font-bold;
+  }
+  
+  .quill-container .ql-editor h1 {
+    @apply text-2xl;
+  }
+  
+  .quill-container .ql-editor h2 {
+    @apply text-xl;
+  }
+  
+  .quill-container .ql-editor h3 {
+    @apply text-lg;
+  }
+  
+  .quill-container .ql-editor.ql-blank::before {
+    @apply text-muted-foreground not-italic left-4 right-4;
+  }
+  
+  .quill-container .ql-snow .ql-picker.ql-expanded .ql-picker-options {
+    @apply border border-input bg-background shadow-sm rounded-md;
+  }
+  
+  .quill-container .ql-snow .ql-tooltip {
+    @apply bg-popover text-popover-foreground border border-input shadow-sm p-2 rounded-md;
+  }
+  
+  /* Dark theme for QuillJS */
+  .quill-dark-theme {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .quill-dark-theme .ql-toolbar {
+    @apply border-gray-700 bg-gray-900;
+  }
+  
+  .quill-dark-theme .ql-container {
+    @apply text-white;
+  }
+  
+  .quill-dark-theme .ql-snow .ql-stroke {
+    @apply stroke-gray-400;
+  }
+  
+  .quill-dark-theme .ql-snow .ql-fill {
+    @apply fill-gray-400;
+  }
+  
+  .quill-dark-theme .ql-snow .ql-picker {
+    @apply text-gray-400;
+  }
+  
+  .quill-dark-theme .ql-editor.ql-blank::before {
+    @apply text-gray-500;
+  }
 }
