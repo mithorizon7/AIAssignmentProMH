@@ -57,9 +57,10 @@ function formatSize(bytes: number): string {
 interface SubmissionHistoryProps {
   submissions: SubmissionWithFeedback[];
   loading?: boolean;
+  showAssignmentTitle?: boolean;
 }
 
-export function SubmissionHistory({ submissions, loading = false }: SubmissionHistoryProps) {
+export function SubmissionHistory({ submissions, loading = false, showAssignmentTitle = false }: SubmissionHistoryProps) {
   const [expandedFeedbacks, setExpandedFeedbacks] = useState<Record<number, boolean>>({});
   const [, navigate] = useLocation();
   
@@ -160,6 +161,11 @@ export function SubmissionHistory({ submissions, loading = false }: SubmissionHi
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-medium text-neutral-800">Submission #{submissions.length - index}</h3>
+                  {showAssignmentTitle && submission.assignment && (
+                    <p className="text-sm text-indigo-600 font-medium">
+                      {submission.assignment.title}
+                    </p>
+                  )}
                   <p className="text-sm text-neutral-600">{formatDate(submission.createdAt)}</p>
                 </div>
                 {index === 0 && (
