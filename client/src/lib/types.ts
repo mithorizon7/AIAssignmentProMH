@@ -44,9 +44,14 @@ export interface Submission {
   assignment?: Assignment;
   fileUrl?: string;
   fileName?: string;
+  fileType?: string;
+  fileSize?: number;
   content?: string;
+  code?: string;
+  submissionType?: 'file' | 'code';
   notes?: string;
   status: typeof SUBMISSION_STATUS[keyof typeof SUBMISSION_STATUS];
+  processingProgress?: number;
   createdAt: string;
   updatedAt: string;
 }
