@@ -62,7 +62,7 @@ export function AdminShell({ children }: AdminShellProps) {
   return (
     <div className="flex h-screen">
       {/* Desktop sidebar */}
-      <div className="hidden md:flex w-80 flex-col fixed inset-y-0">
+      <div className="hidden md:flex w-80 flex-col fixed inset-y-0 top-20">
         <div className="flex flex-col flex-grow border-r bg-primary-foreground pt-5 overflow-y-auto">
           <div className="flex items-center flex-shrink-0 px-4 mb-5">
             <div className="h-8 w-8 rounded-full bg-primary mr-3 flex items-center justify-center">
@@ -104,12 +104,12 @@ export function AdminShell({ children }: AdminShellProps) {
 
       {/* Mobile sidebar */}
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild className="md:hidden absolute top-4 left-4 z-20">
+        <SheetTrigger asChild className="md:hidden absolute top-24 left-4 z-20">
           <Button variant="ghost" size="icon">
             <Menu />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-80 p-0">
+        <SheetContent side="left" className="w-80 p-0 pt-20">
           <div className="flex flex-col h-full pt-5">
             <div className="flex items-center flex-shrink-0 px-4 mb-5">
               <div className="h-8 w-8 rounded-full bg-primary mr-3 flex items-center justify-center">
@@ -153,7 +153,7 @@ export function AdminShell({ children }: AdminShellProps) {
 
       {/* Main content */}
       <div className="flex flex-col flex-1 md:pl-80">
-        <main className="flex-1 pt-16 md:pt-8 px-4 sm:px-6 md:px-8 bg-background min-h-screen">
+        <main className="flex-1 pt-24 md:pt-24 px-4 sm:px-6 md:px-8 bg-background min-h-screen">
           {children}
         </main>
       </div>
