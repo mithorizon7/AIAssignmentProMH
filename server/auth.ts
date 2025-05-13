@@ -526,9 +526,16 @@ export function configureAuth(app: any) {
     );
     
     // Auth0 login route
-    app.get('/api/auth-sso/login', passport.authenticate('auth0', { 
-      scope: 'openid email profile' 
-    }));
+    app.get('/api/auth-sso/login', (req: Request, res: Response, next: NextFunction) => {
+      // Store returnTo in session if provided
+      if (req.query.returnTo) {
+        req.session.returnTo = req.query.returnTo as string;
+      }
+      
+      passport.authenticate('auth0', { 
+        scope: 'openid email profile' 
+      })(req, res, next);
+    });
     
     // Auth0 callback route
     app.get('/api/auth-sso/callback', (req: Request, res: Response, next: NextFunction) => {
@@ -549,8 +556,20 @@ export function configureAuth(app: any) {
             return res.redirect('/login?error=sso_failed&reason=session_error');
           }
           
-          // Successful login
-          return res.redirect('/');
+          // Check for returnTo parameter in the session (set during login initiation)
+          let returnTo = '/';
+          if (req.session.returnTo) {
+            returnTo = req.session.returnTo;
+            delete req.session.returnTo; // Clear it after use
+          }
+            
+          // Validate returnTo URL to prevent open redirect vulnerabilities
+          if (!returnTo.startsWith('/') || returnTo.includes('//')) {
+            returnTo = '/';
+          }
+            
+          console.log('[INFO] Redirecting after successful Auth0 login to:', returnTo);
+          return res.redirect(returnTo);
         });
       })(req, res, next);
     });
@@ -675,9 +694,16 @@ export function configureAuth(app: any) {
     }));
     
     // MIT Horizon login route
-    app.get('/api/auth/horizon/login', passport.authenticate('horizon-oidc', { 
-      scope: 'openid email profile' 
-    }));
+    app.get('/api/auth/horizon/login', (req: Request, res: Response, next: NextFunction) => {
+      // Store returnTo in session if provided
+      if (req.query.returnTo) {
+        req.session.returnTo = req.query.returnTo as string;
+      }
+      
+      passport.authenticate('horizon-oidc', { 
+        scope: 'openid email profile' 
+      })(req, res, next);
+    });
     
     // MIT Horizon callback route
     app.get('/api/auth/horizon/callback', (req: Request, res: Response, next: NextFunction) => {
@@ -698,8 +724,20 @@ export function configureAuth(app: any) {
             return res.redirect('/login?error=horizon_failed&reason=session_error');
           }
           
-          // Successful login
-          return res.redirect('/');
+          // Check for returnTo parameter in the session (set during login initiation)
+          let returnTo = '/';
+          if (req.session.returnTo) {
+            returnTo = req.session.returnTo;
+            delete req.session.returnTo; // Clear it after use
+          }
+            
+          // Validate returnTo URL to prevent open redirect vulnerabilities
+          if (!returnTo.startsWith('/') || returnTo.includes('//')) {
+            returnTo = '/';
+          }
+            
+          console.log('[INFO] Redirecting after successful login to:', returnTo);
+          return res.redirect(returnTo);
         });
       })(req, res, next);
     });
