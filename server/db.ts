@@ -16,16 +16,23 @@ export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 // Create drizzle instance
 const drizzleInstance = drizzle({ client: pool, schema });
 
+// Define the types for the execute method parameters and result
+type QueryParams = unknown[];
+type QueryResult<T> = { rows: T[] };
+
 // Extend drizzle object with a raw query execution method
 const db = drizzleInstance as typeof drizzleInstance & {
-  execute: <T = any>(sql: string, params?: any[]) => Promise<{ rows: T[] }>
+  execute: <T extends Record<string, unknown>>(sql: string, params?: QueryParams) => Promise<QueryResult<T>>
 };
 
 // Define the execute method
-db.execute = async <T = any>(sql: string, params?: any[]): Promise<{ rows: T[] }> => {
+db.execute = async <T extends Record<string, unknown>>(
+  sql: string, 
+  params?: QueryParams
+): Promise<QueryResult<T>> => {
   const result = params ? await pool.query(sql, params) : await pool.query(sql);
   // Safe casting - we know the result has a rows property
-  return result as unknown as { rows: T[] };
+  return result as unknown as QueryResult<T>;
 };
 
 export { db };

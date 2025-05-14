@@ -80,8 +80,8 @@ export async function extractTextContent(
     // For other document types, return basic metadata
     return `This is a ${contentType} file with MIME type ${mimeType}. Content processing not available for this file type.`;
     
-  } catch (error: any) {
-    const errorMessage = error?.message || String(error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`Error extracting text content: ${errorMessage}`);
     return undefined;
   }
@@ -135,8 +135,8 @@ export async function createMultimodalPromptParts(
     
     return parts;
     
-  } catch (error: any) {
-    const errorMessage = error?.message || String(error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`Error creating multimodal prompt parts: ${errorMessage}`);
     
     // Fallback to text-only if file processing fails
@@ -183,8 +183,8 @@ export async function cleanupFile(filePath: string): Promise<void> {
     if (filePath && fs.existsSync(filePath)) {
       await unlinkAsync(filePath);
     }
-  } catch (error: any) {
-    const errorMessage = error?.message || String(error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`Error cleaning up file ${filePath}: ${errorMessage}`);
   }
 }
@@ -245,8 +245,9 @@ export async function processFileForMultimodal(
         // The filename extension might be needed for some document types
         const extension = path.extname(fileName).toLowerCase();
         textContent = await extractTextContent(filePath, mimeType, extension);
-      } catch (error: any) {
-        console.warn(`Failed to extract text from ${fileName}: ${error.message}`);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.warn(`Failed to extract text from ${fileName}: ${errorMessage}`);
         // Continue with the process even if text extraction fails
       }
     }
@@ -258,8 +259,9 @@ export async function processFileForMultimodal(
       textContent,
       mimeType
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`Error processing file ${fileName} for multimodal analysis:`, error);
-    throw new Error(`Failed to process file for multimodal analysis: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to process file for multimodal analysis: ${errorMessage}`);
   }
 }
