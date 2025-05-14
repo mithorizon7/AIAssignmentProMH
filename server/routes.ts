@@ -690,6 +690,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (user.role === 'instructor') {
         // Instructors can see all courses
         courses = await storage.listCourses();
+        
+        // Enhance courses with additional stats
+        courses = await Promise.all(courses.map(async (course: any) => {
+          // Get assignments for this course
+          const courseAssignments = await storage.listAssignments(course.id);
+          
+          // Get enrollment count
+          const enrolledStudents = await storage.listCourseEnrollments(course.id);
+          
+          return {
+            ...course,
+            assignmentCount: courseAssignments.length,
+            studentCount: enrolledStudents.length
+          };
+        }));
       } else {
         // Students can only see courses they're enrolled in
         courses = await storage.listUserEnrollments(user.id);
@@ -716,10 +731,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get assignments for this course
       const assignments = await storage.listAssignments(courseId);
       
-      // Return course with assignments
+      // Get enrollment count
+      const enrolledStudents = await storage.listCourseEnrollments(courseId);
+      const studentCount = enrolledStudents.length;
+      
+      // Get submission counts for each assignment
+      const assignmentsWithStats = await Promise.all(
+        assignments.map(async (assignment) => {
+          const submissions = await storage.listSubmissionsForAssignment(assignment.id);
+          const submittedCount = new Set(submissions.map(s => s.userId)).size;
+          
+          return {
+            ...assignment,
+            submittedCount,
+            totalStudents: studentCount,
+            submissionPercentage: studentCount > 0 ? (submittedCount / studentCount) * 100 : 0
+          };
+        })
+      );
+      
+      // Return course with assignments and stats
       res.json({
         ...course,
-        assignments
+        studentCount,
+        assignments: assignmentsWithStats
       });
   }));
   
@@ -839,9 +874,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         students = allStudents.slice((page - 1) * pageSize, page * pageSize).map((student: User) => {
           // Find the most recent submission for this student
-          const studentSubmissions = allSubmissions.filter(sub => sub.userId === student.id);
+          const studentSubmissions = allSubmissions.filter((sub: any) => sub.userId === student.id);
           const latestSubmission = studentSubmissions.length > 0 ? 
-            studentSubmissions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] : 
+            studentSubmissions.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] : 
             null;
             
           let status: 'submitted' | 'not_submitted' | 'needs_review' = 'not_submitted';

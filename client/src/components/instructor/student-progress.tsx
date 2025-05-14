@@ -37,7 +37,8 @@ export function StudentProgress({
     onSearch(searchQuery);
   };
   
-  const getStatusBadgeVariant = (status: string): 'default' | 'destructive' | 'outline' | 'secondary' => {
+  // Use any valid variant from the Badge component
+  const getStatusBadgeVariant = (status: string): "default" | "destructive" | "outline" | "secondary" => {
     switch (status) {
       case 'submitted':
         return 'secondary';
