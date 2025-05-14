@@ -26,6 +26,24 @@ export interface CriteriaScore {
   feedback: string;
 }
 
+/**
+ * InstructorContext represents private information provided by instructors
+ * that is only shared with the AI for evaluation purposes and never shown to students.
+ * It typically contains HTML content created with a rich text editor (QuillJS).
+ * 
+ * Common use cases:
+ * - Sample solutions
+ * - Evaluation guidelines
+ * - Common pitfalls to watch for
+ * - Specific feedback patterns to provide
+ * - Grading emphasis details
+ */
+export interface InstructorContext {
+  content: string;        // HTML content from rich text editor
+  version?: string;       // Optional version tracking
+  lastUpdated?: Date;     // Optional timestamp of last update
+}
+
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['student', 'instructor', 'admin']);
 export const assignmentStatusEnum = pgEnum('assignment_status', ['active', 'completed', 'upcoming']);
@@ -91,8 +109,8 @@ export const assignments = pgTable("assignments", {
   dueDate: timestamp("due_date").notNull(),
   status: assignmentStatusEnum("status").notNull().default('upcoming'),
   shareableCode: text("shareable_code"),
-  rubric: json("rubric"),
-  instructorContext: json("instructor_context"), // Hidden information for AI evaluation only
+  rubric: json("rubric").$type<Rubric>(),
+  instructorContext: json("instructor_context").$type<InstructorContext>(), // Hidden information for AI evaluation only
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => {

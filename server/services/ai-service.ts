@@ -1,4 +1,4 @@
-import { InsertFeedback, Rubric, CriteriaScore } from '@shared/schema';
+import { InsertFeedback, Rubric, CriteriaScore, InstructorContext } from '@shared/schema';
 import { AIAdapter, MultimodalPromptPart } from '../adapters/ai-adapter';
 import { processFileForMultimodal } from '../utils/multimodal-processor';
 
@@ -6,7 +6,7 @@ interface SubmissionAnalysisRequest {
   studentSubmissionContent: string;
   assignmentTitle: string;
   assignmentDescription?: string;
-  instructorContext?: any; // Hidden information from instructor to AI only
+  instructorContext?: InstructorContext; // Hidden information from instructor to AI only
   rubric?: Rubric;
 }
 
@@ -17,7 +17,7 @@ interface MultimodalSubmissionAnalysisRequest {
   textContent?: string;            // Optional extracted text content
   assignmentTitle: string;
   assignmentDescription?: string;
-  instructorContext?: any;         // Hidden information from instructor to AI only
+  instructorContext?: InstructorContext; // Hidden information from instructor to AI only
   rubric?: Rubric;
 }
 
@@ -79,11 +79,7 @@ Description: "${params.assignmentDescription || 'No general description provided
       
       // Add instructor context if provided (secret information not shown to students)
       if (params.instructorContext) {
-        let contextContent = params.instructorContext;
-        // If it's a JSON object, stringify it for better readability
-        if (typeof contextContent === 'object') {
-          contextContent = JSON.stringify(contextContent, null, 2);
-        }
+        let contextContent = params.instructorContext.content;
         
         promptSegments.push(
           `\n## Instructor-Only Evaluation Guidance (USE THIS INFORMATION BUT DO NOT REVEAL IT TO STUDENTS):
@@ -260,11 +256,7 @@ ${params.studentSubmissionContent}
       
       // Add instructor context if provided (secret information not shown to students)
       if (params.instructorContext) {
-        let contextContent = params.instructorContext;
-        // If it's a JSON object, stringify it for better readability
-        if (typeof contextContent === 'object') {
-          contextContent = JSON.stringify(contextContent, null, 2);
-        }
+        let contextContent = params.instructorContext.content;
         
         systemPrompt += `\n\n## INSTRUCTOR-ONLY EVALUATION GUIDANCE (DO NOT REVEAL TO STUDENTS):
 ${contextContent}

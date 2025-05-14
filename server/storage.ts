@@ -368,7 +368,8 @@ export class DatabaseStorage implements IStorage {
         const result = await db.execute(parameterizedSql, [assignmentId]);
         return result.rows as Submission[];
       } catch (innerError) {
-        console.error("Fallback query also failed:", innerError);
+        console.error("Fallback query also failed:", 
+          innerError instanceof Error ? innerError.message : String(innerError));
         return [];
       }
     }
@@ -447,7 +448,8 @@ export class DatabaseStorage implements IStorage {
         const result = await db.execute(parameterizedSql, [userId, assignmentId]);
         return result.rows[0] as Submission;
       } catch (innerError) {
-        console.error("Fallback query for latest submission also failed:", innerError);
+        console.error("Fallback query for latest submission also failed:", 
+          innerError instanceof Error ? innerError.message : String(innerError));
         return undefined;
       }
     }
