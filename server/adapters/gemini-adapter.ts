@@ -9,6 +9,27 @@ import { fileToDataURI } from '../utils/multimodal-processor';
 
 const readFileAsync = promisify(fs.readFile);
 
+/**
+ * Interface for parsed AI responses
+ */
+interface ParsedContent {
+  strengths?: string[];
+  improvements?: string[];
+  suggestions?: string[];
+  summary?: string;
+  score?: number;
+  criteriaScores?: CriteriaScore[];
+  [key: string]: unknown;
+}
+
+/**
+ * Extended FileData interface that includes cleanup methods
+ * for the Gemini API which might have different versions
+ */
+interface GeminiFileData extends FileData {
+  delete?: () => Promise<void>;
+}
+
 // Extracted from Google AI Gemini API documentation
 // https://ai.google.dev/gemini-api/docs/image-understanding
 // https://ai.google.dev/gemini-api/docs/video-understanding
@@ -188,7 +209,7 @@ export class GeminiAdapter implements AIAdapter {
       const text = response.text();
       
       // Parse the content as JSON
-      let parsedContent: any = {};
+      let parsedContent: ParsedContent = {};
       try {
         // Extract JSON from the response if it's embedded in text
         const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -520,7 +541,7 @@ Please analyze the above submission and provide feedback in the following JSON f
       const text = response.text();
       
       // Parse the content as JSON
-      let parsedContent: any = {};
+      let parsedContent: ParsedContent = {};
       try {
         // Extract JSON from the response if it's embedded in text
         const jsonMatch = text.match(/\{[\s\S]*\}/);
