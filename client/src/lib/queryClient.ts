@@ -99,6 +99,7 @@ export async function apiRequest<TData = unknown>(
     try {
       const errorData = await res.json();
       if (errorData.message === 'CSRF token validation failed') {
+        console.warn('CSRF token validation failed. Retrying with a new token.');
         // Invalidate the token
         csrfToken = null;
         
@@ -114,11 +115,34 @@ export async function apiRequest<TData = unknown>(
           credentials: "include",
         });
         
+        // Handle the second 403 more specifically
+        if (retryRes.status === 403) {
+          try {
+            const retryErrorData = await retryRes.json();
+            // If it's still a CSRF error after retry, this may indicate a more serious issue
+            if (retryErrorData.message === 'CSRF token validation failed') {
+              throw new ApiError(403, 'Forbidden', 'Persistent CSRF token validation failure. Please refresh the page and try again.');
+            } else if (retryErrorData.message) {
+              // Return any other specific error message
+              throw new ApiError(403, 'Forbidden', retryErrorData.message);
+            }
+          } catch (retryParseError) {
+            // If we can't parse the response as JSON, or if any other error occurred
+            if (retryParseError instanceof ApiError) {
+              throw retryParseError; // Rethrow our custom error
+            }
+          }
+        }
+        
         await throwIfResNotOk(retryRes);
         return retryRes;
       }
     } catch (e) {
-      // If we can't parse the response as JSON, continue with normal error handling
+      // If we can't parse the response as JSON or another error occurred
+      if (e instanceof ApiError) {
+        throw e; // Rethrow our custom error
+      }
+      // Otherwise continue with normal error handling
     }
   }
 
