@@ -274,31 +274,21 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(columnsQuery);
       const existingColumns = result.rows.map(row => row.column_name);
       
-      // Create a new object with only the known fields based on what columns exist
-      const safeSubmission: Record<string, any> = {
+      // Create a new submissions insert object with required fields
+      const submissionData: InsertSubmission = {
         assignmentId: insertSubmission.assignmentId,
         userId: insertSubmission.userId,
-        fileUrl: insertSubmission.fileUrl,
-        fileName: insertSubmission.fileName,
-        content: insertSubmission.content,
-        notes: insertSubmission.notes,
+        fileUrl: insertSubmission.fileUrl || '',
+        fileName: insertSubmission.fileName || '',
+        content: insertSubmission.content || '',
+        notes: insertSubmission.notes || null,
         status: insertSubmission.status || 'pending',
+        mimeType: existingColumns.includes('mime_type') ? (insertSubmission.mimeType || null) : null,
+        fileSize: existingColumns.includes('file_size') ? (insertSubmission.fileSize || null) : null,
+        contentType: existingColumns.includes('content_type') ? (insertSubmission.contentType || null) : null
       };
       
-      // Only include the optional columns if they exist in the database
-      if (existingColumns.includes('mime_type') && insertSubmission.mimeType) {
-        safeSubmission.mimeType = insertSubmission.mimeType;
-      }
-      
-      if (existingColumns.includes('file_size') && insertSubmission.fileSize) {
-        safeSubmission.fileSize = insertSubmission.fileSize;
-      }
-      
-      if (existingColumns.includes('content_type') && insertSubmission.contentType) {
-        safeSubmission.contentType = insertSubmission.contentType;
-      }
-      
-      const [submission] = await db.insert(submissions).values([safeSubmission]).returning();
+      const [submission] = await db.insert(submissions).values([submissionData]).returning();
       console.log(`[INFO] Submission created successfully: ${submission.id}`);
       return submission;
     } catch (error) {
@@ -730,7 +720,7 @@ export class DatabaseStorage implements IStorage {
           sql = `
             INSERT INTO file_type_settings (
               content_type, context, context_id, enabled, extensions,
-              mime_types, max_size, created_at, updated_at, created_by, updated_by
+              mime_types, max_size, updated_at, updated_by
             )
             VALUES (
               '${setting.contentType}',
@@ -741,8 +731,6 @@ export class DatabaseStorage implements IStorage {
               '${mimeTypes.replace(/'/g, "''")}',
               ${setting.maxSize || 'NULL'},
               NOW(),
-              NOW(),
-              ${setting.createdBy || 'NULL'},
               ${setting.updatedBy || 'NULL'}
             )
             RETURNING *;
@@ -768,21 +756,24 @@ export class DatabaseStorage implements IStorage {
     mimeType: string
   ): Promise<boolean> {
     try {
-      // Convert string contentType parameter to ContentType enum value
-      // This ensures we're using the proper content type from our enum
+      // Validate contentType is one of the allowed values
+      if (!['text', 'image', 'audio', 'video', 'document'].includes(contentType)) {
+        console.warn(`Invalid content type: ${contentType}`);
+        return false;
+      }
+
+      // Use the contentType as a valid ContentType
       const normalizedContentType = contentType as ContentType;
       
       console.log(`Checking file enablement: Content type=${normalizedContentType}, Extension=${extension}, MIME=${mimeType}`);
       
-      // Get system settings for this content type
+      // Get system settings for this content type - using SQL template
+      const contentTypeFilter = sql`${fileTypeSettings.contentType}::text = ${normalizedContentType}`;
+      const contextFilter = sql`${fileTypeSettings.context} = ${'system'}`;
+      const enabledFilter = sql`${fileTypeSettings.enabled} = ${true}`;
+      
       const query = db.select().from(fileTypeSettings)
-        .where(
-          and(
-            eq(fileTypeSettings.contentType, normalizedContentType),
-            eq(fileTypeSettings.context, 'system'),
-            eq(fileTypeSettings.enabled, true)
-          )
-        );
+        .where(and(contentTypeFilter, contextFilter, enabledFilter));
       
       const settings = await query;
       
