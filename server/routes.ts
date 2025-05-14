@@ -127,63 +127,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Create assignment (instructor only)
   app.post('/api/assignments', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
-    const { title, description, courseId, dueDate, rubric } = req.body;
-    
-    // Validate request
-    const assignmentSchema = z.object({
-      title: z.string().min(3),
-      description: z.string().min(10),
-      courseId: z.union([
-        z.number().int().positive(),
-        z.string().transform(val => parseInt(val))
-      ]).optional(), // Make optional for standalone assignments
-      dueDate: z.string().refine(val => !isNaN(Date.parse(val)), {
-        message: 'Invalid date format'
-      }),
-      rubric: z.object({
-        criteria: z.array(z.object({
-          id: z.string(),
-          type: z.string(),
-          name: z.string(),
-          description: z.string(),
-          maxScore: z.number().int().min(1),
-          weight: z.number().int().min(1),
-        })).optional(),
-        totalPoints: z.number().int().positive().optional(),
-        passingThreshold: z.number().int().min(0).max(100).optional(),
-      }).optional(),
-    });
-    
-    const result = assignmentSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ message: 'Invalid assignment data', errors: result.error });
-    }
-    
-    // Check if course exists (if courseId is provided)
-    if (courseId) {
-      const courseIdNum = typeof courseId === 'string' ? parseInt(courseId) : courseId;
-      const course = await storage.getCourse(courseIdNum);
-      if (!course) {
-        return res.status(404).json({ message: 'Course not found' });
+    try {
+      const { title, description, courseId, dueDate, rubric } = req.body;
+      
+      console.log("Creating assignment with data:", JSON.stringify({
+        title, 
+        description: description?.substring(0, 30) + "...", 
+        courseId,
+        dueDate
+      }));
+      
+      // Validate request
+      const assignmentSchema = z.object({
+        title: z.string().min(3),
+        description: z.string().min(10),
+        courseId: z.union([
+          z.number().int().positive(),
+          z.string().transform(val => parseInt(val))
+        ]).optional(), // Make optional for standalone assignments
+        dueDate: z.string().refine(val => !isNaN(Date.parse(val)), {
+          message: 'Invalid date format'
+        }),
+        rubric: z.object({
+          criteria: z.array(z.object({
+            id: z.string(),
+            type: z.string(),
+            name: z.string(),
+            description: z.string(),
+            maxScore: z.number().int().min(1),
+            weight: z.number().int().min(1),
+          })).optional(),
+          totalPoints: z.number().int().positive().optional(),
+          passingThreshold: z.number().int().min(0).max(100).optional(),
+        }).optional(),
+      });
+      
+      const result = assignmentSchema.safeParse(req.body);
+      if (!result.success) {
+        const errorDetails = JSON.stringify(result.error.format());
+        console.error("Assignment validation failed:", errorDetails);
+        return res.status(400).json({ 
+          message: 'Invalid assignment data', 
+          errors: result.error.format() 
+        });
       }
+      
+      // Check if course exists (if courseId is provided)
+      if (courseId) {
+        const courseIdNum = typeof courseId === 'string' ? parseInt(courseId) : courseId;
+        const course = await storage.getCourse(courseIdNum);
+        if (!course) {
+          return res.status(404).json({ message: 'Course not found' });
+        }
+      }
+      
+      // Generate a unique shareable code
+      const shareableCode = generateShareableCode();
+      
+      // Create assignment
+      const courseIdNum = courseId ? (typeof courseId === 'string' ? parseInt(courseId) : courseId) : undefined;
+      const assignment = await storage.createAssignment({
+        title,
+        description,
+        courseId: courseIdNum, // Now properly parsed and optional
+        dueDate: new Date(dueDate), // The client already sends an ISO string, so we just need a Date object
+        status: 'active', // Setting to active by default so students can submit immediately
+        shareableCode,
+        rubric: rubric ? JSON.stringify(rubric) as any : null,
+      });
+      
+      console.log("Assignment created successfully, ID:", assignment.id);
+      return res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error creating assignment:", error);
+      return res.status(500).json({ 
+        message: 'Failed to create assignment', 
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
-    
-    // Generate a unique shareable code
-    const shareableCode = generateShareableCode();
-    
-    // Create assignment
-    const courseIdNum = courseId ? (typeof courseId === 'string' ? parseInt(courseId) : courseId) : undefined;
-    const assignment = await storage.createAssignment({
-      title,
-      description,
-      courseId: courseIdNum, // Now properly parsed and optional
-      dueDate: new Date(dueDate), // The client already sends an ISO string, so we just need a Date object
-      status: 'active', // Setting to active by default so students can submit immediately
-      shareableCode,
-      rubric: rubric ? JSON.stringify(rubric) as any : null,
-    });
-    
-    res.status(201).json(assignment);
   }));
 
   // Get assignment details for instructor
@@ -1034,22 +1055,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Content is required' });
       }
       
-      // Use AI service to analyze the content
-      const aiService = new AIService(process.env.OPENAI_API_KEY ? 
-        new OpenAIAdapter() : new GeminiAdapter());
+      // Use AI service to analyze the content - always use GeminiAdapter since we have that key
+      const aiService = new AIService(new GeminiAdapter());
       
-      const feedback = await aiService.analyzeProgrammingAssignment({
-        content,
-        assignmentContext
-      });
-      
-      res.json({
-        strengths: feedback.strengths,
-        improvements: feedback.improvements,
-        suggestions: feedback.suggestions,
-        summary: feedback.summary,
-        score: feedback.score
-      });
+      try {
+        const feedback = await aiService.analyzeProgrammingAssignment({
+          content,
+          assignmentContext
+        });
+        
+        console.log("AI feedback generated successfully:", JSON.stringify(feedback).slice(0, 200) + "...");
+        
+        return res.json({
+          strengths: feedback.strengths,
+          improvements: feedback.improvements,
+          suggestions: feedback.suggestions,
+          summary: feedback.summary,
+          score: feedback.score
+        });
+      } catch (error) {
+        console.error("Error generating AI feedback:", error);
+        return res.status(500).json({ 
+          message: 'Failed to generate AI feedback',
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
   }));
 
   // Export grades as CSV
