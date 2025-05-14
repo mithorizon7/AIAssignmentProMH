@@ -97,7 +97,7 @@ export class BatchOperationsService {
     
     // Get all submissions for this course (across all assignments and students)
     // Using batching to handle large datasets efficiently
-    const studentBatches = this.chunkArray(enrolledStudents.map(s => s.userId), this.batchSize);
+    const studentBatches = this.chunkArray(enrolledStudents.map((s: { userId: number }) => s.userId), this.batchSize);
     
     // Process each batch of students
     const studentsWithProgress = [];
@@ -114,13 +114,13 @@ export class BatchOperationsService {
         })
         .from(submissions)
         .where(and(
-          inArray(submissions.userId, batchUserIds),
-          inArray(submissions.assignmentId, courseAssignments.map(a => a.id))
+          inArray(submissions.userId, batchUserIds as number[]),
+          inArray(submissions.assignmentId, courseAssignments.map((a: { id: number }) => a.id))
         ))
         .orderBy(submissions.createdAt);
       
       // Get feedback for all submissions
-      const submissionIds = studentSubmissions.map(s => s.id);
+      const submissionIds = studentSubmissions.map((s: { id: number }) => s.id);
       const feedbackItems = submissionIds.length > 0
         ? await db
             .select()
@@ -151,22 +151,22 @@ export class BatchOperationsService {
       }
       
       // Calculate progress for each student in the batch
-      for (const student of enrolledStudents.filter(s => batchUserIds.includes(s.userId))) {
+      for (const student of enrolledStudents.filter((s: { userId: number }) => batchUserIds.includes(s.userId))) {
         const studentSubmissions = submissionsByStudent.get(student.userId) || [];
         
         // Calculate completion rate (completed submissions / total assignments)
-        const completedCount = studentSubmissions.filter(s => s.status === 'completed').length;
+        const completedCount = studentSubmissions.filter((s: { status: string }) => s.status === 'completed').length;
         const completionRate = courseAssignments.length > 0
           ? completedCount / courseAssignments.length
           : 0;
         
         // Calculate average score across all submissions with feedback
-        const submissionsWithScores = studentSubmissions.filter(s => 
-          s.feedback && typeof s.feedback.score === 'number'
-        );
+        const submissionsWithScores = studentSubmissions.filter((s: { 
+          feedback?: { score?: number } 
+        }) => s.feedback && typeof s.feedback.score === 'number');
         
         const totalScore = submissionsWithScores.reduce(
-          (sum, s) => sum + (s.feedback.score || 0), 
+          (sum: number, s: { feedback: { score?: number } }) => sum + (s.feedback.score || 0), 
           0
         );
         
