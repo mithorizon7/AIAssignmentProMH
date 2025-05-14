@@ -21,16 +21,25 @@ type QueryParams = unknown[];
 type QueryResult<T> = { rows: T[] };
 
 // Extend drizzle object with a raw query execution method
-const db = drizzleInstance as typeof drizzleInstance & {
-  execute: <T extends Record<string, unknown>>(sql: string, params?: QueryParams) => Promise<QueryResult<T>>
-};
+// Using any here is unavoidable due to the complex Drizzle type structure
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = drizzleInstance as any;
 
-// Define the execute method
-db.execute = async <T extends Record<string, unknown>>(
-  sql: string, 
+// Define the execute method with more flexible parameter handling
+db.execute = async function<T extends Record<string, unknown>>(
+  sqlOrConfig: string | { text: string; values?: any[] },
   params?: QueryParams
-): Promise<QueryResult<T>> => {
-  const result = params ? await pool.query(sql, params) : await pool.query(sql);
+): Promise<QueryResult<T>> {
+  let result;
+  
+  if (typeof sqlOrConfig === 'string') {
+    // Called with (sql, params)
+    result = params ? await pool.query(sqlOrConfig, params) : await pool.query(sqlOrConfig);
+  } else {
+    // Called with ({ text, values }) config object
+    result = await pool.query(sqlOrConfig);
+  }
+  
   // Safe casting - we know the result has a rows property
   return result as unknown as QueryResult<T>;
 };
