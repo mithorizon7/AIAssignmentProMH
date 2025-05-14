@@ -12,7 +12,7 @@ async function addMissingColumnsToSubmissions() {
   `;
   
   const result = await db.execute(columnsQuery);
-  const existingColumns = result.rows.map(row => row.column_name);
+  const existingColumns = result.rows.map((row: { column_name: string }) => row.column_name);
   
   const missingColumns = [];
   

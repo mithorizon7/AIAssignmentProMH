@@ -206,7 +206,7 @@ export class DatabaseStorage implements IStorage {
     .innerJoin(users, eq(enrollments.userId, users.id))
     .where(eq(enrollments.courseId, courseId));
     
-    return result.map(r => r.user);
+    return result.map((r: { user: User }) => r.user);
   }
 
   // Assignment operations
@@ -287,7 +287,7 @@ export class DatabaseStorage implements IStorage {
     .where(eq(enrollments.userId, userId))
     .orderBy(desc(assignments.dueDate));
     
-    return result.map(r => r.assignment);
+    return result.map((r: { assignment: Assignment }) => r.assignment);
   }
 
   async updateAssignmentStatus(id: number, status: string): Promise<Assignment> {
@@ -323,7 +323,7 @@ export class DatabaseStorage implements IStorage {
       `;
       
       const result = await db.execute(columnsQuery);
-      const existingColumns = result.rows.map(row => row.column_name);
+      const existingColumns = result.rows.map((row: { column_name: string }) => row.column_name);
       
       // Create a new submissions insert object with required fields
       const submissionData: InsertSubmission = {
