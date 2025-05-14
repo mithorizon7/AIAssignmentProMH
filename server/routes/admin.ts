@@ -63,8 +63,7 @@ router.get('/stats', requireAdmin, asyncHandler(async (req: Request, res: Respon
 }));
 
 // Get recent failed submissions for monitoring
-router.get('/failed-submissions', requireAdmin, async (req: Request, res: Response) => {
-  try {
+router.get('/failed-submissions', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
     const failedSubmissions = await db
       .select({
         id: submissions.id,
@@ -79,85 +78,56 @@ router.get('/failed-submissions', requireAdmin, async (req: Request, res: Respon
       .limit(50);
     
     res.json(failedSubmissions);
-  } catch (error) {
-    console.error('Error fetching failed submissions:', error);
-    res.status(500).json({ message: 'Failed to fetch failed submissions', error: error.message });
-  }
-});
+}));
 
 // Get system load over time using metrics service
-router.get('/load', requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { unit = 'day', count = 7 } = req.query;
-    
-    const loadData = await metricsService.getSystemLoad(
-      String(unit), 
-      Number(count) || 7
-    );
-    
-    res.json(loadData);
-  } catch (error) {
-    console.error('Error fetching system load:', error);
-    res.status(500).json({ message: 'Failed to fetch system load', error: (error as Error).message });
-  }
-});
+router.get('/load', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const { unit = 'day', count = 7 } = req.query;
+  
+  const loadData = await metricsService.getSystemLoad(
+    String(unit), 
+    Number(count) || 7
+  );
+  
+  res.json(loadData);
+}));
 
 // Get detailed processing statistics
-router.get('/performance', requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const [processingStats, percentiles] = await Promise.all([
-      metricsService.getProcessingStats(),
-      metricsService.getProcessingTimePercentiles()
-    ]);
-    
-    res.json({
-      ...processingStats,
-      percentiles
-    });
-  } catch (error) {
-    console.error('Error fetching performance metrics:', error);
-    res.status(500).json({ message: 'Failed to fetch performance metrics', error: (error as Error).message });
-  }
-});
+router.get('/performance', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const [processingStats, percentiles] = await Promise.all([
+    metricsService.getProcessingStats(),
+    metricsService.getProcessingTimePercentiles()
+  ]);
+  
+  res.json({
+    ...processingStats,
+    percentiles
+  });
+}));
 
 // Get metrics by assignment
-router.get('/assignment-metrics/:id?', requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const assignmentId = req.params.id ? parseInt(req.params.id) : undefined;
-    const metrics = await metricsService.getAssignmentMetrics(assignmentId);
-    
-    res.json(metrics);
-  } catch (error) {
-    console.error('Error fetching assignment metrics:', error);
-    res.status(500).json({ message: 'Failed to fetch assignment metrics', error: (error as Error).message });
-  }
-});
+router.get('/assignment-metrics/:id?', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const assignmentId = req.params.id ? parseInt(req.params.id) : undefined;
+  const metrics = await metricsService.getAssignmentMetrics(assignmentId);
+  
+  res.json(metrics);
+}));
 
 // Retry failed submissions
-router.post('/retry-failed', requireAdmin, async (req: Request, res: Response) => {
-  try {
-    // Use the BullMQ queue's built-in method to retry all failed submissions
-    const count = await submissionQueue.retryFailedSubmissions();
-    
-    res.json({ 
-      message: `Requeued ${count} failed submissions`,
-      count
-    });
-  } catch (error) {
-    console.error('Error retrying failed submissions:', error);
-    res.status(500).json({ message: 'Failed to retry submissions', error: (error as Error).message });
-  }
-});
+router.post('/retry-failed', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  // Use the BullMQ queue's built-in method to retry all failed submissions
+  const count = await submissionQueue.retryFailedSubmissions();
+  
+  res.json({ 
+    message: `Requeued ${count} failed submissions`,
+    count
+  });
+}));
 
 // Get queue statistics
-router.get('/queue-stats', requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const stats = await submissionQueue.getStats();
-    res.json(stats);
-  } catch (error) {
-    console.error('Error fetching queue stats:', error);
-    res.status(500).json({ message: 'Failed to fetch queue statistics', error: (error as Error).message });
-  }
-});
+router.get('/queue-stats', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const stats = await submissionQueue.getStats();
+  res.json(stats);
+}));
 
 export default router;

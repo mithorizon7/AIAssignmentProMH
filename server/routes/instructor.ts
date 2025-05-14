@@ -6,6 +6,7 @@ import { eq, count, and, desc, sql, inArray } from 'drizzle-orm';
 import { batchOperations } from '../services/batch-operations';
 import { metricsService } from '../services/metrics-service';
 import { stringify } from 'csv-stringify';
+import { asyncHandler } from '../lib/error-handler';
 
 const router = Router();
 
@@ -19,8 +20,7 @@ const requireInstructor = (req: Request, res: Response, next: any) => {
 };
 
 // Get student progress for an entire course (optimized for large classes)
-router.get('/students/progress/:courseId', requireInstructor, async (req: Request, res: Response) => {
-  try {
+router.get('/students/progress/:courseId', requireInstructor, asyncHandler(async (req: Request, res: Response) => {
     const courseId = parseInt(req.params.courseId);
 
     // Validate course exists and instructor has access
@@ -62,11 +62,7 @@ router.get('/students/progress/:courseId', requireInstructor, async (req: Reques
     };
     
     res.json(progressData);
-  } catch (error) {
-    console.error('Error fetching student progress:', error);
-    res.status(500).json({ message: 'Failed to fetch student progress', error: (error as Error).message });
-  }
-});
+}));
 
 // Bulk enroll students in a course
 router.post('/course/:courseId/enroll-students', requireInstructor, async (req: Request, res: Response) => {
