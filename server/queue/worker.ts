@@ -31,6 +31,25 @@ class EnhancedSubmissionQueue extends EventEmitter {
   }
   
   /**
+   * Add a job to the queue
+   * @param jobName The name of the job
+   * @param data The job data
+   */
+  async add(jobName: string, data: any): Promise<void> {
+    try {
+      if (jobName === 'process' && data.submissionId) {
+        await queueApi.addSubmission(data.submissionId);
+        this.emit('added', data.submissionId);
+      } else {
+        console.warn(`Unrecognized job name: ${jobName}`);
+      }
+    } catch (error) {
+      console.error(`Error adding job ${jobName} to queue:`, error);
+      throw error;
+    }
+  }
+  
+  /**
    * Retry all failed submissions
    */
   async retryFailedSubmissions(): Promise<number> {
