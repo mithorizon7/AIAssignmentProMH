@@ -24,7 +24,7 @@ const mockRequest = () => {
 describe('Error Handler TypeScript Type Safety', () => {
   let req: Request;
   let res: Response;
-  let next: any;
+  let next: jest.Mock;
 
   beforeEach(() => {
     req = mockRequest();
