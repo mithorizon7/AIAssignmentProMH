@@ -32,7 +32,13 @@ import LogsPage from "@/pages/admin/logs";
 import UXExamples from "@/pages/ux-examples";
 import { AuthProvider, useAuth } from "./lib/auth";
 
-function PrivateRoute({ component: Component, requireRole, ...rest }: any) {
+interface PrivateRouteProps {
+  component: React.ComponentType<any>;
+  requireRole?: 'student' | 'instructor' | 'admin';
+  [key: string]: any;
+}
+
+function PrivateRoute({ component: Component, requireRole, ...rest }: PrivateRouteProps) {
   const { user, isAuthenticated } = useAuth();
   
   if (!isAuthenticated) {
