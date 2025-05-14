@@ -37,14 +37,14 @@ export function StudentProgress({
     onSearch(searchQuery);
   };
   
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status: string): 'default' | 'destructive' | 'outline' | 'secondary' => {
     switch (status) {
       case 'submitted':
-        return 'success';
+        return 'secondary';
       case 'not_submitted':
         return 'destructive';
       case 'needs_review':
-        return 'warning';
+        return 'default';
       default:
         return 'outline';
     }
@@ -172,17 +172,22 @@ export function StudentProgress({
                       <div className="text-sm text-neutral-700">{student.attempts}</div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button 
-                        variant="link" 
-                        className={`text-primary hover:text-primary-dark h-auto p-0 ${
-                          student.status === 'not_submitted' 
-                            ? 'text-neutral-400 cursor-not-allowed' 
-                            : ''
-                        }`}
-                        disabled={student.status === 'not_submitted'}
+                      <Link 
+                        href={student.submissionId ? `/submission/${student.submissionId}` : '#'}
+                        onClick={e => !student.submissionId && e.preventDefault()}
                       >
-                        Review
-                      </Button>
+                        <Button 
+                          variant="link" 
+                          className={`text-primary hover:text-primary-dark h-auto p-0 ${
+                            student.status === 'not_submitted' || !student.submissionId
+                              ? 'text-neutral-400 cursor-not-allowed' 
+                              : ''
+                          }`}
+                          disabled={student.status === 'not_submitted' || !student.submissionId}
+                        >
+                          Review
+                        </Button>
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))
@@ -203,10 +208,13 @@ export function StudentProgress({
           <Pagination>
             <PaginationContent>
               <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                />
+                {currentPage === 1 ? (
+                  <PaginationPrevious className="cursor-not-allowed opacity-50" />
+                ) : (
+                  <PaginationPrevious 
+                    onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+                  />
+                )}
               </PaginationItem>
               
               {[...Array(Math.min(5, totalPages))].map((_, i) => {
@@ -243,10 +251,13 @@ export function StudentProgress({
               )}
               
               <PaginationItem>
-                <PaginationNext 
-                  onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                />
+                {currentPage === totalPages ? (
+                  <PaginationNext className="cursor-not-allowed opacity-50" />
+                ) : (
+                  <PaginationNext 
+                    onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+                  />
+                )}
               </PaginationItem>
             </PaginationContent>
           </Pagination>

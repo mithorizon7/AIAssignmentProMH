@@ -95,6 +95,7 @@ export interface StudentProgress {
   status: 'submitted' | 'not_submitted' | 'needs_review';
   lastSubmission?: string;
   attempts: number;
+  submissionId?: number;
 }
 
 export interface AssignmentStats {
