@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { useDropzone } from "react-dropzone";
+import { useDropzone, FileRejection, DropEvent, FileError } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Upload, X, File, Image, FileCode, FileText, Video, Music, PieChart, FileJson, Loader2, CheckCircle, AlertCircle } from "lucide-react";
@@ -56,18 +56,18 @@ export function FileUpload({
   }, []);
 
   const onDrop = useCallback(
-    (acceptedFiles: File[], rejectedFiles: any[]) => {
+    (acceptedFiles: File[], rejectedFiles: FileRejection[], event: DropEvent) => {
       // Handle rejected files
       if (rejectedFiles.length > 0) {
         const errors: string[] = [];
-        rejectedFiles.forEach((file) => {
-          file.errors.forEach((err: any) => {
+        rejectedFiles.forEach((fileRejection) => {
+          fileRejection.errors.forEach((err) => {
             if (err.code === "file-too-large") {
-              errors.push(`File "${file.file.name}" is too large. Max size is ${formatSize(maxSize)}.`);
+              errors.push(`File "${fileRejection.file.name}" is too large. Max size is ${formatSize(maxSize)}.`);
             } else if (err.code === "file-invalid-type") {
-              errors.push(`File "${file.file.name}" has an invalid type.`);
+              errors.push(`File "${fileRejection.file.name}" has an invalid type.`);
             } else {
-              errors.push(`File "${file.file.name}": ${err.message}`);
+              errors.push(`File "${fileRejection.file.name}": ${err.message}`);
             }
           });
         });

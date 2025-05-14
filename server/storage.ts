@@ -195,7 +195,7 @@ export class DatabaseStorage implements IStorage {
     .innerJoin(courses, eq(enrollments.courseId, courses.id))
     .where(eq(enrollments.userId, userId));
     
-    return result.map(r => r.course);
+    return result.map((r: { course: Course }) => r.course);
   }
 
   async listCourseEnrollments(courseId: number): Promise<User[]> {
