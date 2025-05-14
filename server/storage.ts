@@ -432,16 +432,16 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error getting latest submission:", error);
       
-      // Fallback approach with raw SQL if there's a schema issue
+      // Fallback approach with parameterized SQL for security
       try {
-        const sql = `
+        const parameterizedSql = `
           SELECT * FROM submissions 
-          WHERE user_id = ${userId} AND assignment_id = ${assignmentId}
+          WHERE user_id = $1 AND assignment_id = $2
           ORDER BY created_at DESC
           LIMIT 1;
         `;
         
-        const result = await db.execute(sql);
+        const result = await db.execute(parameterizedSql, [userId, assignmentId]);
         return result.rows[0] as Submission;
       } catch (innerError) {
         console.error("Fallback query for latest submission also failed:", innerError);

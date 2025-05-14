@@ -342,6 +342,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If user is not authenticated, they will be redirected to login
       // from the client side, and then back to the submission page
       
+      // Ensure assignment has a valid shareable code
+      let shareableCode = assignment.shareableCode;
+      
+      // If no shareable code exists, generate one and try to persist it
+      if (!shareableCode && assignment.id) {
+        shareableCode = generateShareableCode();
+        try {
+          // Try to update the assignment with the new code, but don't fail if it doesn't work
+          await storage.updateAssignmentShareableCode(assignment.id, shareableCode);
+          console.log(`Generated new shareable code ${shareableCode} for assignment ${assignment.id}`);
+        } catch (err) {
+          console.error('Error updating assignment with new shareable code:', err);
+        }
+      }
+
       // Return assignment with authentication status flag set to true (always require auth)
       res.json({
         id: assignment.id,
@@ -351,7 +366,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         courseCode: course.code,
         courseName: course.name,
         dueDate: assignment.dueDate,
-        shareableCode: assignment.shareableCode,
+        // Always provide a shareable code, using temp- prefix as fallback if needed
+        shareableCode: shareableCode || `TEMP-${assignment.id}`,
         requiresAuth: true, // Always require authentication for submissions
         isAuthenticated: isAuthenticated // Flag indicating if user is already authenticated
       });
@@ -393,7 +409,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Validate shareable code - this is a critical security check
-      if (!assignment.shareableCode || assignment.shareableCode !== shareableCode) {
+      
+      // Get the stored shareable code from the assignment, or generate a persistent one if missing
+      let storedShareableCode = assignment.shareableCode;
+      
+      // If assignment has no shareable code but has an ID, generate and persist one
+      if (!storedShareableCode && assignment.id) {
+        storedShareableCode = generateShareableCode();
+        try {
+          // Try to update the assignment with the new code, but don't fail if it doesn't work
+          await storage.updateAssignmentShareableCode(assignment.id, storedShareableCode);
+          console.log(`Generated new shareable code ${storedShareableCode} for assignment ${assignment.id}`);
+        } catch (err) {
+          console.error('Error updating assignment with new shareable code:', err);
+        }
+      }
+      
+      // Create a temp code based on ID for older assignments where code generation failed
+      const fallbackCode = `TEMP-${assignment.id}`;
+      
+      // Check if the provided code matches either the stored code or the temp code
+      if (shareableCode !== storedShareableCode && shareableCode !== fallbackCode) {
         return res.status(403).json({ 
           message: 'Invalid shareable code for this assignment',
           details: 'The provided shareable code does not match the assignment' 

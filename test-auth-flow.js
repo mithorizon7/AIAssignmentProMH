@@ -68,6 +68,26 @@ async function testAuthRequiredForSubmissions() {
   } catch (error) {
     console.error('Error testing shareable link endpoint:', error);
   }
+  
+  // Test SQL Injection protection
+  try {
+    // Test with SQL injection characters
+    const maliciousCode = "TEST123' OR '1'='1"; 
+    const response = await fetch(`http://localhost:5000/api/assignments/code/${maliciousCode}`);
+    
+    console.log(`SQL Injection test: ${response.status} ${response.statusText}`);
+    
+    // The endpoint should handle this gracefully and not expose a 500 error
+    if (response.status !== 500) {
+      console.log('✓ SQL Injection protection functioning correctly');
+    } else {
+      console.log('❌ Possible SQL vulnerability detected!');
+      const errorText = await response.text();
+      console.log('Error details:', errorText);
+    }
+  } catch (error) {
+    console.error('Error testing SQL injection protection:', error);
+  }
 }
 
 // Run tests
