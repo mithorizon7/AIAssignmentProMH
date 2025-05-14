@@ -81,22 +81,7 @@ export class StorageService {
   }
 
   // Get submission with feedback
-  async getSubmissionWithFeedback(submissionId: number): Promise<{ 
-    id: number; 
-    assignmentId: number; 
-    userId: number; 
-    status: string; 
-    content?: string; 
-    fileUrl?: string; 
-    fileName?: string;
-    mimeType?: string;
-    fileSize?: number;
-    contentType?: string;
-    notes?: string;
-    createdAt: Date;
-    updatedAt: Date;
-    feedback: Feedback | null;
-  } | null> {
+  async getSubmissionWithFeedback(submissionId: number): Promise<(Submission & { feedback: Feedback | null }) | null> {
     try {
       const submission = await storage.getSubmission(submissionId);
       if (!submission) return null;

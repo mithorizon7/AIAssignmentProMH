@@ -17,7 +17,59 @@ export class BatchOperationsService {
    * This implementation is optimized for large classes with thousands of students
    * @param courseId The course ID to get progress for
    */
-  async getUserProgressForCourse(courseId: number): Promise<any> {
+  async getUserProgressForCourse(courseId: number): Promise<{
+    courseId: number;
+    courseName: string;
+    totalStudents: number;
+    totalAssignments: number;
+    avgCompletionRate: number;
+    avgScore: number;
+    assignments: Array<{
+      id: number;
+      title: string;
+      description: string | null;
+      courseId: number;
+      dueDate: Date;
+      status: string;
+      shareableCode: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+    students: Array<{
+      userId: number;
+      name: string;
+      email: string;
+      completionRate: number;
+      averageScore: number;
+      completedAssignments: number;
+      totalAssignments: number;
+      submissions: Array<{
+        id: number;
+        userId: number;
+        assignmentId: number;
+        status: string;
+        createdAt: Date;
+        feedback: {
+          id: number;
+          submissionId: number;
+          score: number | null;
+          strengths: string[];
+          improvements: string[];
+          suggestions: string[];
+          summary: string | null;
+          criteriaScores: Array<{
+            criteriaId: string;
+            score: number;
+            feedback: string;
+          }> | null;
+          processingTime: number;
+          modelName: string | null;
+          tokenCount: number | null;
+          createdAt: Date;
+        } | null;
+      }>;
+    }>;
+  }> {
     // Get course information
     const course = await storage.getCourse(courseId);
     if (!course) {

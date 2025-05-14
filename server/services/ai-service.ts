@@ -29,7 +29,7 @@ interface FeedbackResponse {
   criteriaScores?: CriteriaScore[];
   score?: number;
   processingTime: number;
-  rawResponse: Record<string, any>;
+  rawResponse: Record<string, unknown>;
   modelName: string;
   tokenCount: number;
 }

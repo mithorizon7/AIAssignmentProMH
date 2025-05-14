@@ -135,7 +135,7 @@ export class MetricsService {
       .from(feedback)
       .orderBy(feedback.processingTime);
     
-    const times = feedbackTimes.map(f => f.time).filter(Boolean) as number[];
+    const times = feedbackTimes.map((f: { time: number | null }) => f.time).filter(Boolean) as number[];
     
     if (times.length === 0) {
       return { p50: 0, p75: 0, p90: 0, p95: 0, p99: 0 };
