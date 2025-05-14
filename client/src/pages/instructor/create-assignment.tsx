@@ -23,7 +23,7 @@ import { API_ROUTES, APP_ROUTES } from "@/lib/constants";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Rubric } from '@shared/schema';
-import { Assignment, Course } from '@/lib/types';
+import type { Assignment, Course } from '@/lib/types';
 import { RubricBuilder } from "@/components/instructor/rubric-builder";
 import { RubricTester } from "@/components/instructor/rubric-tester";
 import { ShareableLink } from "@/components/instructor/shareable-link";
@@ -243,7 +243,7 @@ export default function CreateAssignment() {
                 
                 <ShareableLink 
                   assignmentId={createdAssignment.id}
-                  shareableCode={createdAssignment.shareableCode}
+                  shareableCode={createdAssignment.shareableCode || ''}
                 />
                 
                 <div className="pt-4 flex justify-between">

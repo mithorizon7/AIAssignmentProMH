@@ -32,6 +32,7 @@ export interface Assignment {
   status: 'active' | 'completed' | 'upcoming';
   shareableCode?: string;
   rubric?: Rubric;
+  instructorContext?: string;
   createdAt: string;
   updatedAt: string;
 }

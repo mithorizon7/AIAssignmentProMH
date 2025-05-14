@@ -180,7 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       dueDate: new Date(dueDate), // The client already sends an ISO string, so we just need a Date object
       status: 'active', // Setting to active by default so students can submit immediately
       shareableCode,
-      rubric: rubric ? JSON.stringify(rubric) : null,
+      rubric: rubric ? JSON.stringify(rubric) as any : null,
     });
     
     res.status(201).json(assignment);
@@ -210,8 +210,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // Get additional data with error handling
     let course = null;
-    let submissions = [];
-    let students = [];
+    let submissions: any[] = [];
+    let students: any[] = [];
     
     try {
       course = await storage.getCourse(assignment.courseId);
