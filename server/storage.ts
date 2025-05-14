@@ -451,12 +451,12 @@ export class DatabaseStorage implements IStorage {
         console.log(`[INFO] Using fallback SQL approach for submission ${id} status update`);
         const safeSql = `
           UPDATE submissions 
-          SET status = '${status.replace(/'/g, "''")}', updated_at = NOW() 
-          WHERE id = ${id}
+          SET status = $1, updated_at = NOW() 
+          WHERE id = $2
           RETURNING *;
         `;
         
-        const result = await db.execute(safeSql);
+        const result = await db.execute(safeSql, [status, id]);
         if (result.rows.length === 0) {
           throw new Error(`Submission with ID ${id} not found`);
         }
@@ -763,15 +763,29 @@ export class DatabaseStorage implements IStorage {
       try {
         console.log('[INFO] Attempting fallback SQL for file type setting upsert');
         
-        // First check if the setting exists
-        const checkSql = `
-          SELECT id FROM file_type_settings 
-          WHERE content_type = '${setting.contentType}' 
-          AND context = '${setting.context}'
-          ${setting.contextId ? `AND context_id = ${setting.contextId}` : 'AND context_id IS NULL'};
-        `;
+        // First check if the setting exists using parameterized query
+        let checkSql;
+        let checkParams = [];
         
-        const checkResult = await db.execute(checkSql);
+        if (setting.contextId) {
+          checkSql = `
+            SELECT id FROM file_type_settings 
+            WHERE content_type = $1 
+            AND context = $2
+            AND context_id = $3;
+          `;
+          checkParams = [setting.contentType, setting.context, setting.contextId];
+        } else {
+          checkSql = `
+            SELECT id FROM file_type_settings 
+            WHERE content_type = $1 
+            AND context = $2
+            AND context_id IS NULL;
+          `;
+          checkParams = [setting.contentType, setting.context];
+        }
+        
+        const checkResult = await db.execute(checkSql, checkParams);
         const existingId = checkResult.rows[0]?.id;
         
         const extensions = JSON.stringify(
@@ -783,43 +797,56 @@ export class DatabaseStorage implements IStorage {
         );
         
         let sql;
+        let params = [];
         if (existingId) {
-          // Update
+          // Update using parameterized query
           sql = `
             UPDATE file_type_settings
             SET 
-              enabled = ${setting.enabled || false},
-              extensions = '${extensions.replace(/'/g, "''")}',
-              mime_types = '${mimeTypes.replace(/'/g, "''")}',
-              max_size = ${setting.maxSize || 'NULL'},
+              enabled = $1,
+              extensions = $2,
+              mime_types = $3,
+              max_size = $4,
               updated_at = NOW(),
-              updated_by = ${setting.updatedBy || 'NULL'}
-            WHERE id = ${existingId}
+              updated_by = $5
+            WHERE id = $6
             RETURNING *;
           `;
+          
+          params = [
+            setting.enabled || false,
+            extensions,
+            mimeTypes,
+            setting.maxSize || null,
+            setting.updatedBy || null,
+            existingId
+          ];
         } else {
-          // Insert
+          // Insert using parameterized query
           sql = `
             INSERT INTO file_type_settings (
               content_type, context, context_id, enabled, extensions,
               mime_types, max_size, updated_at, updated_by
             )
             VALUES (
-              '${setting.contentType}',
-              '${setting.context}',
-              ${setting.contextId || 'NULL'},
-              ${setting.enabled || false},
-              '${extensions.replace(/'/g, "''")}',
-              '${mimeTypes.replace(/'/g, "''")}',
-              ${setting.maxSize || 'NULL'},
-              NOW(),
-              ${setting.updatedBy || 'NULL'}
+              $1, $2, $3, $4, $5, $6, $7, NOW(), $8
             )
             RETURNING *;
           `;
+          
+          params = [
+            setting.contentType,
+            setting.context,
+            setting.contextId || null,
+            setting.enabled || false,
+            extensions,
+            mimeTypes,
+            setting.maxSize || null,
+            setting.updatedBy || null
+          ];
         }
         
-        const result = await db.execute(sql);
+        const result = await db.execute(sql, params);
         if (result.rows.length === 0) {
           throw new Error('Failed to upsert file type setting with fallback SQL');
         }
