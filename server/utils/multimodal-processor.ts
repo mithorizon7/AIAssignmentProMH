@@ -9,7 +9,8 @@ import {
   getContentTypeFromMimeType, 
   getMimeTypeFromExtension,
   isCSVFile,
-  getExtensionFromFilename
+  getExtensionFromFilename,
+  ContentType
 } from './file-type-settings';
 
 const readFileAsync = promisify(fs.readFile);
