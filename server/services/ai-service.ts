@@ -185,9 +185,13 @@ ${params.studentSubmissionContent}
         ...response,
         processingTime
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('AI submission analysis error:', error);
-      throw new Error(`Failed to analyze submission: ${error.message || String(error)}`);
+      if (error instanceof Error) {
+        throw new Error(`Failed to analyze submission: ${error.message}`);
+      } else {
+        throw new Error(`Failed to analyze submission: ${String(error)}`);
+      }
     }
   }
 
@@ -283,9 +287,13 @@ into your evaluation logic while keeping the actual guidance confidential.`;
         ...response,
         processingTime
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('AI multimodal submission analysis error:', error);
-      throw new Error(`Failed to analyze multimodal submission: ${error.message || String(error)}`);
+      if (error instanceof Error) {
+        throw new Error(`Failed to analyze multimodal submission: ${error.message}`);
+      } else {
+        throw new Error(`Failed to analyze multimodal submission: ${String(error)}`);
+      }
     }
   }
 

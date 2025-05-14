@@ -164,7 +164,7 @@ export const feedback = pgTable("feedback", {
   score: smallint("score"),
   criteriaScores: json("criteria_scores").$type<CriteriaScore[]>(),
   processingTime: integer("processing_time").notNull(), // in milliseconds
-  rawResponse: json("raw_response").$type<Record<string, any>>(),
+  rawResponse: json("raw_response").$type<Record<string, unknown>>(),
   modelName: text("model_name"),
   tokenCount: integer("token_count"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
