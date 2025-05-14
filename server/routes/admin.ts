@@ -29,21 +29,21 @@ router.get('/stats', requireAdmin, asyncHandler(async (req: Request, res: Respon
       completedCount,
       failedCount
     ] = await Promise.all([
-      db.select({ count: count() }).from(users).then(r => r[0].count),
-      db.select({ count: count() }).from(courses).then(r => r[0].count),
-      db.select({ count: count() }).from(assignments).then(r => r[0].count),
-      db.select({ count: count() }).from(submissions).then(r => r[0].count),
-      db.select({ count: count() }).from(submissions).where(eq(submissions.status, 'pending')).then(r => r[0].count),
-      db.select({ count: count() }).from(submissions).where(eq(submissions.status, 'processing')).then(r => r[0].count),
-      db.select({ count: count() }).from(submissions).where(eq(submissions.status, 'completed')).then(r => r[0].count),
-      db.select({ count: count() }).from(submissions).where(eq(submissions.status, 'failed')).then(r => r[0].count),
+      db.select({ count: count() }).from(users).then((r: { count: number }[]) => r[0].count),
+      db.select({ count: count() }).from(courses).then((r: { count: number }[]) => r[0].count),
+      db.select({ count: count() }).from(assignments).then((r: { count: number }[]) => r[0].count),
+      db.select({ count: count() }).from(submissions).then((r: { count: number }[]) => r[0].count),
+      db.select({ count: count() }).from(submissions).where(eq(submissions.status, 'pending')).then((r: { count: number }[]) => r[0].count),
+      db.select({ count: count() }).from(submissions).where(eq(submissions.status, 'processing')).then((r: { count: number }[]) => r[0].count),
+      db.select({ count: count() }).from(submissions).where(eq(submissions.status, 'completed')).then((r: { count: number }[]) => r[0].count),
+      db.select({ count: count() }).from(submissions).where(eq(submissions.status, 'failed')).then((r: { count: number }[]) => r[0].count),
     ]);
 
     // Get average processing time for completed submissions
     const avgProcessingTime = await db
       .select({ avg: avg(feedback.processingTime) })
       .from(feedback)
-      .then(r => r[0].avg || 0);
+      .then((r: { avg: number | null }[]) => r[0].avg || 0);
 
     res.json({
       userCount,

@@ -114,7 +114,7 @@ router.get('/assignments/:id/submissions', requireInstructor, asyncHandler(async
       .orderBy(desc(submissions.createdAt));
     
     // Get submission IDs for feedback lookup
-    const submissionIds = submissionsData.map(s => s.submission.id);
+    const submissionIds = submissionsData.map((s: { submission: { id: number } }) => s.submission.id);
     
     // Get feedback for all submissions
     const feedbackItems = submissionIds.length > 0 
@@ -133,7 +133,7 @@ router.get('/assignments/:id/submissions', requireInstructor, asyncHandler(async
     const metrics = await metricsService.getAssignmentMetrics(assignmentId);
     
     // Combine the data
-    const result = submissionsData.map(item => ({
+    const result = submissionsData.map((item: { submission: Submission; userName: string; userEmail: string }) => ({
       ...item.submission,
       student: {
         name: item.userName,
