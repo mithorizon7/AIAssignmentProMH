@@ -300,26 +300,30 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("[ERROR] Error creating submission:", error);
       
-      // Fallback approach if there's a schema issue
+      // Fallback approach if there's a schema issue - using parameterized query
       try {
-        const sql = `
+        // Define the parameterized SQL query
+        const parameterizedSql = `
           INSERT INTO submissions (assignment_id, user_id, file_url, file_name, content, notes, status)
-          VALUES (
-            ${insertSubmission.assignmentId}, 
-            ${insertSubmission.userId}, 
-            ${insertSubmission.fileUrl ? `'${insertSubmission.fileUrl.replace(/'/g, "''")}'` : 'NULL'},
-            ${insertSubmission.fileName ? `'${insertSubmission.fileName.replace(/'/g, "''")}'` : 'NULL'},
-            ${insertSubmission.content ? `'${insertSubmission.content.replace(/'/g, "''")}'` : 'NULL'},
-            ${insertSubmission.notes ? `'${insertSubmission.notes.replace(/'/g, "''")}'` : 'NULL'},
-            '${insertSubmission.status || 'pending'}'
-          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
           RETURNING *;
         `;
         
-        console.log("[INFO] Using fallback SQL for submission creation");
-        const result = await db.execute(sql);
+        // Define parameters with proper types
+        const params = [
+          insertSubmission.assignmentId, 
+          insertSubmission.userId,
+          insertSubmission.fileUrl || null,
+          insertSubmission.fileName || null,
+          insertSubmission.content || null,
+          insertSubmission.notes || null,
+          insertSubmission.status || 'pending'
+        ];
+        
+        console.log("[INFO] Using fallback parameterized SQL for submission creation");
+        const result = await db.execute(parameterizedSql, params);
         const submission = result.rows[0] as Submission;
-        console.log(`[INFO] Submission created successfully with fallback: ${submission.id}`);
+        console.log(`[INFO] Submission created successfully with secure fallback: ${submission.id}`);
         return submission;
       } catch (fallbackError) {
         console.error("[ERROR] Fallback submission creation also failed:", fallbackError);
@@ -350,15 +354,15 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error listing submissions for assignment:", error);
       
-      // Fallback approach with raw SQL if there's a schema issue
+      // Fallback approach with parameterized SQL if there's a schema issue
       try {
-        const sql = `
+        const parameterizedSql = `
           SELECT * FROM submissions 
-          WHERE assignment_id = ${assignmentId}
+          WHERE assignment_id = $1
           ORDER BY created_at DESC;
         `;
         
-        const result = await db.execute(sql);
+        const result = await db.execute(parameterizedSql, [assignmentId]);
         return result.rows as Submission[];
       } catch (innerError) {
         console.error("Fallback query also failed:", innerError);

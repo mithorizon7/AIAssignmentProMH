@@ -1,0 +1,35 @@
+When a student clicks a custom (shareable) link for an assignment, logs in, and then accesses that assignment, here's what the AIGrader system's code indicates would happen regarding their assignments and course enrollment:
+
+Accessing the Assignment via Shareable Link:
+
+The frontend route for shareable links (e.g., /submit/:code) would trigger a call to the backend API endpoint GET /api/assignments/code/:code (defined in AIGrader/server/routes.ts).
+This backend endpoint retrieves assignment details. It also includes flags requiresAuth: true and isAuthenticated (based on the current session) in its response.
+The client-side component handling /submit/:code (conceptually, a SubmitByCodePage.tsx or similar, though its exact code isn't provided for review) would check these flags. If isAuthenticated is false, it should redirect the user to the login page, passing the shareableCode or assignmentId as a returnTo parameter.
+Post-Login Redirection:
+
+The authentication routes (configured in AIGrader/server/auth.ts), upon successful login (e.g., local, Auth0, or MIT Horizon OIDC callbacks), are designed to check for a req.session.returnTo parameter.
+If this returnTo parameter is present and valid (e.g., /submit/SHAREABLE_CODE), the student is redirected back to the assignment submission page they were originally trying to access, rather than the default dashboard.
+Auto-Enrollment in the Course upon Submission:
+
+The primary mechanism for associating the student with the course, if they aren't already, is handled when they actually submit the assignment.
+The POST /api/submissions endpoint in AIGrader/server/routes.ts (which handles authenticated submissions) would contain logic to:
+Get the assignmentId from the submission.
+Retrieve the courseId associated with that assignmentId (likely from storage.getAssignment(assignmentId)).
+Check if an enrollment exists for the authenticated userId and the retrieved courseId using a method like storage.getEnrollment(userId, courseId) (defined in AIGrader/server/storage.ts).
+If no enrollment exists, it calls storage.createEnrollment({ userId, courseId }) to add the student to the course.
+Impact for the Student (Assignment appearing in "their" assignments):
+
+Once an enrollment is created, the student is formally part of the course.
+When the student views their dashboard or list of assignments, the backend endpoint GET /api/assignments (for students) calls storage.listAssignmentsForUser(user.id).
+The listAssignmentsForUser method in AIGrader/server/storage.ts fetches assignments based on the courses the user is enrolled in. The SQL query in this method explicitly joins enrollments with assignments on courseId.
+Therefore, after successful submission and the subsequent auto-enrollment, the assignment (and the course) will appear in the student's list of assignments.
+Impact for the Instructor (Student added to course/assignment):
+
+The creation of an enrollment record via storage.createEnrollment means the student is now officially part of the course roster in the database.
+When an instructor views their course (e.g., student progress, submissions for an assignment within that course), the backend queries (like those in AIGrader/server/routes/instructor.ts for GET /api/instructor/students/progress/:courseId or GET /api/instructor/assignments/:id/submissions) would now include this newly enrolled student.
+For example, listCourseEnrollments(courseId) in AIGrader/server/storage.ts would fetch this student.
+In summary, based on the code structure:
+
+The assignment becomes accessible to the student immediately after they log in and are redirected back via the shareable link.
+The formal addition of the assignment to "their" dashboard list and their appearance on the instructor's course roster (and for that assignment) is primarily solidified upon the student's first submission for that assignment, which triggers the auto-enrollment logic if they weren't already enrolled in the course.
+This enrollment then ensures the student is linked to the course for all subsequent views and tracking by both the student and the instructor.
