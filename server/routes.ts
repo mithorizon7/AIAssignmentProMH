@@ -425,9 +425,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'No file uploaded' });
       }
       
-      // Determine content type based on file extension
+      // Determine content type based on file extension and mime type
       const extension = path.extname(req.file.originalname).toLowerCase().slice(1);
-      const contentType = determineContentType(extension);
+      const mimeType = req.file.mimetype;
+      const contentType = determineContentType(mimeType, req.file.originalname);
       
       if (!contentType || !isFileTypeAllowed(extension, contentType)) {
         return res.status(400).json({ 
