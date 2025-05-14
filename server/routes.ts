@@ -822,7 +822,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             email: student.email,
             status,
             lastSubmission: latestSubmission ? new Date(latestSubmission.createdAt).toLocaleString() : undefined,
-            attempts: studentSubmissions.length
+            attempts: studentSubmissions.length,
+            submissionId: latestSubmission ? latestSubmission.id : undefined
           };
         });
         
@@ -833,13 +834,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalCount = allStudents.length;
         
         // Get paginated students
-        students = allStudents.slice((page - 1) * pageSize, page * pageSize).map((student: User) => ({
-          id: student.id,
-          name: student.name,
-          email: student.email,
-          status: 'not_submitted', // Default status
-          attempts: 0
-        }));
+        // Get all submissions to determine status
+        const allSubmissions = await db.select().from(submissions);
+        
+        students = allStudents.slice((page - 1) * pageSize, page * pageSize).map((student: User) => {
+          // Find the most recent submission for this student
+          const studentSubmissions = allSubmissions.filter(sub => sub.userId === student.id);
+          const latestSubmission = studentSubmissions.length > 0 ? 
+            studentSubmissions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] : 
+            null;
+            
+          let status: 'submitted' | 'not_submitted' | 'needs_review' = 'not_submitted';
+          
+          if (latestSubmission) {
+            if (latestSubmission.status === 'completed') {
+              status = 'submitted';
+            } else if (['pending', 'processing'].includes(latestSubmission.status)) {
+              status = 'needs_review';
+            }
+          }
+          
+          return {
+            id: student.id,
+            name: student.name,
+            email: student.email,
+            status,
+            lastSubmission: latestSubmission ? new Date(latestSubmission.createdAt).toLocaleString() : undefined,
+            attempts: studentSubmissions.length,
+            submissionId: latestSubmission ? latestSubmission.id : undefined
+          };
+        });
       }
       
       // Apply search filter
