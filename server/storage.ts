@@ -7,6 +7,7 @@ import {
   enrollments,
   systemSettings,
   fileTypeSettings,
+  contentTypeEnum,
   type User, 
   type InsertUser, 
   type Course, 
@@ -24,6 +25,9 @@ import {
   type FileTypeSetting,
   type InsertFileTypeSetting,
 } from "@shared/schema";
+
+// Define type for the content type enum values
+type ContentType = "text" | "image" | "audio" | "video" | "document";
 import { db } from "./db";
 import { eq, and, desc, gte, lt, like, or, sql } from "drizzle-orm";
 
@@ -522,22 +526,21 @@ export class DatabaseStorage implements IStorage {
         const sql = `
           INSERT INTO feedback (
             submission_id, strengths, improvements, suggestions, 
-            overall_feedback, score, criteria_scores, criteria_feedback,
-            feedback_type, token_count, model_name, created_at, updated_at
+            summary, score, criteria_scores, processing_time,
+            raw_response, token_count, model_name, created_at
           )
           VALUES (
             ${insertFeedback.submissionId},
             '${strengths.replace(/'/g, "''")}',
             '${improvements.replace(/'/g, "''")}',
             '${suggestions.replace(/'/g, "''")}',
-            ${insertFeedback.overallFeedback ? `'${insertFeedback.overallFeedback.replace(/'/g, "''")}'` : 'NULL'},
+            ${insertFeedback.summary ? `'${insertFeedback.summary.replace(/'/g, "''")}'` : 'NULL'},
             ${insertFeedback.score || 'NULL'},
             ${insertFeedback.criteriaScores ? `'${JSON.stringify(insertFeedback.criteriaScores).replace(/'/g, "''")}'` : 'NULL'},
-            ${insertFeedback.criteriaFeedback ? `'${JSON.stringify(insertFeedback.criteriaFeedback).replace(/'/g, "''")}'` : 'NULL'},
-            ${insertFeedback.feedbackType ? `'${insertFeedback.feedbackType}'` : 'NULL'},
+            ${insertFeedback.processingTime},
+            ${insertFeedback.rawResponse ? `'${JSON.stringify(insertFeedback.rawResponse).replace(/'/g, "''")}'` : 'NULL'},
             ${insertFeedback.tokenCount || 'NULL'},
             ${insertFeedback.modelName ? `'${insertFeedback.modelName}'` : 'NULL'},
-            NOW(),
             NOW()
           )
           RETURNING *;
@@ -600,19 +603,18 @@ export class DatabaseStorage implements IStorage {
     // Create base query
     const query = db.select().from(fileTypeSettings);
     
-    // Apply filters
-    const filters = [];
-    filters.push(eq(fileTypeSettings.contentType, contentType));
-    filters.push(eq(fileTypeSettings.context, context));
+    // Build the query with direct string comparison
+    const conditions = [];
+    conditions.push(sql`${fileTypeSettings.contentType}::text = ${contentType}`);
+    conditions.push(sql`${fileTypeSettings.context} = ${context}`);
     
     if (contextId !== undefined) {
-      filters.push(eq(fileTypeSettings.contextId, contextId));
+      conditions.push(sql`${fileTypeSettings.contextId} = ${contextId}`);
     } else {
-      filters.push(sql`${fileTypeSettings.contextId} IS NULL`);
+      conditions.push(sql`${fileTypeSettings.contextId} IS NULL`);
     }
     
-    // Execute query with all filters
-    return await query.where(and(...filters));
+    return await query.where(and(...conditions));
   }
 
   async upsertFileTypeSetting(setting: InsertFileTypeSetting): Promise<FileTypeSetting> {
