@@ -6,6 +6,7 @@ import { promisify } from 'util';
 import { AIAdapter, MultimodalPromptPart } from './ai-adapter';
 import { CriteriaScore } from '@shared/schema';
 import { fileToDataURI } from '../utils/multimodal-processor';
+import { ContentType } from '../utils/file-type-settings';
 
 const readFileAsync = promisify(fs.readFile);
 
@@ -119,7 +120,7 @@ export class GeminiAdapter implements AIAdapter {
    * @param contentType The content category (image, video, audio, document)
    * @returns True if the MIME type is supported
    */
-  private isMimeTypeSupported(mimeType: string, contentType: string): boolean {
+  private isMimeTypeSupported(mimeType: string, contentType: ContentType): boolean {
     const supportedTypes = SUPPORTED_MIME_TYPES[contentType as keyof typeof SUPPORTED_MIME_TYPES];
     if (!supportedTypes) return false;
     return supportedTypes.includes(mimeType);
@@ -130,8 +131,8 @@ export class GeminiAdapter implements AIAdapter {
    * @param contentType The content category
    * @returns A default MIME type for the given category
    */
-  private getDefaultMimeType(contentType: string): string {
-    const defaults = {
+  private getDefaultMimeType(contentType: ContentType): string {
+    const defaults: Record<ContentType, string> = {
       'text': 'text/plain',
       'image': 'image/jpeg',
       'audio': 'audio/mpeg',
@@ -139,7 +140,7 @@ export class GeminiAdapter implements AIAdapter {
       'document': 'application/pdf'
     };
     
-    return defaults[contentType as keyof typeof defaults] || 'application/octet-stream';
+    return defaults[contentType] || 'application/octet-stream';
   }
   
   /**

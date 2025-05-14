@@ -26,7 +26,7 @@ export interface FileMetadata {
   path: string;
   size: number;
   mimeType: string;
-  contentType: 'text' | 'image' | 'audio' | 'video' | 'document';
+  contentType: ContentType;
   assignmentId?: number;
   userId?: number;
 }
@@ -129,7 +129,7 @@ export async function createMultimodalPromptParts(
     // Add assignment prompt if provided
     if (assignmentPrompt) {
       parts.push({
-        type: 'text',
+        type: 'text' as ContentType,
         content: assignmentPrompt
       });
     }
@@ -143,11 +143,11 @@ export async function createMultimodalPromptParts(
     // Fallback to text-only if file processing fails
     return [
       {
-        type: 'text' as const,
+        type: 'text' as ContentType,
         content: `Failed to process ${fileMetadata.contentType} file: ${fileMetadata.originalName}. ${errorMessage}`
       },
       ...(assignmentPrompt ? [{
-        type: 'text' as const,
+        type: 'text' as ContentType,
         content: assignmentPrompt
       }] : [])
     ];

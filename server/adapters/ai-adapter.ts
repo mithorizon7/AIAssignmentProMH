@@ -1,8 +1,10 @@
 import { CriteriaScore } from '@shared/schema';
 
+import { ContentType } from '../utils/file-type-settings';
+
 // Define a structure for multimodal prompts
 export interface MultimodalPromptPart {
-  type: 'text' | 'image' | 'audio' | 'video' | 'document';
+  type: ContentType;
   content: string | Buffer;
   mimeType?: string;
   textContent?: string; // Optional extracted text content from non-text files
