@@ -1026,8 +1026,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Test rubric with AI (instructor only)
-  app.post('/api/test-rubric', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
-    try {
+  app.post('/api/test-rubric', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
       const { content, assignmentContext } = req.body;
       
       if (!content) {
@@ -1050,15 +1049,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         summary: feedback.summary,
         score: feedback.score
       });
-    } catch (error) {
-      console.error('Error testing rubric:', error);
-      res.status(500).json({ message: 'Failed to test rubric' });
-    }
-  });
+  }));
 
   // Export grades as CSV
-  app.get('/api/export/grades', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
-    try {
+  app.get('/api/export/grades', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
       const assignmentId = parseInt(req.query.assignmentId as string);
       
       if (!assignmentId) {
@@ -1143,11 +1137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Disposition', `attachment; filename="${course.code}_${assignment.title.replace(/\s+/g, '_')}_grades.csv"`);
       
       res.send(csv);
-    } catch (error) {
-      console.error('Error exporting grades:', error);
-      res.status(500).json({ message: 'Failed to export grades' });
-    }
-  });
+  }));
   
   const httpServer = createServer(app);
 
