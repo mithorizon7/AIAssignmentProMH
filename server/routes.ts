@@ -61,79 +61,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication endpoints handled in auth.ts
 
   // Assignment endpoints
-  app.get('/api/assignments', requireAuth, async (req: Request, res: Response) => {
-    try {
-      const user = req.user as any;
-      let assignments;
+  app.get('/api/assignments', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+    const user = req.user as any;
+    let assignments;
+    
+    if (user.role === 'student') {
+      assignments = await storage.listAssignmentsForUser(user.id);
       
-      if (user.role === 'student') {
-        assignments = await storage.listAssignmentsForUser(user.id);
-        
-        // For each assignment, get the latest submission
-        const assignmentsWithSubmissions = await Promise.all(
-          assignments.map(async (assignment) => {
-            const submission = await storage.getLatestSubmission(user.id, assignment.id);
-            const course = await storage.getCourse(assignment.courseId);
-            return {
-              ...assignment,
-              submissions: submission ? [submission] : [],
-              course
-            };
-          })
-        );
-        
-        res.json(assignmentsWithSubmissions);
-      } else {
-        // For instructors, return all assignments with submission counts
-        assignments = await storage.listAssignments();
-        
-        const assignmentsWithStats = await Promise.all(
-          assignments.map(async (assignment) => {
-            const submissions = await storage.listSubmissionsForAssignment(assignment.id);
-            const course = await storage.getCourse(assignment.courseId);
-            const students = await storage.listCourseEnrollments(assignment.courseId);
-            
-            const submittedCount = new Set(submissions.map(s => s.userId)).size;
-            
-            return {
-              ...assignment,
-              submittedCount,
-              totalStudents: students.length,
-              submissionPercentage: students.length > 0 ? (submittedCount / students.length) * 100 : 0,
-              course
-            };
-          })
-        );
-        
-        res.json(assignmentsWithStats);
-      }
-    } catch (error) {
-      console.error('Error fetching assignments:', error);
-      res.status(500).json({ message: 'Failed to fetch assignments' });
+      // For each assignment, get the latest submission
+      const assignmentsWithSubmissions = await Promise.all(
+        assignments.map(async (assignment) => {
+          const submission = await storage.getLatestSubmission(user.id, assignment.id);
+          const course = await storage.getCourse(assignment.courseId);
+          return {
+            ...assignment,
+            submissions: submission ? [submission] : [],
+            course
+          };
+        })
+      );
+      
+      res.json(assignmentsWithSubmissions);
+    } else {
+      // For instructors, return all assignments with submission counts
+      assignments = await storage.listAssignments();
+      
+      const assignmentsWithStats = await Promise.all(
+        assignments.map(async (assignment) => {
+          const submissions = await storage.listSubmissionsForAssignment(assignment.id);
+          const course = await storage.getCourse(assignment.courseId);
+          const students = await storage.listCourseEnrollments(assignment.courseId);
+          
+          const submittedCount = new Set(submissions.map(s => s.userId)).size;
+          
+          return {
+            ...assignment,
+            submittedCount,
+            totalStudents: students.length,
+            submissionPercentage: students.length > 0 ? (submittedCount / students.length) * 100 : 0,
+            course
+          };
+        })
+      );
+      
+      res.json(assignmentsWithStats);
     }
-  });
+  }));
 
   // Get specific assignment
-  app.get('/api/assignments/:id', requireAuth, async (req: Request, res: Response) => {
-    try {
-      const assignmentId = parseInt(req.params.id);
-      const assignment = await storage.getAssignment(assignmentId);
-      
-      if (!assignment) {
-        return res.status(404).json({ message: 'Assignment not found' });
-      }
-      
-      const course = await storage.getCourse(assignment.courseId);
-      
-      res.json({
-        ...assignment,
-        course
-      });
-    } catch (error) {
-      console.error('Error fetching assignment:', error);
-      res.status(500).json({ message: 'Failed to fetch assignment' });
+  app.get('/api/assignments/:id', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+    const assignmentId = parseInt(req.params.id);
+    const assignment = await storage.getAssignment(assignmentId);
+    
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
     }
-  });
+    
+    const course = await storage.getCourse(assignment.courseId);
+    
+    res.json({
+      ...assignment,
+      course
+    });
+  }));
 
   // Create assignment (instructor only)
   app.post('/api/assignments', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {

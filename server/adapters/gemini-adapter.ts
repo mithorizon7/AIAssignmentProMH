@@ -124,10 +124,9 @@ export class GeminiAdapter implements AIAdapter {
       console.warn('Gemini File API not available, using data URI fallback for content handling');
       const dataUri = await fileToDataURI(content, mimeType);
       
-      // Create a valid FileData structure that mimics what the API would return
-      // This allows the code to continue working even without the API
+      // Create a valid FileData structure that strictly matches what generateContent expects
+      // for Part.fileData: { mimeType: string, fileUri: string }
       return {
-        uri: dataUri,
         fileUri: dataUri,
         mimeType: mimeType
       } as unknown as FileData;
@@ -139,7 +138,6 @@ export class GeminiAdapter implements AIAdapter {
         const dataUri = await fileToDataURI(content, mimeType);
         console.warn('Using data URI fallback after File API error');
         return {
-          uri: dataUri,
           fileUri: dataUri,
           mimeType: mimeType
         } as unknown as FileData;
