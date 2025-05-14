@@ -167,54 +167,109 @@ export class GeminiAdapter implements AIAdapter {
     );
   }
   
+  /**
+   * Upload and prepare files for the Gemini API
+   * This method handles uploading files directly to the Gemini File API
+   * and returns the proper FileData format for use in generateContent
+   * 
+   * @param content The file content as a Buffer
+   * @param mimeType The MIME type of the file
+   * @returns A Promise resolving to a GeminiFileData object with fileUri
+   */
   private async createFileData(content: Buffer, mimeType: string): Promise<GeminiFileData> {
     try {
-      // Check if the GenerativeAI instance has the createFile method (latest API version)
+      // Primary path: Upload file to Gemini File API using proper method
+      // First check if the GenerativeAI instance has the createFile method (latest API version)
       if (this.generativeAI.createFile && typeof this.generativeAI.createFile === 'function') {
-        return await this.generativeAI.createFile({
+        const fileData = await this.generativeAI.createFile({
           data: content,
           mimeType
         }) as GeminiFileData;
+        
+        console.log('[INFO] Successfully uploaded file to Gemini File API');
+        return fileData;
       }
       
-      // Fallback to createBlob for older API versions
+      // Try alternative method: createBlob for older API versions
       if (this.generativeAI.createBlob && typeof this.generativeAI.createBlob === 'function') {
-        return await this.generativeAI.createBlob({
+        const fileData = await this.generativeAI.createBlob({
           data: content,
           mimeType
         }) as GeminiFileData;
+        
+        console.log('[INFO] Successfully uploaded file to Gemini File API (using createBlob)');
+        return fileData;
       }
       
-      // Fallback for when File API is completely unavailable
-      // Create a synthetic FileData object with a Data URI scheme
-      console.warn('Gemini File API not available, using data URI fallback for content handling');
-      const dataUri = await fileToDataURI(content, mimeType);
-      
-      // Create a valid FileData structure that strictly matches what generateContent expects
-      // for Part.fileData: { mimeType: string, fileUri: string }
-      return {
-        fileUri: dataUri,
-        mimeType: mimeType
-      } as unknown as FileData;
+      // If we reach here, File API methods are not available
+      console.error('Gemini File API methods not available! File content cannot be properly processed.');
+      throw new Error('Gemini File API methods (createFile/createBlob) not available');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error creating file with Gemini File API:', errorMessage);
       
-      // Even if API call fails, provide a fallback that won't break the application
-      try {
-        const dataUri = await fileToDataURI(content, mimeType);
-        console.warn('Using data URI fallback after File API error');
-        return {
-          fileUri: dataUri,
-          mimeType: mimeType
-        } as unknown as FileData;
-      } catch (fallbackError) {
-        console.error('Both Gemini File API and fallback failed:', fallbackError);
-        throw error instanceof Error ? error : new Error(String(error)); // Throw the original error if fallback also fails
-      }
+      // We don't want to directly use data URI as fileUri - it's not the intended use
+      // Instead we'll throw the error and let the calling code handle it based on content type
+      throw error instanceof Error ? error : new Error(String(error));
     }
   }
   
+  /**
+   * Helper method to handle file upload failures based on file type
+   * Different content types have different fallback strategies
+   * 
+   * @param content The file content as a Buffer
+   * @param mimeType The MIME type of the file
+   * @param textContent Optional extracted text from the file
+   * @returns A Part object that can be added to the content parts array
+   */
+  private handleFileUploadFailure(content: Buffer, mimeType: string, textContent?: string): Part {
+    // Detect content category from MIME type
+    const contentCategory = this.getContentCategoryFromMimeType(mimeType);
+    
+    // For images (only) that are small enough, we can fallback to inlineData
+    if (contentCategory === 'image' && content.length < 4 * 1024 * 1024) { // 4MB limit for inline
+      console.warn('Falling back to inlineData for image after File API failure');
+      return {
+        inlineData: {
+          mimeType: mimeType,
+          data: content.toString('base64')
+        }
+      };
+    }
+    
+    // For text-based documents, fall back to text content
+    if (contentCategory === 'document' && 
+        ['text/plain', 'text/csv', 'text/html', 'text/markdown', 'application/json'].includes(mimeType)) {
+      console.warn('Falling back to text content for document after File API failure');
+      return { text: content.toString('utf8') };
+    }
+    
+    // For all other file types, if we have extracted text, use that
+    if (textContent) {
+      console.warn(`Using extracted text content for ${mimeType} after File API failure`);
+      return { text: textContent };
+    }
+    
+    // Last resort - just inform that the content couldn't be processed
+    console.error(`Unable to process ${mimeType} file after File API failure`);
+    return { 
+      text: `[CONTENT UNAVAILABLE: ${mimeType} file could not be processed. File API error.]` 
+    };
+  }
+  
+  /**
+   * Determine content category from MIME type
+   */
+  private getContentCategoryFromMimeType(mimeType: string): ContentType | 'unknown' {
+    for (const [category, types] of Object.entries(SUPPORTED_MIME_TYPES)) {
+      if (types.includes(mimeType)) {
+        return category as ContentType;
+      }
+    }
+    return 'unknown';
+  }
+
   /**
    * Add inline image data to content parts for small images
    * Following Google AI Gemini API documentation: https://ai.google.dev/gemini-api/docs/image-understanding
@@ -367,7 +422,6 @@ export class GeminiAdapter implements AIAdapter {
                   fileObjects.push(fileData);
                   
                   // Add the file part with fileData
-                  // The FileData object might have different properties depending on API version
                   contentParts.push({
                     fileData: {
                       fileUri: this.getFileUri(fileData),
@@ -375,9 +429,11 @@ export class GeminiAdapter implements AIAdapter {
                     }
                   });
                 } catch (error) {
-                  console.warn('Failed to use Gemini File API for large image, falling back to inline data:', error);
-                  // Fallback to inline data
-                  this.addInlineImagePart(contentParts, part.content, mimeType);
+                  console.warn('Failed to use Gemini File API for large image:', error);
+                  // Use our specialized handler for file upload failures
+                  contentParts.push(
+                    this.handleFileUploadFailure(part.content, mimeType, textContent)
+                  );
                 }
               } else {
                 // For smaller images, use inline data (more efficient)
@@ -419,17 +475,12 @@ export class GeminiAdapter implements AIAdapter {
                   }
                 });
               } catch (error) {
-                console.warn(`Failed to use Gemini File API for document (${mimeType}), falling back to text:`, error);
+                console.warn(`Failed to use Gemini File API for document (${mimeType}):`, error);
                 
-                // Fallback to text content for text-based documents
-                if (textContent) {
-                  contentParts.push({ text: textContent });
-                } else if (['text/csv', 'text/plain', 'application/json', 'text/markdown', 'text/html'].includes(mimeType)) {
-                  // Handle text-based document formats directly
-                  contentParts.push({ text: part.content.toString('utf8') });
-                } else {
-                  contentParts.push({ text: `[DOCUMENT: ${mimeType} - Unable to process]` });
-                }
+                // Use our specialized handler for file upload failures that considers document type
+                contentParts.push(
+                  this.handleFileUploadFailure(part.content, mimeType, textContent)
+                );
               }
             } else if (typeof part.content === 'string') {
               // Handle document content as text
@@ -469,14 +520,10 @@ export class GeminiAdapter implements AIAdapter {
               } catch (error) {
                 console.warn(`Failed to use Gemini File API for audio (${mimeType}):`, error);
                 
-                contentParts.push({
-                  text: `[AUDIO: Could not process file directly]`
-                });
-                
-                // Include extracted text or transcription if available
-                if (textContent) {
-                  contentParts.push({ text: textContent });
-                }
+                // Use our specialized handler for file upload failures
+                contentParts.push(
+                  this.handleFileUploadFailure(part.content, mimeType, textContent)
+                );
               }
             } else {
               contentParts.push({
@@ -517,14 +564,10 @@ export class GeminiAdapter implements AIAdapter {
               } catch (error) {
                 console.warn(`Failed to use Gemini File API for video (${mimeType}):`, error);
                 
-                contentParts.push({
-                  text: `[VIDEO: Could not process file directly]`
-                });
-                
-                // Include extracted text or description if available
-                if (textContent) {
-                  contentParts.push({ text: textContent });
-                }
+                // Use our specialized handler for file upload failures
+                contentParts.push(
+                  this.handleFileUploadFailure(part.content, mimeType, textContent)
+                );
               }
             } else {
               contentParts.push({
