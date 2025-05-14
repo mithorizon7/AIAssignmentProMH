@@ -1,6 +1,7 @@
 import { InsertFeedback, Rubric, CriteriaScore, InstructorContext } from '@shared/schema';
 import { AIAdapter, MultimodalPromptPart } from '../adapters/ai-adapter';
 import { processFileForMultimodal } from '../utils/multimodal-processor';
+import { ContentType } from '../utils/file-type-settings';
 
 interface SubmissionAnalysisRequest {
   studentSubmissionContent: string;
@@ -237,7 +238,7 @@ ${params.studentSubmissionContent}
       
       // Add the file content as the appropriate type
       promptParts.push({
-        type: processedFile.contentType as any,
+        type: processedFile.contentType as ContentType,
         content: processedFile.content,
         mimeType: params.mimeType
       });

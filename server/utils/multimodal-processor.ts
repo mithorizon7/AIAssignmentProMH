@@ -214,7 +214,7 @@ export function fileToDataURI(content: Buffer, mimeType: string): string {
  */
 export interface ProcessedFile {
   content: Buffer | string;
-  contentType: 'text' | 'image' | 'audio' | 'video' | 'document';
+  contentType: ContentType;
   textContent?: string;
   mimeType: string;
 }
