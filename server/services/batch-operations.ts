@@ -3,6 +3,7 @@ import { submissions, feedback, users, courses, assignments, enrollments } from 
 import { db } from '../db';
 import { eq, and, lt, desc, sql, count, inArray } from 'drizzle-orm';
 import { stringify } from 'csv-stringify';
+import type { InferSelectModel } from 'drizzle-orm';
 
 /**
  * Type definitions for batch operations
@@ -419,8 +420,11 @@ export class BatchOperationsService {
       .from(feedback)
       .where(inArray(feedback.submissionId, submissionIds));
     
-    // Create a map of submission ID to score
-    const scoreMap = new Map(feedbackScores.map((fs: { submissionId: number; score: number | null }) => [fs.submissionId, fs.score]));
+    // Create a map of submission ID to score with proper typing
+    const scoreMap = new Map<number, number | null>();
+    for (const fs of feedbackScores) {
+      scoreMap.set(fs.submissionId, fs.score === null ? null : Number(fs.score));
+    }
     
     // Create a map of student-assignment to score
     const result = new Map<string, number | null>();
@@ -429,8 +433,8 @@ export class BatchOperationsService {
     for (const submission of latestSubmissions as SubmissionRecord[]) {
       const key = `${submission.userId}-${submission.assignmentId}`;
       const score = scoreMap.get(submission.submissionId);
-      // Ensure we only set numeric values or null, not empty objects
-      result.set(key, (score !== undefined && (typeof score === 'number')) ? score : null);
+      // Ensure we only set numeric values or null
+      result.set(key, score ?? null);
     }
     
     return result;
@@ -447,26 +451,29 @@ export class BatchOperationsService {
     avgSubmissionsPerStudent: number,
     avgScores: { assignmentId: number, avgScore: number }[]
   }> {
+    // Define count result type
+    type CountResult = { count: number | bigint }[];
+    
     // Get counts using a single query for efficiency
     const [enrollmentCount, assignmentCount, submissionCount] = await Promise.all([
       // Count enrollments
       db.select({ count: count() })
         .from(enrollments)
         .where(eq(enrollments.courseId, courseId))
-        .then(result => result[0]?.count || 0),
+        .then((result: CountResult) => Number(result[0]?.count || 0)),
       
       // Count assignments
       db.select({ count: count() })
         .from(assignments)
         .where(eq(assignments.courseId, courseId))
-        .then(result => result[0]?.count || 0),
+        .then((result: CountResult) => Number(result[0]?.count || 0)),
       
       // Count submissions (this is more complex - we need to join tables)
       db.select({ count: count() })
         .from(submissions)
         .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
         .where(eq(assignments.courseId, courseId))
-        .then(result => result[0]?.count || 0)
+        .then((result: CountResult) => Number(result[0]?.count || 0))
     ]);
     
     // Calculate average submissions per student
