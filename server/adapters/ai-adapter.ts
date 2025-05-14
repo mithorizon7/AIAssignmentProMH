@@ -17,7 +17,7 @@ export interface AIAdapter {
     summary: string;
     score?: number;
     criteriaScores?: CriteriaScore[];
-    rawResponse: Record<string, any>;
+    rawResponse: Record<string, unknown>;
     modelName: string;
     tokenCount: number;
   }>;
@@ -33,7 +33,7 @@ export interface AIAdapter {
     summary: string;
     score?: number;
     criteriaScores?: CriteriaScore[];
-    rawResponse: Record<string, any>;
+    rawResponse: Record<string, unknown>;
     modelName: string;
     tokenCount: number;
   }>;
