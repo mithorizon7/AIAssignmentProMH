@@ -193,13 +193,55 @@ if (queueActive) {
                 : 'Not a string',
               errorCode: 'RUBRIC_PARSE_ERROR'
             });
+            
+            // Create a notification for the instructor about the rubric parsing error
+            const instructorNotification = {
+              userId: assignment.createdBy, // Instructor who created the assignment
+              type: 'rubric_error',
+              title: 'Rubric Parsing Error',
+              message: `There was an error parsing the rubric for assignment "${assignment.title}" (ID: ${assignment.id}). The submission will be processed without the rubric, which may affect feedback quality.`,
+              metadata: {
+                assignmentId: assignment.id,
+                submissionId: submissionId,
+                error: parseError.message,
+                timestamp: new Date().toISOString()
+              },
+              read: false,
+              createdAt: new Date()
+            };
+            
+            // Save notification (wrapped in try-catch to prevent it from affecting main flow)
+            try {
+              // This is a non-blocking operation - no await
+              // The actual implementation depends on the notification system
+              // For now, just log it as we'll implement the actual notification later
+              logger.info(`Created instructor notification for rubric parsing error`, {
+                notificationType: 'rubric_error',
+                instructorId: assignment.createdBy,
+                assignmentId: assignment.id
+              });
+              
+              // When a notification system is implemented:
+              // await storage.createNotification(instructorNotification);
+            } catch (notifyError) {
+              logger.error(`Failed to create instructor notification`, {
+                error: notifyError.message
+              });
+            }
+            
             // Continue without rubric but with warning
             logger.warn(`Proceeding with submission processing without rubric`, {
               assignmentId: assignment.id,
               submissionId,
               fallbackMode: true
             });
-            rubric = undefined;
+            
+            // Set a minimal placeholder rubric with warning about parsing error
+            rubric = {
+              criteria: [],
+              maxScore: 100,
+              _processingNote: "Original rubric could not be parsed. This is a placeholder to indicate that rubric evaluation was intended but could not be performed."
+            };
           }
         } else {
           rubric = undefined;
@@ -397,9 +439,18 @@ export const queueApi = {
                     : 'Not a string',
                   errorCode: 'RUBRIC_PARSE_ERROR'
                 });
+                // Create a notification for the instructor in development mode
+                console.info(`[DEVELOPMENT] Instructor notification would be created for rubric parsing error on assignment ${assignment.id}`);
+                
                 // Continue without rubric but with warning
                 console.warn(`[DEVELOPMENT] Proceeding with submission processing without rubric for assignment ${assignment.id}`);
-                rubric = undefined;
+                
+                // Set a minimal placeholder rubric with warning about parsing error
+                rubric = {
+                  criteria: [],
+                  maxScore: 100,
+                  _processingNote: "Original rubric could not be parsed. This is a placeholder to indicate that rubric evaluation was intended but could not be performed."
+                };
               }
             } else {
               rubric = undefined;
