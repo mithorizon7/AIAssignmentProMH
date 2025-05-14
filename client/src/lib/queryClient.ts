@@ -60,8 +60,11 @@ async function fetchCsrfToken(): Promise<string> {
 }
 
 // Enhanced API request function with CSRF token
+// Define valid HTTP methods as a type
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
+
 export async function apiRequest<TData = unknown>(
-  method: string,
+  method: HttpMethod,
   url: string,
   data?: TData | undefined,
 ): Promise<Response> {
@@ -71,7 +74,7 @@ export async function apiRequest<TData = unknown>(
   };
   
   // If it's a state-changing request (not GET/HEAD/OPTIONS), add CSRF token
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())) {
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
     // Skip token for login/register
     if (!['/api/auth/login', '/api/auth/register'].includes(url)) {
       try {
@@ -102,7 +105,7 @@ export async function apiRequest<TData = unknown>(
         // Retry the request with a fresh token
         const newToken = await fetchCsrfToken();
         const retryRes = await fetch(url, {
-          method,
+          method, // HttpMethod type ensures this is valid
           headers: {
             'Content-Type': 'application/json',
             'X-CSRF-Token': newToken,
