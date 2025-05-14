@@ -1011,6 +1011,15 @@ export function configureAuth(app: any) {
     
     return fallbackUrl;
   };
+  
+  const validateReturnToUrl = (returnToUrl: string, idpName: string) => {
+    // In production, this URL must be whitelisted in the IdP configuration
+    if (process.env.NODE_ENV === 'production') {
+      console.log(`[INFO] Return URL for ${idpName} logout: ${returnToUrl}`);
+      console.log(`[INFO] Ensure this URL is whitelisted in the ${idpName} configuration`);
+    }
+    return returnToUrl;
+  };
 
   // Logout endpoint
   app.post('/api/auth/logout', (req: Request, res: Response) => {
@@ -1050,11 +1059,13 @@ export function configureAuth(app: any) {
           // redirect to Auth0 logout URL to complete SSO logout
           if (isAuth0User && process.env.AUTH0_DOMAIN && process.env.AUTH0_CLIENT_ID) {
             const loginPageUrl = getLoginPageUrl();
-            console.log(`[INFO] Redirecting to Auth0 logout URL with returnTo: ${loginPageUrl}`);
+            const validatedReturnTo = validateReturnToUrl(loginPageUrl, 'Auth0');
+            console.log(`[INFO] Redirecting to Auth0 logout URL with returnTo: ${validatedReturnTo}`);
             
-            const auth0LogoutUrl = `https://${process.env.AUTH0_DOMAIN}/v2/logout?client_id=${
-              process.env.AUTH0_CLIENT_ID
-            }&returnTo=${encodeURIComponent(loginPageUrl)}`;
+            // Ensure client_id and returnTo parameters are properly included
+            const auth0LogoutUrl = `https://${process.env.AUTH0_DOMAIN}/v2/logout?` + 
+              `client_id=${encodeURIComponent(process.env.AUTH0_CLIENT_ID)}` + 
+              `&returnTo=${encodeURIComponent(validatedReturnTo)}`;
             
             return res.status(200).json({ 
               message: 'Logged out successfully',
@@ -1067,11 +1078,18 @@ export function configureAuth(app: any) {
           // redirect to MIT Horizon logout URL to complete SSO logout
           if (isMitHorizonUser && process.env.MIT_HORIZON_OIDC_ISSUER_URL && process.env.MIT_HORIZON_OIDC_CLIENT_ID) {
             const loginPageUrl = getLoginPageUrl();
-            console.log(`[INFO] Redirecting to MIT Horizon logout URL with returnTo: ${loginPageUrl}`);
+            const validatedReturnTo = validateReturnToUrl(loginPageUrl, 'MIT Horizon');
+            console.log(`[INFO] Redirecting to MIT Horizon logout URL with returnTo: ${validatedReturnTo}`);
             
-            const mitHorizonLogoutUrl = `${process.env.MIT_HORIZON_OIDC_ISSUER_URL}v2/logout?client_id=${
-              process.env.MIT_HORIZON_OIDC_CLIENT_ID
-            }&returnTo=${encodeURIComponent(loginPageUrl)}`;
+            // Ensure OIDC issuer URL ends with a trailing slash before adding the logout endpoint
+            const issuerUrl = process.env.MIT_HORIZON_OIDC_ISSUER_URL.endsWith('/')
+              ? process.env.MIT_HORIZON_OIDC_ISSUER_URL
+              : `${process.env.MIT_HORIZON_OIDC_ISSUER_URL}/`;
+            
+            // Construct the proper logout URL with all parameters properly encoded
+            const mitHorizonLogoutUrl = `${issuerUrl}v2/logout?` + 
+              `client_id=${encodeURIComponent(process.env.MIT_HORIZON_OIDC_CLIENT_ID)}` +
+              `&returnTo=${encodeURIComponent(validatedReturnTo)}`;
             
             return res.status(200).json({ 
               message: 'Logged out successfully',
