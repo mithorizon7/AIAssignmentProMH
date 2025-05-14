@@ -78,10 +78,17 @@ export const logger = {
 
 // Async handler to avoid try/catch repetition in routes
 export const asyncHandler = (
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown> | unknown
 ) => {
   return (req: Request, res: Response, next: NextFunction): void => {
-    Promise.resolve(fn(req, res, next)).catch(next);
+    try {
+      const result = fn(req, res, next);
+      if (result instanceof Promise) {
+        result.catch(next);
+      }
+    } catch (error) {
+      next(error);
+    }
   };
 };
 

@@ -68,10 +68,14 @@ describe('AsyncHandler Type Safety', () => {
   });
 
   it('should handle synchronous errors thrown in the handler', async () => {
-    // Create a handler that throws synchronously
+    // Create a handler that actually throws synchronously (not just returning a rejected promise)
     const errorMessage = 'Synchronous error';
-    const handler = vi.fn().mockImplementation(() => {
-      throw new Error(errorMessage);
+    const mockError = new Error(errorMessage);
+    
+    // Use mockImplementationOnce to make the function throw only once
+    // This avoids repeated errors during test execution
+    const handler = vi.fn().mockImplementationOnce(() => {
+      throw mockError;
     });
     
     const middleware = asyncHandler(handler);
@@ -80,11 +84,18 @@ describe('AsyncHandler Type Safety', () => {
     middleware(mockReq, mockRes, mockNext);
     
     // Check that the error was passed to next
-    await vi.waitFor(() => {
-      expect(handler).toHaveBeenCalledWith(mockReq, mockRes, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
-        message: errorMessage
-      }));
-    });
+    expect(handler).toHaveBeenCalledWith(mockReq, mockRes, mockNext);
+    expect(mockNext).toHaveBeenCalledWith(mockError);
+  });
+  
+  it('should handle truthy non-promise returns without passing to next', async () => {
+    // Test that non-promise return values are handled correctly
+    const handler = vi.fn().mockReturnValue("some string result");
+    
+    const middleware = asyncHandler(handler);
+    middleware(mockReq, mockRes, mockNext);
+    
+    expect(handler).toHaveBeenCalledWith(mockReq, mockRes, mockNext);
+    expect(mockNext).not.toHaveBeenCalled();
   });
 });
