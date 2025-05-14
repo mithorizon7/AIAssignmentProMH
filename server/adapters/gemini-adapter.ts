@@ -39,6 +39,37 @@ interface ExtendedGenerativeAI extends GoogleGenerativeAI {
   createBlob?: (options: { data: Buffer, mimeType: string }) => Promise<FileData>;
 }
 
+/**
+ * Generation configuration options for Gemini API
+ */
+interface GenerationConfig {
+  temperature?: number;
+  maxOutputTokens?: number;
+  topK?: number;
+  topP?: number;
+  responseFormat?: { type: string };
+  [key: string]: unknown;
+}
+
+/**
+ * Response metadata interface for token usage information
+ * Different API versions might have different structures
+ */
+interface ResponseMetadata {
+  candidates?: Array<{
+    usageMetadata?: {
+      totalTokens?: number;
+    };
+  }>;
+  usageMetadata?: {
+    totalTokens?: number;
+  };
+  usage?: {
+    totalTokens?: number;
+  };
+  [key: string]: unknown;
+}
+
 // Extracted from Google AI Gemini API documentation
 // https://ai.google.dev/gemini-api/docs/image-understanding
 // https://ai.google.dev/gemini-api/docs/video-understanding
@@ -125,7 +156,7 @@ export class GeminiAdapter implements AIAdapter {
   private getFileUri(fileData: FileData): string {
     // The FileData object might have different property names in different API versions
     // Handle all possible variants based on Gemini API documentation changes
-    const fileDataObj = fileData as Record<string, unknown>;
+    const fileDataObj = fileData as unknown as Record<string, unknown>;
     return (
       typeof fileDataObj.uri === 'string' ? fileDataObj.uri :
       typeof fileDataObj.fileUri === 'string' ? fileDataObj.fileUri :
@@ -522,7 +553,7 @@ Please analyze the above submission and provide feedback in the following JSON f
       });
       
       // Generate content with the parts
-      const generationConfig: any = {
+      const generationConfig: GenerationConfig = {
         temperature: 0.7, 
         maxOutputTokens: 2048
       };
@@ -580,10 +611,13 @@ Please analyze the above submission and provide feedback in the following JSON f
       
       // Different versions of the API have different ways to access token usage
       try {
+        // Cast response to our ResponseMetadata interface to access usage data
+        const responseMetadata = response as unknown as ResponseMetadata;
+        
         // Try different paths to token usage information based on API version
-        tokenCount = (response as any).candidates?.[0]?.usageMetadata?.totalTokens ||
-                    (response as any).usageMetadata?.totalTokens ||
-                    (response as any).usage?.totalTokens ||
+        tokenCount = responseMetadata.candidates?.[0]?.usageMetadata?.totalTokens ||
+                    responseMetadata.usageMetadata?.totalTokens ||
+                    responseMetadata.usage?.totalTokens ||
                     Math.ceil(text.length / 4); // Fallback to estimation
       } catch (e) {
         // Fallback to estimation if access fails
