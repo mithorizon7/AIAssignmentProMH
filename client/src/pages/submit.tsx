@@ -29,7 +29,15 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
   // State for assignment lookup
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [assignment, setAssignment] = useState<any>(null);
+  const [assignment, setAssignment] = useState<{
+    id: number;
+    title: string;
+    description: string;
+    courseName?: string;
+    courseCode?: string;
+    dueDate: string;
+    shareableCode: string;
+  } | null>(null);
   
   // State for submission
   const [name, setName] = useState('');
@@ -78,8 +86,9 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
         }
         
         setAssignment(data);
-      } catch (err: any) {
-        setError(err.message || 'An error occurred while loading the assignment.');
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred while loading the assignment.';
+        setError(errorMessage);
         console.error('Error fetching assignment by code:', err);
       } finally {
         setLoading(false);
@@ -183,11 +192,13 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
       });
       
       setSubmitted(true);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error submitting assignment:', error);
       toast({
         title: "Submission Failed",
-        description: error.message || "There was a problem submitting your work. Please try again.",
+        description: error instanceof Error 
+          ? error.message 
+          : "There was a problem submitting your work. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -229,7 +240,7 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
     );
   }
   
-  if (submitted) {
+  if (submitted && assignment) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-50">
         <Card className="w-full max-w-lg shadow-lg">
@@ -261,6 +272,11 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
     );
   }
   
+  // Return null if no assignment data
+  if (!assignment) {
+    return null;
+  }
+  
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="container px-4 mx-auto max-w-4xl">
@@ -270,7 +286,10 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
               <div>
                 <CardTitle className="text-xl">{assignment.title}</CardTitle>
                 <CardDescription>
-                  {assignment.courseName} ({assignment.courseCode})
+                  {assignment.courseName && assignment.courseCode 
+                    ? `${assignment.courseName} (${assignment.courseCode})`
+                    : 'Assignment'
+                  }
                 </CardDescription>
               </div>
               <div className="text-sm text-muted-foreground">
