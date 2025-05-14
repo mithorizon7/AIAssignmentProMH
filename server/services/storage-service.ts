@@ -1,5 +1,8 @@
 import { storage } from '../storage';
 import { InsertSubmission, InsertFeedback, Submission, Feedback } from '@shared/schema';
+import { isS3Configured, uploadFile } from '../utils/s3-client';
+import path from 'path';
+import crypto from 'crypto';
 
 export class StorageService {
   // Save submission to database
@@ -26,30 +29,73 @@ export class StorageService {
     }
   }
 
-  // Store file content or URL (this would use S3 in a real implementation)
+  /**
+   * Store submission file in S3 or generate a mock URL if S3 not configured
+   * @param file The uploaded file from multer
+   * @param userId User ID of the submitter
+   * @param assignmentId Assignment ID
+   * @returns URL to the stored file
+   */
   async storeSubmissionFile(file: Express.Multer.File, userId: number, assignmentId: number): Promise<string> {
     try {
-      // In a real implementation, this would upload to S3 or similar
-      // For now, we'll mock a URL
+      // Generate a unique filename to avoid collisions
       const timestamp = Date.now();
-      return `https://storage.example.com/submissions/${userId}/${assignmentId}/${timestamp}/${file.originalname}`;
+      const randomString = crypto.randomBytes(8).toString('hex');
+      const originalExtension = path.extname(file.originalname);
+      const safeFileName = `${path.basename(file.originalname, originalExtension)}-${randomString}${originalExtension}`;
+      
+      // Construct S3 key (path in bucket)
+      const s3Key = `submissions/${userId}/${assignmentId}/${timestamp}/${safeFileName}`;
+      
+      // Upload to S3 if configured
+      if (isS3Configured()) {
+        console.log(`[StorageService] Uploading submission file to S3: ${s3Key}`);
+        return await uploadFile(file.path, s3Key, file.mimetype);
+      } else {
+        console.warn('[StorageService] S3 not configured, using mock URL');
+        // Return a mock URL for development environments
+        return `https://storage.example.com/${s3Key}`;
+      }
     } catch (error) {
       console.error('Error storing file:', error);
-      throw new Error('Failed to store submission file');
+      throw new Error(`Failed to store submission file: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   
-  // Store file for anonymous submissions (this would use S3 in a real implementation)
+  /**
+   * Store anonymous submission file in S3 or generate a mock URL if S3 not configured
+   * @param file The uploaded file from multer
+   * @param assignmentId Assignment ID
+   * @param name Submitter's name
+   * @param email Submitter's email (used to create a unique path)
+   * @returns URL to the stored file
+   */
   async storeAnonymousSubmissionFile(file: Express.Multer.File, assignmentId: number, name: string, email: string): Promise<string> {
     try {
-      // In a real implementation, this would upload to S3 or similar
-      // For now, we'll mock a URL
+      // Generate a unique filename to avoid collisions
       const timestamp = Date.now();
+      const randomString = crypto.randomBytes(8).toString('hex');
+      const originalExtension = path.extname(file.originalname);
+      const safeFileName = `${path.basename(file.originalname, originalExtension)}-${randomString}${originalExtension}`;
+      
+      // Create a safe email-derived path component
       const safeEmail = email.replace('@', '-at-').replace(/[^\w-]/g, '_');
-      return `https://storage.example.com/anonymous-submissions/${assignmentId}/${safeEmail}/${timestamp}/${file.originalname}`;
+      
+      // Construct S3 key (path in bucket)
+      const s3Key = `anonymous-submissions/${assignmentId}/${safeEmail}/${timestamp}/${safeFileName}`;
+      
+      // Upload to S3 if configured
+      if (isS3Configured()) {
+        console.log(`[StorageService] Uploading anonymous submission file to S3: ${s3Key}`);
+        return await uploadFile(file.path, s3Key, file.mimetype);
+      } else {
+        console.warn('[StorageService] S3 not configured, using mock URL');
+        // Return a mock URL for development environments
+        return `https://storage.example.com/${s3Key}`;
+      }
     } catch (error) {
       console.error('Error storing anonymous file:', error);
-      throw new Error('Failed to store submission file');
+      throw new Error(`Failed to store submission file: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

@@ -1,0 +1,82 @@
+Okay, AI Coder, we've decided to use Google Cloud Storage (GCS) instead of AWS S3 for our object storage. You've already done a great job setting up the S3 integration framework. Now, we need to adapt that work for GCS. Please perform the following steps:
+
+Uninstall AWS SDK Packages and Install Google Cloud Storage SDK:
+
+Remove the AWS SDK packages from package.json:
+Bash
+npm uninstall @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
+Install the official Google Cloud Storage client library for Node.js:
+Bash
+npm install --save @google-cloud/storage
+ Update Environment Variables (.env.example and your actual .env file):
+
+Remove the S3-specific environment variables (like AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET_NAME, AWS_S3_REGION).
+Add the necessary environment variables for GCS:
+Code snippet
+# Google Cloud Storage
+GOOGLE_APPLICATION_CREDENTIALS=./path/to/your/gcp-service-account-key.json # Path to the downloaded service account JSON key
+GCS_BUCKET_NAME="your-gcs-bucket-name"      # The unique name of your GCS bucket
+# GCP_PROJECT_ID="your-gcp-project-id"      # Optional: Often inferred from credentials, but good to have
+Instruct me (the user) that I will need to:
+Create a Google Cloud Project.
+Enable the Cloud Storage API.
+Create a GCS bucket.
+Create a Service Account with appropriate permissions (e.g., "Storage Object Admin") for that bucket.
+Download the JSON key for that service account and provide the path to it for GOOGLE_APPLICATION_CREDENTIALS.
+Provide the GCS bucket name.
+Modify/Replace the S3 Client Utility (e.g., server/utils/s3-client.ts):
+
+If you created a dedicated S3 client utility (like server/utils/s3-client.ts as shown in the screenshot), rename or replace it with a GCS client utility (e.g., server/utils/gcs-client.ts).
+
+This new utility should initialize and configure the Google Cloud Storage client using the @google-cloud/storage SDK. It will look something like this:
+
+TypeScript
+// server/utils/gcs-client.ts (New or Modified File)
+import { Storage } from '@google-cloud/storage';
+
+// Initializes GCS Storage client.
+// It automatically uses credentials from the GOOGLE_APPLICATION_CREDENTIALS env var.
+const gcsStorage = new Storage({
+  // projectId: process.env.GCP_PROJECT_ID, // Usually not needed if GOOGLE_APPLICATION_CREDENTIALS is set
+});
+
+const bucketName = process.env.GCS_BUCKET_NAME;
+
+if (!bucketName) {
+  console.warn(
+    'GCS_BUCKET_NAME environment variable is not set. File operations will likely fail.'
+  );
+}
+
+export { gcsStorage, bucketName };
+ Update AIGrader/server/services/storage-service.ts:
+
+Replace S3 SDK Usage with GCS SDK Usage:
+Modify the storeSubmissionFile and storeAnonymousSubmissionFile methods.
+Instead of using the S3 client and PutObjectCommand, use the GCS client's bucket(bucketName).upload() method or file(destination).save() method.
+The upload() method in GCS is convenient as it can take a file path (where Multer temporarily stores the uploaded file, e.g., file.path) and upload it.
+Ensure you are handling file.buffer (if using memoryStorage with Multer as configured) correctly by saving it to a temporary file first if the GCS SDK's upload() method expects a file path, or by streaming the buffer directly if the SDK supports it. A common pattern with memoryStorage and GCS is to use bucket.file(destination).save(file.buffer, { metadata: {...} }).
+File Naming/Path Convention: Maintain a similar path structure in the GCS bucket (e.g., submissions/<userId>/<assignmentId>/<timestamp>/<originalName>).
+URL Generation:
+After a successful upload to GCS, you need to store a URL or an identifier for that file in your database (submissions.fileUrl).
+For private files (recommended): Store the GCS object name (e.g., submissions/user1/assign2/file.pdf). Then, create a new method in StorageService like async generateSignedReadUrl(objectName: string): Promise<string | null> that uses gcsStorage.bucket(bucketName).file(objectName).getSignedUrl({...}) to generate temporary, secure URLs for reading files. This is the most secure approach.
+For public files (simpler but less secure for submissions): If objects are made public in GCS (not recommended for submissions), the URL is https://storage.googleapis.com/${bucketName}/${destinationPath}.
+Error Handling: Adapt error handling for GCS-specific errors.
+Update File Upload Logic in Routes (if necessary):
+
+Review AIGrader/server/routes.ts (specifically the POST /api/submissions and the (deprecated) POST /api/anonymous-submissions endpoints).
+Multer's memoryStorage provides req.file.buffer. The StorageService will now take this buffer and upload it to GCS. Ensure req.file.path (if previously used because Multer was saving to disk) is no longer relied upon if you're passing the buffer. If req.file.path was used with S3's Upload from a file stream, you might need to write the buffer to a temporary file first for GCS's bucket.upload(filePath, options) or directly use the buffer with bucket.file(destination).save(buffer, options).
+Update Test Scripts (e.g., test/s3-file-handling-demo.js):
+
+Rename or adapt any S3-specific test scripts to test GCS functionality.
+Mocks will need to be updated from mocking the S3 client to mocking the GCS client (@google-cloud/storage).
+Summary of Key Changes to Request:
+
+Dependency Swap: Uninstall AWS SDK, install @google-cloud/storage.
+Environment Variables: Update .env.example and .env for GCS (GOOGLE_APPLICATION_CREDENTIALS, GCS_BUCKET_NAME).
+Client Utility: Refactor the S3 client utility to a GCS client utility.
+StorageService Core Logic:
+Replace S3 upload logic with GCS upload logic (using file.buffer from Multer memoryStorage).
+Implement GCS URL generation (preferably signed URLs for private objects).
+Testing: Update tests to reflect GCS integration.
+This will effectively switch your file storage backend from the planned S3 to Google Cloud Storage while reusing the existing structure your AI coder has built.
