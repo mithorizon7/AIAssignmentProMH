@@ -263,7 +263,7 @@ export class DatabaseStorage implements IStorage {
         params.push(JSON.stringify(assignmentData.instructorContext));
       }
       
-      const result = await db.execute(sql, params);
+      const result = await db.execute<Assignment>(sql, params);
       return result.rows[0];
     } catch (error) {
       console.error("[ERROR] Error creating assignment:", error);
@@ -571,9 +571,9 @@ export class DatabaseStorage implements IStorage {
         insertFeedback.modelName || null
       ];
       
-      const result = await db.execute(sql, params);
+      const result = await db.execute<Feedback>(sql, params);
       return result.rows[0];
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[ERROR] Error creating feedback:', error);
       
       // Try a fallback approach with direct SQL if needed
