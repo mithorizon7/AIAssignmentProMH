@@ -239,7 +239,7 @@ export class BatchOperationsService {
         ));
       
       // Create a set of already enrolled student IDs for faster lookup
-      const existingStudentIds = new Set(existingEnrollments.map(e => e.userId));
+      const existingStudentIds = new Set(existingEnrollments.map((e: { userId: number }) => e.userId));
       
       // Filter out students who are already enrolled
       const studentsToEnroll = batchIds.filter(id => !existingStudentIds.has(id));
@@ -307,7 +307,7 @@ export class BatchOperationsService {
       'Student ID', 
       'Name', 
       'Email',
-      ...courseAssignments.map(a => a.title)
+      ...courseAssignments.map((a: { title: string }) => a.title)
     ];
     
     // Initialize the data array for CSV
@@ -318,14 +318,14 @@ export class BatchOperationsService {
     
     for (const studentChunk of studentChunks) {
       // Get all student IDs in this chunk
-      const studentIds = studentChunk.map(s => s.id);
+      const studentIds = studentChunk.map((s: { id: number }) => s.id);
       
       // Get all assignments and their most recent submission scores in bulk
       // This is much more efficient than querying each student+assignment combination
-      const submissionScores = await this.getSubmissionScores(studentIds, courseAssignments.map(a => a.id));
+      const submissionScores = await this.getSubmissionScores(studentIds, courseAssignments.map((a: { id: number }) => a.id));
       
       // Generate a row for each student
-      for (const student of studentChunk) {
+      for (const student of studentChunk as Array<{ id: number; name: string; email: string }>) {
         const studentRow = [
           student.id.toString(),
           student.name,
@@ -389,7 +389,7 @@ export class BatchOperationsService {
     }
     
     // Get submission IDs
-    const submissionIds = latestSubmissions.map(s => s.submissionId);
+    const submissionIds = latestSubmissions.map((s: { submissionId: number }) => s.submissionId);
     
     // Get feedback scores for these submissions
     const feedbackScores = await db
@@ -401,7 +401,7 @@ export class BatchOperationsService {
       .where(inArray(feedback.submissionId, submissionIds));
     
     // Create a map of submission ID to score
-    const scoreMap = new Map(feedbackScores.map(fs => [fs.submissionId, fs.score]));
+    const scoreMap = new Map(feedbackScores.map((fs: { submissionId: number; score: number | null }) => [fs.submissionId, fs.score]));
     
     // Create a map of student-assignment to score
     const result = new Map<string, number | null>();
