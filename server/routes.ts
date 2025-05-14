@@ -460,8 +460,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const fileExtension = path.extname(fileName).slice(1).toLowerCase();
         contentType = determineContentType(mimeType, fileName);
         
-        // Verify that the file type is allowed
-        const isAllowed = await storage.checkFileTypeEnabled(mimeType, fileExtension, mimeType);
+        console.log(`Anonymous submission: ${fileName}, MIME: ${mimeType}, Content type: ${contentType}`);
+        
+        // Verify that the file type is allowed by passing the determined content type
+        // This ensures we're checking based on content category rather than exact MIME/extension match
+        const isAllowed = await storage.checkFileTypeEnabled(contentType, fileExtension, mimeType);
         if (!isAllowed) {
           return res.status(400).json({ 
             message: `File type ${fileExtension} (${mimeType}) is not allowed`,
@@ -594,8 +597,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const fileExtension = path.extname(fileName).slice(1).toLowerCase();
         contentType = determineContentType(mimeType, fileName);
         
-        // Verify that the file type is allowed
-        const isAllowed = await storage.checkFileTypeEnabled(mimeType, fileExtension, mimeType);
+        console.log(`User ${user.id} submission: ${fileName}, MIME: ${mimeType}, Content type: ${contentType}`);
+        
+        // Verify that the file type is allowed by passing the determined content type
+        // This ensures we're checking based on content category rather than exact MIME/extension match
+        const isAllowed = await storage.checkFileTypeEnabled(contentType, fileExtension, mimeType);
         if (!isAllowed) {
           return res.status(400).json({ 
             message: `File type ${fileExtension} (${mimeType}) is not allowed`,
