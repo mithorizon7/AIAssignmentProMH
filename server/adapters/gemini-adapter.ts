@@ -30,6 +30,15 @@ interface GeminiFileData extends FileData {
   delete?: () => Promise<void>;
 }
 
+/**
+ * Extended GoogleGenerativeAI interface that includes file handling methods
+ * which might differ between API versions
+ */
+interface ExtendedGenerativeAI extends GoogleGenerativeAI {
+  createFile?: (options: { data: Buffer, mimeType: string }) => Promise<FileData>;
+  createBlob?: (options: { data: Buffer, mimeType: string }) => Promise<FileData>;
+}
+
 // Extracted from Google AI Gemini API documentation
 // https://ai.google.dev/gemini-api/docs/image-understanding
 // https://ai.google.dev/gemini-api/docs/video-understanding
@@ -57,7 +66,7 @@ export const SUPPORTED_MIME_TYPES = {
 };
 
 export class GeminiAdapter implements AIAdapter {
-  private generativeAI: GoogleGenerativeAI;
+  private generativeAI: ExtendedGenerativeAI;
   private model: GenerativeModel;
   private modelName: string;
 
@@ -116,29 +125,32 @@ export class GeminiAdapter implements AIAdapter {
   private getFileUri(fileData: FileData): string {
     // The FileData object might have different property names in different API versions
     // Handle all possible variants based on Gemini API documentation changes
-    return (fileData as any).uri || 
-           (fileData as any).fileUri || 
-           (fileData as any).url || 
-           (fileData as any).fileUrl || 
-           '';
+    const fileDataObj = fileData as Record<string, unknown>;
+    return (
+      typeof fileDataObj.uri === 'string' ? fileDataObj.uri :
+      typeof fileDataObj.fileUri === 'string' ? fileDataObj.fileUri :
+      typeof fileDataObj.url === 'string' ? fileDataObj.url :
+      typeof fileDataObj.fileUrl === 'string' ? fileDataObj.fileUrl :
+      ''
+    );
   }
   
-  private async createFileData(content: Buffer, mimeType: string): Promise<FileData> {
+  private async createFileData(content: Buffer, mimeType: string): Promise<GeminiFileData> {
     try {
       // Check if the GenerativeAI instance has the createFile method (latest API version)
-      if (typeof (this.generativeAI as any).createFile === 'function') {
-        return await (this.generativeAI as any).createFile({
+      if (this.generativeAI.createFile && typeof this.generativeAI.createFile === 'function') {
+        return await this.generativeAI.createFile({
           data: content,
           mimeType
-        });
+        }) as GeminiFileData;
       }
       
       // Fallback to createBlob for older API versions
-      if (typeof (this.generativeAI as any).createBlob === 'function') {
-        return await (this.generativeAI as any).createBlob({
+      if (this.generativeAI.createBlob && typeof this.generativeAI.createBlob === 'function') {
+        return await this.generativeAI.createBlob({
           data: content,
           mimeType
-        });
+        }) as GeminiFileData;
       }
       
       // Fallback for when File API is completely unavailable
@@ -278,7 +290,7 @@ export class GeminiAdapter implements AIAdapter {
       }
       
       // Track file objects for cleanup
-      const fileObjects: FileData[] = [];
+      const fileObjects: GeminiFileData[] = [];
       
       // Process each part based on its type
       for (const part of parts) {
@@ -529,8 +541,8 @@ Please analyze the above submission and provide feedback in the following JSON f
       // Cleanup file resources
       for (const fileObject of fileObjects) {
         try {
-          if (fileObject && typeof fileObject.delete === 'function') {
-            await fileObject.delete();
+          if (fileObject && typeof (fileObject as GeminiFileData).delete === 'function') {
+            await (fileObject as GeminiFileData).delete?.();
           }
         } catch (cleanupError) {
           console.warn('Error cleaning up file resource:', cleanupError);
