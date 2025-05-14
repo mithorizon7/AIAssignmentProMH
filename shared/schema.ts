@@ -179,46 +179,46 @@ export const feedback = pgTable("feedback", {
 
 // Schema Relationships
 export const usersRelations = {
-  submissions: (users: any) => ({
+  submissions: (users) => ({
     one: { submissions, fields: [users.id], references: [submissions.userId] },
   }),
-  enrollments: (users: any) => ({
+  enrollments: (users) => ({
     one: { enrollments, fields: [users.id], references: [enrollments.userId] },
   }),
 };
 
 export const coursesRelations = {
-  assignments: (courses: any) => ({
+  assignments: (courses) => ({
     one: { assignments, fields: [courses.id], references: [assignments.courseId] },
   }),
-  enrollments: (courses: any) => ({
+  enrollments: (courses) => ({
     one: { enrollments, fields: [courses.id], references: [enrollments.courseId] },
   }),
 };
 
 export const assignmentsRelations = {
-  submissions: (assignments: any) => ({
+  submissions: (assignments) => ({
     one: { submissions, fields: [assignments.id], references: [submissions.assignmentId] },
   }),
-  course: (assignments: any) => ({
+  course: (assignments) => ({
     many: { courses, fields: [assignments.courseId], references: [courses.id] },
   }),
 };
 
 export const submissionsRelations = {
-  feedback: (submissions: any) => ({
+  feedback: (submissions) => ({
     one: { feedback, fields: [submissions.id], references: [feedback.submissionId] },
   }),
-  assignment: (submissions: any) => ({
+  assignment: (submissions) => ({
     many: { assignments, fields: [submissions.assignmentId], references: [assignments.id] },
   }),
-  user: (submissions: any) => ({
+  user: (submissions) => ({
     many: { users, fields: [submissions.userId], references: [users.id] },
   }),
 };
 
 export const feedbackRelations = {
-  submission: (feedback: any) => ({
+  submission: (feedback) => ({
     many: { submissions, fields: [feedback.submissionId], references: [submissions.id] },
   }),
 };
@@ -227,7 +227,7 @@ export const feedbackRelations = {
 export const systemSettings = pgTable("system_settings", {
   id: serial("id").primaryKey(),
   key: text("key").notNull().unique(),
-  value: json("value").$type<any>().notNull(),
+  value: json("value").$type<Record<string, unknown>>().notNull(),
   description: text("description"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   updatedBy: integer("updated_by").references(() => users.id),
