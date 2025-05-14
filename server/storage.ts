@@ -757,11 +757,15 @@ export class DatabaseStorage implements IStorage {
     mimeType: string
   ): Promise<boolean> {
     try {
+      // Convert string contentType parameter to ContentType enum value
+      // This ensures we're using the proper content type from our enum
+      const normalizedContentType = contentType as ContentType;
+      
       // Get system settings for this content type
       const query = db.select().from(fileTypeSettings)
         .where(
           and(
-            eq(fileTypeSettings.contentType, contentType),
+            eq(fileTypeSettings.contentType, normalizedContentType),
             eq(fileTypeSettings.context, 'system'),
             eq(fileTypeSettings.enabled, true)
           )
@@ -770,6 +774,7 @@ export class DatabaseStorage implements IStorage {
       const settings = await query;
       
       if (settings.length === 0) {
+        console.log(`Content type ${normalizedContentType} not enabled at system level`);
         return false; // Content type not enabled at system level
       }
       
@@ -779,15 +784,52 @@ export class DatabaseStorage implements IStorage {
       const allowedExtensions = systemSetting.extensions as string[];
       const allowedMimeTypes = systemSetting.mimeTypes as string[];
       
-      const extMatch = allowedExtensions.some(ext => 
-        ext.toLowerCase() === extension.toLowerCase().replace(/^\./, '')
+      // If extensions or mimeTypes lists are empty or null, use a more permissive approach
+      // based on content type category rather than specific extension/MIME matching
+      if (!allowedExtensions?.length || !allowedMimeTypes?.length) {
+        // Just check if the content type category is enabled
+        return true;
+      }
+      
+      // Clean and normalize the extension for comparison
+      const normalizedExtension = extension.toLowerCase().replace(/^\./, '');
+      const normalizedMimeType = mimeType.toLowerCase();
+      
+      // First check if there's an exact match for both extension and MIME type
+      const exactExtMatch = allowedExtensions.some(ext => 
+        ext.toLowerCase() === normalizedExtension
       );
       
-      const mimeMatch = allowedMimeTypes.some(mime => 
-        mime.toLowerCase() === mimeType.toLowerCase()
+      const exactMimeMatch = allowedMimeTypes.some(mime => 
+        mime.toLowerCase() === normalizedMimeType
       );
       
-      return extMatch && mimeMatch;
+      // If exact matches for both, allow it
+      if (exactExtMatch && exactMimeMatch) {
+        return true;
+      }
+      
+      // For more flexibility, check MIME type categories
+      // For example, if 'image/jpeg' isn't in the allowed list, but 'image/*' is
+      // or if the content type category (e.g., 'image') is enabled
+      
+      // Check for wildcards in MIME types (e.g., 'image/*')
+      const mimeTypeCategory = normalizedMimeType.split('/')[0];
+      const wildcardMatch = allowedMimeTypes.some(mime => 
+        mime === `${mimeTypeCategory}/*` || mime === '*/*'
+      );
+      
+      // If extension matches and there's a wildcard MIME type match, allow it
+      if (exactExtMatch && wildcardMatch) {
+        return true;
+      }
+      
+      // If we get this far, the file type isn't explicitly allowed
+      console.log(`File type check failed - Extension: ${normalizedExtension}, MIME: ${normalizedMimeType}, Content Type: ${normalizedContentType}`);
+      console.log(`Allowed extensions: ${allowedExtensions.join(', ')}`);
+      console.log(`Allowed MIME types: ${allowedMimeTypes.join(', ')}`);
+      
+      return false;
     } catch (error) {
       console.error('Error checking file type enablement:', error);
       return false; // Default to disallowed in case of error
