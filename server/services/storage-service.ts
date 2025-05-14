@@ -1,5 +1,5 @@
 import { storage } from '../storage';
-import { InsertSubmission, InsertFeedback } from '@shared/schema';
+import { InsertSubmission, InsertFeedback, Submission, Feedback } from '@shared/schema';
 
 export class StorageService {
   // Save submission to database
@@ -81,7 +81,22 @@ export class StorageService {
   }
 
   // Get submission with feedback
-  async getSubmissionWithFeedback(submissionId: number): Promise<any> {
+  async getSubmissionWithFeedback(submissionId: number): Promise<{ 
+    id: number; 
+    assignmentId: number; 
+    userId: number; 
+    status: string; 
+    content?: string; 
+    fileUrl?: string; 
+    fileName?: string;
+    mimeType?: string;
+    fileSize?: number;
+    contentType?: string;
+    notes?: string;
+    createdAt: Date;
+    updatedAt: Date;
+    feedback: Feedback | null;
+  } | null> {
     try {
       const submission = await storage.getSubmission(submissionId);
       if (!submission) return null;
@@ -99,7 +114,7 @@ export class StorageService {
   }
 
   // Get all submissions for an assignment with feedback
-  async getAssignmentSubmissions(assignmentId: number): Promise<any[]> {
+  async getAssignmentSubmissions(assignmentId: number): Promise<Array<Submission & { feedback: Feedback | null }>> {
     try {
       const submissions = await storage.listSubmissionsForAssignment(assignmentId);
       

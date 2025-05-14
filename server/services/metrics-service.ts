@@ -79,7 +79,13 @@ export class MetricsService {
   /**
    * Get performance metrics breakdown by assignment
    */
-  async getAssignmentMetrics(assignmentId?: number): Promise<any[]> {
+  async getAssignmentMetrics(assignmentId?: number): Promise<Array<{
+    assignmentId: number;
+    totalSubmissions: number;
+    averageProcessingTime: number | null;
+    maxProcessingTime: number | null;
+    minProcessingTime: number | null;
+  }>> {
     // Base query to get assignment stats
     if (assignmentId) {
       // If assignmentId is provided, filter by it
@@ -154,7 +160,10 @@ export class MetricsService {
    * Get system load for the specified time period
    * Units can be 'hour', 'day', 'week', 'month'
    */
-  async getSystemLoad(unit: string = 'day', count: number = 7): Promise<any[]> {
+  async getSystemLoad(unit: string = 'day', count: number = 7): Promise<Array<{
+    id: number;
+    createdAt: Date;
+  }>> {
     // This is a placeholder - in a real implementation you'd use window functions or time-series analysis
     const timeAgo = new Date();
     
