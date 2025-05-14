@@ -5,6 +5,22 @@ import { eq, and, lt, desc, sql, count, inArray } from 'drizzle-orm';
 import { stringify } from 'csv-stringify';
 
 /**
+ * Type definitions for batch operations
+ */
+interface Student {
+  id: number;
+  userId: number;
+  name: string;
+  email: string;
+}
+
+interface SubmissionRecord {
+  userId: number;
+  assignmentId: number;
+  submissionId: number;
+}
+
+/**
  * Service for efficiently handling batch operations on large datasets
  * These operations are optimized for handling classes with thousands of students
  */
@@ -314,18 +330,20 @@ export class BatchOperationsService {
     const csvData: (string | number | null)[][] = [];
     
     // Process in chunks to avoid memory issues with large classes
-    const studentChunks = this.chunkArray(enrolledStudents, this.batchSize);
+    // Cast enrolledStudents to Student[] type for proper typing
+    const typedStudents = enrolledStudents as Student[];
+    const studentChunks = this.chunkArray(typedStudents, this.batchSize);
     
     for (const studentChunk of studentChunks) {
-      // Get all student IDs in this chunk
-      const studentIds = studentChunk.map((s: { id: number }) => s.id);
+      // Get all student IDs in this chunk with proper typing
+      const studentIds = studentChunk.map(s => s.id);
       
       // Get all assignments and their most recent submission scores in bulk
       // This is much more efficient than querying each student+assignment combination
       const submissionScores = await this.getSubmissionScores(studentIds, courseAssignments.map((a: { id: number }) => a.id));
       
       // Generate a row for each student
-      for (const student of studentChunk as Array<{ id: number; name: string; email: string }>) {
+      for (const student of studentChunk) {
         const studentRow = [
           student.id.toString(),
           student.name,
@@ -337,7 +355,8 @@ export class BatchOperationsService {
           // Look up the score using a composite key
           const key = `${student.id}-${assignment.id}`;
           const score = submissionScores.get(key);
-          studentRow.push(score !== undefined ? score : null);
+          // Convert null to string 'N/A' for consistent CSV data typing
+          studentRow.push(score !== undefined ? score?.toString() || 'N/A' : 'N/A');
         }
         
         csvData.push(studentRow);
@@ -407,10 +426,11 @@ export class BatchOperationsService {
     const result = new Map<string, number | null>();
     
     // Map each student-assignment pair to its score
-    for (const submission of latestSubmissions) {
+    for (const submission of latestSubmissions as SubmissionRecord[]) {
       const key = `${submission.userId}-${submission.assignmentId}`;
       const score = scoreMap.get(submission.submissionId);
-      result.set(key, score !== undefined ? score : null);
+      // Ensure we only set numeric values or null, not empty objects
+      result.set(key, (score !== undefined && (typeof score === 'number')) ? score : null);
     }
     
     return result;
