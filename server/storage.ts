@@ -573,8 +573,9 @@ export class DatabaseStorage implements IStorage {
       
       const result = await db.execute<Feedback>(sql, params);
       return result.rows[0];
-    } catch (error: unknown) {
-      console.error('[ERROR] Error creating feedback:', error);
+    } catch (initialError: unknown) {
+      console.error('[ERROR] Error creating feedback:', initialError);
+      const initialErrorMessage = initialError instanceof Error ? initialError.message : String(initialError);
       
       // Try a fallback approach with direct SQL if needed
       try {
@@ -620,9 +621,9 @@ export class DatabaseStorage implements IStorage {
         }
         
         return result.rows[0] as Feedback;
-      } catch (fallbackError: any) {
+      } catch (fallbackError: unknown) {
         console.error('[ERROR] Fallback feedback creation also failed:', fallbackError);
-        throw new Error(`Failed to create feedback: ${error.message}`);
+        throw new Error(`Failed to create feedback: ${initialErrorMessage}`);
       }
     }
   }

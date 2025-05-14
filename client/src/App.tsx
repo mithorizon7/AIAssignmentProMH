@@ -33,9 +33,11 @@ import UXExamples from "@/pages/ux-examples";
 import { AuthProvider, useAuth } from "./lib/auth";
 
 interface PrivateRouteProps {
-  component: React.ComponentType<any>;
+  component: React.ComponentType<any>; // Using any here is unavoidable due to varying component props
   requireRole?: 'student' | 'instructor' | 'admin';
-  [key: string]: any;
+  id?: string | number;
+  code?: string;
+  [key: string]: unknown;
 }
 
 function PrivateRoute({ component: Component, requireRole, ...rest }: PrivateRouteProps) {
@@ -169,7 +171,7 @@ function Router() {
 
 function App() {
   // Function to log errors to monitoring service
-  const handleError = (error: Error, errorInfo: React.ErrorInfo) => {
+  const handleError = (error: Error, errorInfo: React.ErrorInfo): void => {
     // In production, you would send this to an error monitoring service
     console.error('Error caught by error boundary:', error, errorInfo);
   };
