@@ -935,7 +935,21 @@ export function configureAuth(app: any) {
             req.login(userData, (loginErr) => {
               if (loginErr) {
                 console.error('[ERROR] Re-login error after session regeneration:', loginErr);
-                return next(loginErr);
+                
+                // More robust error handling - try to destroy the inconsistent session before redirecting
+                req.session.destroy((destroyErr) => {
+                  if (destroyErr) {
+                    console.error('[ERROR] Failed to destroy inconsistent session:', destroyErr);
+                  }
+                  
+                  // Return login error with redirect instructions
+                  return res.status(500).json({ 
+                    message: 'Authentication error occurred during login',
+                    redirectTo: '/login',
+                    error: 'Session regeneration error'
+                  });
+                });
+                return; // Return early to prevent next(loginErr) from being called
               }
               
               // Save the session to store
@@ -984,7 +998,18 @@ export function configureAuth(app: any) {
     // Fallback for local development
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
     const host = app.get('host') || 'localhost:5000';
-    return `${protocol}://${host}`;
+    const fallbackUrl = `${protocol}://${host}`;
+    
+    // Log a warning that BASE_URL should be set in production
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('\x1b[33m%s\x1b[0m', 
+        `WARNING: Using fallback URL ${fallbackUrl} for login redirects. ` +
+        `This may not work correctly in production environments. ` +
+        `Please set BASE_URL environment variable.`
+      );
+    }
+    
+    return fallbackUrl;
   };
 
   // Logout endpoint
