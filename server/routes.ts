@@ -126,418 +126,359 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Create assignment (instructor only)
-  app.post('/api/assignments', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
-    try {
-      const { title, description, courseId, dueDate, rubric } = req.body;
-      
-      // Validate request
-      const assignmentSchema = z.object({
-        title: z.string().min(3),
-        description: z.string().min(10),
-        courseId: z.union([
-          z.number().int().positive(),
-          z.string().transform(val => parseInt(val))
-        ]).optional(), // Make optional for standalone assignments
-        dueDate: z.string().refine(val => !isNaN(Date.parse(val)), {
-          message: 'Invalid date format'
-        }),
-        rubric: z.object({
-          criteria: z.array(z.object({
-            id: z.string(),
-            type: z.string(),
-            name: z.string(),
-            description: z.string(),
-            maxScore: z.number().int().min(1),
-            weight: z.number().int().min(1),
-          })).optional(),
-          totalPoints: z.number().int().positive().optional(),
-          passingThreshold: z.number().int().min(0).max(100).optional(),
-        }).optional(),
-      });
-      
-      const result = assignmentSchema.safeParse(req.body);
-      if (!result.success) {
-        return res.status(400).json({ message: 'Invalid assignment data', errors: result.error });
-      }
-      
-      // Check if course exists (if courseId is provided)
-      if (courseId) {
-        const courseIdNum = typeof courseId === 'string' ? parseInt(courseId) : courseId;
-        const course = await storage.getCourse(courseIdNum);
-        if (!course) {
-          return res.status(404).json({ message: 'Course not found' });
-        }
-      }
-      
-      // Generate a unique shareable code
-      const shareableCode = generateShareableCode();
-      
-      // Create assignment
-      const courseIdNum = courseId ? (typeof courseId === 'string' ? parseInt(courseId) : courseId) : undefined;
-      const assignment = await storage.createAssignment({
-        title,
-        description,
-        courseId: courseIdNum, // Now properly parsed and optional
-        dueDate: new Date(dueDate), // The client already sends an ISO string, so we just need a Date object
-        status: 'active', // Setting to active by default so students can submit immediately
-        shareableCode,
-        rubric: rubric ? JSON.stringify(rubric) : null,
-      });
-      
-      res.status(201).json(assignment);
-    } catch (error) {
-      console.error('Error creating assignment:', error);
-      res.status(500).json({ message: 'Failed to create assignment' });
+  app.post('/api/assignments', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+    const { title, description, courseId, dueDate, rubric } = req.body;
+    
+    // Validate request
+    const assignmentSchema = z.object({
+      title: z.string().min(3),
+      description: z.string().min(10),
+      courseId: z.union([
+        z.number().int().positive(),
+        z.string().transform(val => parseInt(val))
+      ]).optional(), // Make optional for standalone assignments
+      dueDate: z.string().refine(val => !isNaN(Date.parse(val)), {
+        message: 'Invalid date format'
+      }),
+      rubric: z.object({
+        criteria: z.array(z.object({
+          id: z.string(),
+          type: z.string(),
+          name: z.string(),
+          description: z.string(),
+          maxScore: z.number().int().min(1),
+          weight: z.number().int().min(1),
+        })).optional(),
+        totalPoints: z.number().int().positive().optional(),
+        passingThreshold: z.number().int().min(0).max(100).optional(),
+      }).optional(),
+    });
+    
+    const result = assignmentSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ message: 'Invalid assignment data', errors: result.error });
     }
-  });
+    
+    // Check if course exists (if courseId is provided)
+    if (courseId) {
+      const courseIdNum = typeof courseId === 'string' ? parseInt(courseId) : courseId;
+      const course = await storage.getCourse(courseIdNum);
+      if (!course) {
+        return res.status(404).json({ message: 'Course not found' });
+      }
+    }
+    
+    // Generate a unique shareable code
+    const shareableCode = generateShareableCode();
+    
+    // Create assignment
+    const courseIdNum = courseId ? (typeof courseId === 'string' ? parseInt(courseId) : courseId) : undefined;
+    const assignment = await storage.createAssignment({
+      title,
+      description,
+      courseId: courseIdNum, // Now properly parsed and optional
+      dueDate: new Date(dueDate), // The client already sends an ISO string, so we just need a Date object
+      status: 'active', // Setting to active by default so students can submit immediately
+      shareableCode,
+      rubric: rubric ? JSON.stringify(rubric) : null,
+    });
+    
+    res.status(201).json(assignment);
+  }));
 
   // Get assignment details for instructor
-  app.get('/api/assignments/:id/details', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
+  app.get('/api/assignments/:id/details', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+    const assignmentId = parseInt(req.params.id);
+    // Get the basic assignment data
+    let assignment;
     try {
-      const assignmentId = parseInt(req.params.id);
-      // Get the basic assignment data
-      let assignment;
-      try {
-        assignment = await storage.getAssignment(assignmentId);
-      } catch (err) {
-        console.error('Error retrieving assignment:', err);
-        // Generate minimal assignment data for UI to work with
-        const assignments = await storage.listAssignments();
-        assignment = assignments.find(a => a.id === assignmentId);
-        
-        if (!assignment) {
-          return res.status(404).json({ message: 'Assignment not found' });
-        }
-      }
+      assignment = await storage.getAssignment(assignmentId);
+    } catch (err) {
+      console.error('Error retrieving assignment:', err);
+      // Generate minimal assignment data for UI to work with
+      const assignments = await storage.listAssignments();
+      assignment = assignments.find(a => a.id === assignmentId);
       
       if (!assignment) {
         return res.status(404).json({ message: 'Assignment not found' });
       }
-      
-      // Get additional data with error handling
-      let course = null;
-      let submissions = [];
-      let students = [];
-      
-      try {
-        course = await storage.getCourse(assignment.courseId);
-      } catch (err) {
-        console.error('Error fetching course:', err);
-      }
-      
-      try {
-        submissions = await storage.listSubmissionsForAssignment(assignment.id);
-      } catch (err) {
-        console.error('Error fetching submissions:', err);
-      }
-      
-      try {
-        students = await storage.listCourseEnrollments(assignment.courseId);
-      } catch (err) {
-        console.error('Error fetching students:', err);
-      }
-      
-      const submittedCount = submissions.length > 0 ? new Set(submissions.map(s => s.userId)).size : 0;
-      
-      // Ensure shareableCode is included
-      let shareableCode = assignment.shareableCode;
-      if (!shareableCode && assignment.id) {
-        // Generate a code if one doesn't exist
-        shareableCode = generateShareableCode();
-        try {
-          // Try to update the assignment with the new code, but don't fail if it doesn't work
-          await storage.updateAssignmentShareableCode(assignment.id, shareableCode);
-        } catch (err) {
-          console.error('Error updating assignment with shareable code:', err);
-        }
-      }
-      
-      res.json({
-        ...assignment,
-        course,
-        submittedCount,
-        totalStudents: students.length,
-        submissionPercentage: students.length > 0 ? (submittedCount / students.length) * 100 : 0,
-        shareableCode: shareableCode || 'temp-' + assignment.id
-      });
-    } catch (error) {
-      console.error('Error fetching assignment details:', error);
-      res.status(500).json({ message: 'Failed to fetch assignment details' });
     }
-  });
+    
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+    
+    // Get additional data with error handling
+    let course = null;
+    let submissions = [];
+    let students = [];
+    
+    try {
+      course = await storage.getCourse(assignment.courseId);
+    } catch (err) {
+      console.error('Error fetching course:', err);
+    }
+    
+    try {
+      submissions = await storage.listSubmissionsForAssignment(assignment.id);
+    } catch (err) {
+      console.error('Error fetching submissions:', err);
+    }
+    
+    try {
+      students = await storage.listCourseEnrollments(assignment.courseId);
+    } catch (err) {
+      console.error('Error fetching students:', err);
+    }
+    
+    const submittedCount = submissions.length > 0 ? new Set(submissions.map(s => s.userId)).size : 0;
+    
+    // Ensure shareableCode is included
+    let shareableCode = assignment.shareableCode;
+    if (!shareableCode && assignment.id) {
+      // Generate a code if one doesn't exist
+      shareableCode = generateShareableCode();
+      try {
+        // Try to update the assignment with the new code, but don't fail if it doesn't work
+        await storage.updateAssignmentShareableCode(assignment.id, shareableCode);
+      } catch (err) {
+        console.error('Error updating assignment with shareable code:', err);
+      }
+    }
+    
+    res.json({
+      ...assignment,
+      course,
+      submittedCount,
+      totalStudents: students.length,
+      submissionPercentage: students.length > 0 ? (submittedCount / students.length) * 100 : 0,
+      shareableCode: shareableCode || 'temp-' + assignment.id
+    });
+  }));
   
   // Update assignment status (instructor only)
-  app.patch('/api/assignments/:id/status', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
-    try {
-      const assignmentId = parseInt(req.params.id);
-      
-      if (isNaN(assignmentId)) {
-        return res.status(400).json({ message: 'Invalid assignment ID' });
-      }
-      
-      // Validate request
-      const statusSchema = z.object({
-        status: z.enum(['active', 'upcoming', 'completed'])
-      });
-      
-      const result = statusSchema.safeParse(req.body);
-      if (!result.success) {
-        return res.status(400).json({ message: 'Invalid status value', errors: result.error });
-      }
-      
-      const { status } = result.data;
-      
-      // Check if assignment exists
-      const assignment = await storage.getAssignment(assignmentId);
-      if (!assignment) {
-        return res.status(404).json({ message: 'Assignment not found' });
-      }
-      
-      // Update assignment status
-      const updatedAssignment = await storage.updateAssignmentStatus(assignmentId, status);
-      
-      res.json(updatedAssignment);
-    } catch (error) {
-      console.error('Error updating assignment status:', error);
-      res.status(500).json({ message: 'Failed to update assignment status' });
+  app.patch('/api/assignments/:id/status', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+    const assignmentId = parseInt(req.params.id);
+    
+    if (isNaN(assignmentId)) {
+      return res.status(400).json({ message: 'Invalid assignment ID' });
     }
-  });
+    
+    // Validate request
+    const statusSchema = z.object({
+      status: z.enum(['active', 'upcoming', 'completed'])
+    });
+    
+    const result = statusSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ message: 'Invalid status value', errors: result.error });
+    }
+    
+    const { status } = result.data;
+    
+    // Check if assignment exists
+    const assignment = await storage.getAssignment(assignmentId);
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+    
+    // Update assignment status
+    const updatedAssignment = await storage.updateAssignmentStatus(assignmentId, status);
+    
+    res.json(updatedAssignment);
+  }));
 
   // Lookup assignment by shareable code - with rate limiting
-  app.get('/api/assignments/code/:code', defaultRateLimiter, async (req: Request, res: Response) => {
-    try {
-      const code = req.params.code;
-      
-      if (!code || code.length < 6) {
-        return res.status(400).json({ message: 'Invalid shareable code' });
-      }
-      
-      // Query assignments to find one with matching shareable code
-      const assignments = await storage.listAssignments();
-      const assignment = assignments.find(a => a.shareableCode === code);
-      
-      if (!assignment) {
-        return res.status(404).json({ message: 'Assignment not found with this code' });
-      }
-      
-      // Get course information
-      const course = await storage.getCourse(assignment.courseId);
-      
-      if (!course) {
-        return res.status(404).json({ message: 'Course not found for this assignment' });
-      }
-      
-      // Check if user is authenticated
-      const isAuthenticated = req.isAuthenticated();
-      
-      // If user is not authenticated, they will be redirected to login
-      // from the client side, and then back to the submission page
-      
-      // Ensure assignment has a valid shareable code
-      let shareableCode = assignment.shareableCode;
-      
-      // If no shareable code exists, generate one and try to persist it
-      if (!shareableCode && assignment.id) {
-        shareableCode = generateShareableCode();
-        try {
-          // Try to update the assignment with the new code, but don't fail if it doesn't work
-          await storage.updateAssignmentShareableCode(assignment.id, shareableCode);
-          console.log(`Generated new shareable code ${shareableCode} for assignment ${assignment.id}`);
-        } catch (err) {
-          console.error('Error updating assignment with new shareable code:', err);
-        }
-      }
-
-      // Return assignment with authentication status flag set to true (always require auth)
-      res.json({
-        id: assignment.id,
-        title: assignment.title,
-        description: assignment.description,
-        courseId: assignment.courseId,
-        courseCode: course.code,
-        courseName: course.name,
-        dueDate: assignment.dueDate,
-        // Always provide a shareable code, using temp- prefix as fallback if needed
-        shareableCode: shareableCode || `TEMP-${assignment.id}`,
-        requiresAuth: true, // Always require authentication for submissions
-        isAuthenticated: isAuthenticated // Flag indicating if user is already authenticated
-      });
-    } catch (error) {
-      console.error('Error looking up assignment by code:', error);
-      res.status(500).json({ message: 'Failed to lookup assignment' });
+  app.get('/api/assignments/code/:code', defaultRateLimiter, asyncHandler(async (req: Request, res: Response) => {
+    const code = req.params.code;
+    
+    if (!code || code.length < 6) {
+      return res.status(400).json({ message: 'Invalid shareable code' });
     }
-  });
+    
+    // Query assignments to find one with matching shareable code
+    const assignments = await storage.listAssignments();
+    const assignment = assignments.find(a => a.shareableCode === code);
+    
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found with this code' });
+    }
+    
+    // Get course information
+    const course = await storage.getCourse(assignment.courseId);
+    
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found for this assignment' });
+    }
+    
+    // Check if user is authenticated
+    const isAuthenticated = req.isAuthenticated();
+    
+    // If user is not authenticated, they will be redirected to login
+    // from the client side, and then back to the submission page
+    
+    // Ensure assignment has a valid shareable code
+    let shareableCode = assignment.shareableCode;
+    
+    // If no shareable code exists, generate one and try to persist it
+    if (!shareableCode && assignment.id) {
+      shareableCode = generateShareableCode();
+      try {
+        // Try to update the assignment with the new code, but don't fail if it doesn't work
+        await storage.updateAssignmentShareableCode(assignment.id, shareableCode);
+        console.log(`Generated new shareable code ${shareableCode} for assignment ${assignment.id}`);
+      } catch (err) {
+        console.error('Error updating assignment with new shareable code:', err);
+      }
+    }
+
+    // Return assignment with authentication status flag set to true (always require auth)
+    res.json({
+      id: assignment.id,
+      title: assignment.title,
+      description: assignment.description,
+      courseId: assignment.courseId,
+      courseCode: course.code,
+      courseName: course.name,
+      dueDate: assignment.dueDate,
+      // Always provide a shareable code, using temp- prefix as fallback if needed
+      shareableCode: shareableCode || `TEMP-${assignment.id}`,
+      requiresAuth: true, // Always require authentication for submissions
+      isAuthenticated: isAuthenticated // Flag indicating if user is already authenticated
+    });
+  }));
 
   // Anonymous submission (via shareable link) - with strict rate limiting
   // The /api/anonymous-submissions endpoint is now deprecated - everything should use the authenticated endpoint
   // We're keeping this route but making it require authentication for backward compatibility
-  app.post('/api/anonymous-submissions', submissionRateLimiter, requireAuth, upload.single('file'), async (req: Request, res: Response) => {
-    try {
-      // Validate request with enhanced security for shareable code
-      const submissionSchema = z.object({
-        assignmentId: z.string().transform(val => parseInt(val)),
-        submissionType: z.enum(['file', 'code']),
-        name: z.string().min(1),
-        email: z.string().email(),
-        notes: z.string().optional(),
-        code: z.string().optional(),
-        shareableCode: z.string().min(1, "Shareable code is required for anonymous submissions"),
-      });
-      
-      const result = submissionSchema.safeParse(req.body);
-      if (!result.success) {
-        return res.status(400).json({ message: 'Invalid submission data', errors: result.error });
-      }
-      
-      const { assignmentId, submissionType, name, email, notes, code, shareableCode } = result.data;
-      
-      // Get the assignment to validate the shareableCode
-      const assignment = await storage.getAssignment(assignmentId);
-      
-      // Check if assignment exists
-      if (!assignment) {
-        return res.status(404).json({ message: 'Assignment not found' });
-      }
-      
-      // Validate shareable code - this is a critical security check
-      
-      // Get the stored shareable code from the assignment, or generate a persistent one if missing
-      let storedShareableCode = assignment.shareableCode;
-      
-      // If assignment has no shareable code but has an ID, generate and persist one
-      if (!storedShareableCode && assignment.id) {
-        storedShareableCode = generateShareableCode();
-        try {
-          // Try to update the assignment with the new code, but don't fail if it doesn't work
-          await storage.updateAssignmentShareableCode(assignment.id, storedShareableCode);
-          console.log(`Generated new shareable code ${storedShareableCode} for assignment ${assignment.id}`);
-        } catch (err) {
-          console.error('Error updating assignment with new shareable code:', err);
-        }
-      }
-      
-      // Create a temp code based on ID for older assignments where code generation failed
-      const fallbackCode = `TEMP-${assignment.id}`;
-      
-      // Check if the provided code matches either the stored code or the temp code
-      if (shareableCode !== storedShareableCode && shareableCode !== fallbackCode) {
-        return res.status(403).json({ 
-          message: 'Invalid shareable code for this assignment',
-          details: 'The provided shareable code does not match the assignment' 
-        });
-      }
-      
-      // Check if assignment is active and not past due date
-      const isActive = await storageService.isAssignmentActive(assignmentId);
-      if (!isActive) {
-        return res.status(400).json({ message: 'Assignment is not active or has passed its due date' });
-      }
-      
-      // Create submission
-      let fileUrl = '';
-      let fileName = '';
-      let content = code || '';
-      let mimeType = null;
-      let fileSize = null;
-      let contentType: ContentType | null = null;
-      
-      if (submissionType === 'file' && req.file) {
-        // Get file metadata
-        fileName = req.file.originalname;
-        mimeType = req.file.mimetype;
-        fileSize = req.file.size;
-        
-        // Determine content type based on file extension and MIME type
-        const fileExtension = path.extname(fileName).slice(1).toLowerCase();
-        contentType = determineContentType(mimeType, fileName);
-        
-        console.log(`Anonymous submission: ${fileName}, MIME: ${mimeType}, Content type: ${contentType}`);
-        
-        // Verify that the file type is allowed by passing the determined content type
-        // This ensures we're checking based on content category rather than exact MIME/extension match
-        const isAllowed = await storage.checkFileTypeEnabled(contentType, fileExtension, mimeType);
-        if (!isAllowed) {
-          return res.status(400).json({ 
-            message: `File type ${fileExtension} (${mimeType}) is not allowed`,
-            details: 'This file type is currently not supported for AI evaluation'
-          });
-        }
-        
-        // Store file and get URL
-        fileUrl = await storageService.storeAnonymousSubmissionFile(req.file, assignmentId, name, email);
-        
-        // For text files, extract and store content
-        if (contentType === 'text' && mimeType.startsWith('text/')) {
-          content = req.file.buffer.toString('utf8');
-        }
-      } else if (submissionType === 'code') {
-        // Validate code content
-        if (!content.trim()) {
-          return res.status(400).json({ message: 'Code content is required for code submissions' });
-        }
-        
-        // Set default metadata for code submissions
-        mimeType = 'text/plain';
-        contentType = 'text' as ContentType;
-        fileSize = Buffer.from(content).length;
-      } else {
-        return res.status(400).json({ message: 'Invalid submission type or missing file' });
-      }
-      
-      // Create or find a temporary user for the submission
-      let user = await storage.getUserByEmail(email);
-      
-      if (!user) {
-        // Create a temporary user
-        user = await storage.createUser({
-          username: email,
-          email: email,
-          password: '', // Empty password for temporary users
-          name: name,
-          role: 'student'
-        });
-        
-        // Automatically enroll the user in the course
-        const assignment = await storage.getAssignment(assignmentId);
-        if (assignment) {
-          await storage.createEnrollment({
-            userId: user.id,
-            courseId: assignment.courseId
-          });
-        }
-      }
-      
-      // Create submission in database with additional metadata for multimodal content
-      const submission = await storage.createSubmission({
-        assignmentId,
-        userId: user.id,
-        fileUrl,
-        fileName,
-        content,
-        notes: notes || null,
-        status: 'pending',
-        mimeType: mimeType || null,
-        fileSize: fileSize || null,
-        contentType: contentType || null
-      });
-      
-      // Queue submission for AI processing
-      submissionQueue.addSubmission(submission.id);
-      
-      res.status(201).json({
-        id: submission.id,
-        status: submission.status,
-        message: "Submission received successfully"
-      });
-    } catch (error) {
-      console.error('Error processing anonymous submission:', error);
-      res.status(500).json({ message: 'Failed to process submission' });
+  app.post('/api/anonymous-submissions', submissionRateLimiter, requireAuth, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
+    const submissionSchema = z.object({
+      assignmentId: z.string().transform(val => parseInt(val)),
+      submissionType: z.enum(['file', 'code']),
+      name: z.string().min(1),
+      email: z.string().email(),
+      notes: z.string().optional(),
+      code: z.string().optional(),
+      shareableCode: z.string().min(1, "Shareable code is required for anonymous submissions"),
+    });
+    
+    const result = submissionSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ message: 'Invalid submission data', errors: result.error });
     }
-  });
+    
+    const { assignmentId, submissionType, name, email, notes, code, shareableCode } = result.data;
+    
+    // Get the assignment to validate the shareableCode
+    const assignment = await storage.getAssignment(assignmentId);
+    
+    // Check if assignment exists
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+    
+    // Validate shareable code - this is a critical security check
+    let storedShareableCode = assignment.shareableCode;
+    
+    // If assignment has no shareable code but has an ID, generate and persist one
+    if (!storedShareableCode && assignment.id) {
+      storedShareableCode = generateShareableCode();
+      try {
+        await storage.updateAssignmentShareableCode(assignment.id, storedShareableCode);
+        console.log(`Generated new shareable code ${storedShareableCode} for assignment ${assignment.id}`);
+      } catch (err) {
+        console.error('Error updating assignment with new shareable code:', err);
+      }
+    }
+    
+    // If no valid stored code, use temporary format based on ID for security
+    if (!storedShareableCode) {
+      storedShareableCode = `TEMP-${assignment.id}`;
+    }
+    
+    // Now compare the provided code with the stored/generated one
+    if (shareableCode !== storedShareableCode) {
+      return res.status(403).json({ message: 'Invalid shareable code' });
+    }
+    
+    const userId = req.user ? (req.user as any).id : 0;
+    
+    // Prepare submission data
+    let submission: any = {
+      assignmentId,
+      userId,
+      name,
+      email,
+      status: 'submitted',
+      notes,
+      contentType: null,
+      fileSize: null,
+      fileName: null,
+      fileExtension: null,
+      submissionType
+    };
+    
+    // Handle submission content based on type
+    if (submissionType === 'file') {
+      // File upload - process file from multer
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+      
+      // Determine content type based on file extension
+      const extension = path.extname(req.file.originalname).toLowerCase().slice(1);
+      const contentType = determineContentType(extension);
+      
+      if (!contentType || !isFileTypeAllowed(extension, contentType)) {
+        return res.status(400).json({ 
+          message: `File type .${extension} is not allowed`,
+          allowedTypes: SUPPORTED_MIME_TYPES
+        });
+      }
+      
+      // Add file information to submission
+      submission.contentType = contentType;
+      submission.fileSize = req.file.size;
+      submission.fileName = req.file.originalname;
+      submission.fileExtension = extension;
+      submission.content = req.file.buffer.toString('base64');
+    } else if (submissionType === 'code') {
+      // Code snippet submission
+      if (!code) {
+        return res.status(400).json({ message: 'Code content is required for code submissions' });
+      }
+      
+      submission.contentType = 'text';
+      submission.content = code;
+      submission.fileExtension = 'txt';
+    } else {
+      return res.status(400).json({ message: 'Invalid submission type' });
+    }
+    
+    // Create the submission in the database
+    const createdSubmission = await storage.createSubmission(submission);
+    
+    // Add to processing queue
+    await submissionQueue.add('process', {
+      submissionId: createdSubmission.id,
+      assignmentId: assignmentId,
+      userId: userId,
+      submissionType: submissionType,
+      contentType: submission.contentType,
+      content: submission.content,
+      fileName: submission.fileName,
+      fileExtension: submission.fileExtension,
+    });
+    
+    // Return success response
+    res.status(201).json({
+      id: createdSubmission.id,
+      message: 'Submission added successfully and queued for processing'
+    });
+  }));
 
   // Submission endpoints
-  app.post('/api/submissions', requireAuth, upload.single('file'), async (req: Request, res: Response) => {
-    try {
+  app.post('/api/submissions', requireAuth, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
       const user = req.user as any;
       
       if (user.role !== 'student') {
@@ -641,15 +582,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       submissionQueue.addSubmission(submission.id);
       
       res.status(201).json(submission);
-    } catch (error) {
-      console.error('Error processing submission:', error);
-      res.status(500).json({ message: 'Failed to process submission' });
-    }
-  });
+  }));
 
   // Get submissions for the current user
-  app.get('/api/submissions', requireAuth, async (req: Request, res: Response) => {
-    try {
+  app.get('/api/submissions', requireAuth, asyncHandler(async (req: Request, res: Response) => {
       const user = req.user as any;
       const assignmentId = req.query.assignmentId ? parseInt(req.query.assignmentId as string) : undefined;
       
@@ -668,15 +604,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       res.json(submissionsWithFeedback);
-    } catch (error) {
-      console.error('Error fetching submissions:', error);
-      res.status(500).json({ message: 'Failed to fetch submissions' });
-    }
-  });
+  }));
 
   // Get recent submissions for the current user
-  app.get('/api/submissions/recent', requireAuth, async (req: Request, res: Response) => {
-    try {
+  app.get('/api/submissions/recent', requireAuth, asyncHandler(async (req: Request, res: Response) => {
       const user = req.user as any;
       
       // Get recent submissions using the storage service instead of direct db access
@@ -700,15 +631,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       res.json(submissionsWithFeedback);
-    } catch (error) {
-      console.error('Error fetching recent submissions:', error);
-      res.status(500).json({ message: 'Failed to fetch recent submissions' });
-    }
-  });
+  }));
 
   // Get submissions for a specific assignment (instructor only)
-  app.get('/api/assignments/:id/submissions', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
-    try {
+  app.get('/api/assignments/:id/submissions', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
       const assignmentId = parseInt(req.params.id);
       
       // Check if assignment exists
@@ -717,18 +643,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Assignment not found' });
       }
       
-      const submissionsWithFeedback = await storageService.getAssignmentSubmissions(assignmentId);
+      const submissions = await storage.listSubmissionsForAssignment(assignmentId);
+      
+      // For each submission, get the feedback
+      const submissionsWithFeedback = await Promise.all(
+        submissions.map(async (submission) => {
+          const feedback = await storage.getFeedbackBySubmissionId(submission.id);
+          
+          return {
+            ...submission,
+            feedback
+          };
+        })
+      );
       
       res.json(submissionsWithFeedback);
-    } catch (error) {
-      console.error('Error fetching assignment submissions:', error);
-      res.status(500).json({ message: 'Failed to fetch assignment submissions' });
-    }
-  });
+  }));
 
   // Course endpoints
-  app.get('/api/courses', requireAuth, async (req: Request, res: Response) => {
-    try {
+  app.get('/api/courses', requireAuth, asyncHandler(async (req: Request, res: Response) => {
       const user = req.user as any;
       let courses;
       
@@ -741,15 +674,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json(courses);
-    } catch (error) {
-      console.error('Error fetching courses:', error);
-      res.status(500).json({ message: 'Failed to fetch courses' });
-    }
-  });
+  }));
   
   // Get course by ID with its assignments
-  app.get('/api/courses/:id', requireAuth, async (req: Request, res: Response) => {
-    try {
+  app.get('/api/courses/:id', requireAuth, asyncHandler(async (req: Request, res: Response) => {
       const courseId = parseInt(req.params.id);
       
       if (isNaN(courseId)) {
@@ -771,15 +699,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...course,
         assignments
       });
-    } catch (error) {
-      console.error('Error fetching course details:', error);
-      res.status(500).json({ message: 'Failed to fetch course details' });
-    }
-  });
+  }));
   
   // Create course (instructor only)
-  app.post('/api/courses', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
-    try {
+  app.post('/api/courses', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
       const { name, code, description } = req.body;
       
       // Validate request
@@ -819,15 +742,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(201).json(course);
-    } catch (error) {
-      console.error('Error creating course:', error);
-      res.status(500).json({ message: 'Failed to create course' });
-    }
-  });
+  }));
 
   // Student progress data for instructors
-  app.get('/api/students/progress/:assignmentId?', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
-    try {
+  app.get('/api/students/progress/:assignmentId?', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
       const page = parseInt(req.query.page as string || '1');
       const pageSize = 10;
       const searchQuery = req.query.search as string || '';
@@ -928,15 +846,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalPages,
         currentPage: page
       });
-    } catch (error) {
-      console.error('Error fetching student progress:', error);
-      res.status(500).json({ message: 'Failed to fetch student progress' });
-    }
-  });
+  }));
 
   // Assignment statistics for instructors
-  app.get('/api/assignments/stats', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
-    try {
+  app.get('/api/assignments/stats', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
       // Get all assignments
       const allAssignments = await storage.listAssignments();
       
@@ -990,15 +903,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         feedbackGenerated,
         submissionsIncrease,
       });
-    } catch (error) {
-      console.error('Error fetching assignment stats:', error);
-      res.status(500).json({ message: 'Failed to fetch assignment statistics' });
-    }
-  });
+  }));
 
   // Assignment analytics for instructors
-  app.get('/api/assignments/:id?/analytics', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
-    try {
+  app.get('/api/assignments/:id?/analytics', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
       const assignmentId = req.params.id ? parseInt(req.params.id) : undefined;
       
       let targetAssignmentId = assignmentId;
@@ -1115,11 +1023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         avgRevisionsPerStudent,
         avgImprovementPercentage
       });
-    } catch (error) {
-      console.error('Error fetching assignment analytics:', error);
-      res.status(500).json({ message: 'Failed to fetch assignment analytics' });
-    }
-  });
+  }));
 
   // Test rubric with AI (instructor only)
   app.post('/api/test-rubric', requireAuth, requireRole('instructor'), async (req: Request, res: Response) => {
