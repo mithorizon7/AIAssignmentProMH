@@ -164,8 +164,25 @@ export const feedback = pgTable("feedback", {
   score: smallint("score"),
   criteriaScores: json("criteria_scores").$type<CriteriaScore[]>(),
   processingTime: integer("processing_time").notNull(), // in milliseconds
+  /**
+   * rawResponse: Stores the complete raw response from the AI model.
+   * Structure varies by model and version of model API.
+   * For Gemini models, response structure can change between API versions.
+   */
   rawResponse: json("raw_response").$type<Record<string, unknown>>(),
+  
+  /**
+   * modelName: The specific AI model used for generating feedback
+   */
   modelName: text("model_name"),
+  
+  /**
+   * tokenCount: Number of tokens used in this AI operation.
+   * For Gemini models, this may be an estimate derived from:
+   * 1. API usage metadata (when available)
+   * 2. Response length approximation (when usage metadata is unavailable)
+   * Different versions of the Gemini API provide token usage in different formats.
+   */
   tokenCount: integer("token_count"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => {

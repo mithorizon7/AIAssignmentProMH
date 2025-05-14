@@ -275,9 +275,16 @@ export class GeminiAdapter implements AIAdapter {
         };
       }
       
-      // We don't have token count from Gemini API directly,
-      // so we'll estimate based on text length
-      const estimatedTokens = Math.ceil(text.length / 4);
+      /**
+       * Get token usage information for standard (non-multimodal) completion
+       * 
+       * NOTE: The basic generateContent API response doesn't typically include token usage statistics.
+       * We use an estimation method based on response length as a reasonable approximation.
+       * The estimation method (text length / 4) is an approximation and may not match actual
+       * token usage precisely, but provides a consistent way to track relative usage.
+       */
+      console.info("Token count not available from Gemini API for standard completion, using estimation method");
+      const estimatedTokens = Math.ceil(text.length / 4); // Estimation: ~4 characters per token
       
       return {
         strengths: parsedContent.strengths || [],
@@ -607,22 +614,40 @@ Please analyze the above submission and provide feedback in the following JSON f
         };
       }
       
-      // Get actual token usage if available, otherwise estimate
+      /**
+       * Get token usage information using multiple fallback methods:
+       * 1. Try to get actual token count from API response (different paths depending on API version)
+       * 2. Fall back to estimation based on response length if API doesn't provide token count
+       * 
+       * NOTE: The Gemini API structure for token usage reporting changes between versions.
+       * This code handles multiple known response structures and falls back to estimation
+       * when necessary. The estimation method (text length / 4) is an approximation and
+       * may not match actual token usage precisely.
+       */
       let tokenCount = 0;
       
-      // Different versions of the API have different ways to access token usage
+      // Try to get actual token usage from response metadata (structure varies by API version)
       try {
         // Cast response to our ResponseMetadata interface to access usage data
         const responseMetadata = response as unknown as ResponseMetadata;
         
-        // Try different paths to token usage information based on API version
+        // Check multiple potential paths to token usage data based on different API versions
+        // These paths have been observed in different versions of the Gemini API
         tokenCount = responseMetadata.candidates?.[0]?.usageMetadata?.totalTokens ||
                     responseMetadata.usageMetadata?.totalTokens ||
                     responseMetadata.usage?.totalTokens ||
-                    Math.ceil(text.length / 4); // Fallback to estimation
+                    0; // Default to 0 if none of the above paths exist
+                    
+        // If we couldn't get token count from API response metadata, estimate from text length
+        if (tokenCount === 0) {
+          console.info("Token count not available from Gemini API response, using estimation method");
+          tokenCount = Math.ceil(text.length / 4); // Estimation: ~4 characters per token
+        }
       } catch (e) {
-        // Fallback to estimation if access fails
-        tokenCount = Math.ceil(text.length / 4);
+        // If any error occurs while trying to access the response metadata,
+        // fall back to text length estimation
+        console.warn("Error accessing Gemini API response metadata for token count:", e);
+        tokenCount = Math.ceil(text.length / 4); // Estimation: ~4 characters per token
       }
       
       return {
