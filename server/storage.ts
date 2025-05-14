@@ -599,23 +599,26 @@ export class DatabaseStorage implements IStorage {
             raw_response, token_count, model_name, created_at
           )
           VALUES (
-            ${insertFeedback.submissionId},
-            '${strengths.replace(/'/g, "''")}',
-            '${improvements.replace(/'/g, "''")}',
-            '${suggestions.replace(/'/g, "''")}',
-            ${insertFeedback.summary ? `'${insertFeedback.summary.replace(/'/g, "''")}'` : 'NULL'},
-            ${insertFeedback.score || 'NULL'},
-            ${insertFeedback.criteriaScores ? `'${JSON.stringify(insertFeedback.criteriaScores).replace(/'/g, "''")}'` : 'NULL'},
-            ${insertFeedback.processingTime},
-            ${insertFeedback.rawResponse ? `'${JSON.stringify(insertFeedback.rawResponse).replace(/'/g, "''")}'` : 'NULL'},
-            ${insertFeedback.tokenCount || 'NULL'},
-            ${insertFeedback.modelName ? `'${insertFeedback.modelName}'` : 'NULL'},
-            NOW()
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW()
           )
           RETURNING *;
         `;
         
-        const result = await db.execute(sql);
+        const params = [
+          insertFeedback.submissionId,
+          strengths,
+          improvements,
+          suggestions,
+          insertFeedback.summary || null,
+          insertFeedback.score || null,
+          insertFeedback.criteriaScores ? JSON.stringify(insertFeedback.criteriaScores) : null,
+          insertFeedback.processingTime,
+          insertFeedback.rawResponse ? JSON.stringify(insertFeedback.rawResponse) : null,
+          insertFeedback.tokenCount || null,
+          insertFeedback.modelName || null
+        ];
+        
+        const result = await db.execute(sql, params);
         if (result.rows.length === 0) {
           throw new Error('Failed to create feedback with fallback SQL');
         }
