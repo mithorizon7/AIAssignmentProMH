@@ -60,16 +60,16 @@ export class ServiceUnavailableError extends ApiError {
 
 // Logger function that can be expanded in the future
 export const logger = {
-  info: (message: string, meta?: any) => {
+  info: (message: string, meta?: Record<string, unknown>) => {
     console.log(`[INFO] ${message}`, meta ? meta : '');
   },
-  error: (message: string, error?: any) => {
+  error: (message: string, error?: Error | Record<string, unknown>) => {
     console.error(`[ERROR] ${message}`, error ? error : '');
   },
-  warn: (message: string, meta?: any) => {
+  warn: (message: string, meta?: Record<string, unknown>) => {
     console.warn(`[WARN] ${message}`, meta ? meta : '');
   },
-  debug: (message: string, meta?: any) => {
+  debug: (message: string, meta?: Record<string, unknown>) => {
     if (process.env.NODE_ENV !== 'production') {
       console.debug(`[DEBUG] ${message}`, meta ? meta : '');
     }
@@ -77,22 +77,32 @@ export const logger = {
 };
 
 // Async handler to avoid try/catch repetition in routes
-export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+export const asyncHandler = (
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>
+) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 };
 
 // Global error handler middleware
-export const errorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
+export const errorHandler = (
+  err: unknown, 
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+): void => {
   // Default error values
   let statusCode = 500;
   let message = 'Internal Server Error';
-  let errorDetails = undefined;
+  let errorDetails: unknown = undefined;
   let isOperational = false;
   
   // Log the error
-  logger.error(`Error in ${req.method} ${req.path}`, { error: err, body: req.body });
+  logger.error(`Error in ${req.method} ${req.path}`, { 
+    error: err instanceof Error ? err : 'Unknown error', 
+    body: req.body 
+  });
   
   // Handle specific error types
   if (err instanceof ApiError) {
@@ -110,20 +120,26 @@ export const errorHandler = (err: any, req: Request, res: Response, next: NextFu
     statusCode = 500;
     message = 'Database Error';
     isOperational = false;
-  } else if (err?.code === '23505') {
-    // PostgreSQL unique violation
-    statusCode = 409;
-    message = 'Resource already exists';
-    isOperational = true;
-  } else if (err?.code === '23503') {
-    // PostgreSQL foreign key violation
-    statusCode = 400;
-    message = 'Related resource does not exist';
-    isOperational = true;
+  } else if (typeof err === 'object' && err !== null && 'code' in err) {
+    // PostgreSQL error codes
+    const pgError = err as { code: string };
+    if (pgError.code === '23505') {
+      // PostgreSQL unique violation
+      statusCode = 409;
+      message = 'Resource already exists';
+      isOperational = true;
+    } else if (pgError.code === '23503') {
+      // PostgreSQL foreign key violation
+      statusCode = 400;
+      message = 'Related resource does not exist';
+      isOperational = true;
+    }
   }
   
   // Only include stack trace in non-production environments and for non-operational errors
-  const stack = process.env.NODE_ENV !== 'production' && !isOperational ? err.stack : undefined;
+  const stack = process.env.NODE_ENV !== 'production' && !isOperational && err instanceof Error 
+    ? err.stack 
+    : undefined;
   
   // Send the response
   res.status(statusCode).json({
