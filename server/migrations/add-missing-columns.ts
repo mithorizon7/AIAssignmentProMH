@@ -83,6 +83,11 @@ export async function runMigrations() {
   try {
     console.log('[Migration] Starting database migrations...');
     await addMissingColumnsToSubmissions();
+    
+    // Import the createFileTypeSettingsTable function dynamically to avoid circular dependencies
+    const { createFileTypeSettingsTable } = await import('./add-file-type-settings');
+    await createFileTypeSettingsTable();
+    
     console.log('[Migration] All migrations completed successfully.');
   } catch (error) {
     console.error('[Migration] Error running migrations:', error);
