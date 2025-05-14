@@ -23,6 +23,7 @@ import { API_ROUTES, APP_ROUTES } from "@/lib/constants";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Rubric } from '@shared/schema';
+import { Assignment, Course } from '@/lib/types';
 import { RubricBuilder } from "@/components/instructor/rubric-builder";
 import { RubricTester } from "@/components/instructor/rubric-tester";
 import { ShareableLink } from "@/components/instructor/shareable-link";
@@ -49,7 +50,7 @@ export default function CreateAssignment() {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [rubric, setRubric] = useState<Rubric>({ criteria: [], passingThreshold: 60 });
-  const [createdAssignment, setCreatedAssignment] = useState<any>(null);
+  const [createdAssignment, setCreatedAssignment] = useState<Assignment | null>(null);
   const [showCourseDialog, setShowCourseDialog] = useState(false);
   const [newCourseName, setNewCourseName] = useState('');
   const [newCourseCode, setNewCourseCode] = useState('');
@@ -68,7 +69,7 @@ export default function CreateAssignment() {
   });
   
   // Fetch courses for the dropdown
-  const { data: courses = [] } = useQuery<any[]>({
+  const { data: courses = [] } = useQuery<Course[]>({
     queryKey: [API_ROUTES.COURSES],
   });
   
@@ -418,7 +419,7 @@ export default function CreateAssignment() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {courses.map((course: any) => (
+                              {courses.map((course: Course) => (
                                 <SelectItem key={course.id} value={course.id.toString()}>
                                   {course.name} ({course.code})
                                 </SelectItem>
