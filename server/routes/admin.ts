@@ -4,6 +4,7 @@ import { db } from '../db';
 import { submissions, users, courses, assignments, feedback } from '@shared/schema';
 import { eq, count, avg, gt, lt, between, and, desc } from 'drizzle-orm';
 import { metricsService } from '../services/metrics-service';
+import { asyncHandler } from '../lib/error-handler';
 
 const router = Router();
 
@@ -17,8 +18,7 @@ const requireAdmin = (req: Request, res: Response, next: any) => {
 };
 
 // Get overall system statistics
-router.get('/stats', requireAdmin, async (req: Request, res: Response) => {
-  try {
+router.get('/stats', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
     const [
       userCount,
       courseCount,
@@ -60,11 +60,7 @@ router.get('/stats', requireAdmin, async (req: Request, res: Response) => {
         avgProcessingTimeMs: avgProcessingTime,
       }
     });
-  } catch (error) {
-    console.error('Error fetching admin stats:', error);
-    res.status(500).json({ message: 'Failed to fetch admin statistics', error: error.message });
-  }
-});
+}));
 
 // Get recent failed submissions for monitoring
 router.get('/failed-submissions', requireAdmin, async (req: Request, res: Response) => {
