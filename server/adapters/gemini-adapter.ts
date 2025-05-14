@@ -635,9 +635,10 @@ Please analyze the above submission and provide feedback in the following JSON f
         modelName: this.modelName,
         tokenCount: tokenCount
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Gemini multimodal API error:", error);
-      throw new Error(`Multimodal AI generation failed: ${error.message || String(error)}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Multimodal AI generation failed: ${errorMessage}`);
     }
   }
 }
