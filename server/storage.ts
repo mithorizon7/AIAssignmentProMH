@@ -327,7 +327,10 @@ export class DatabaseStorage implements IStorage {
         return submission;
       } catch (fallbackError) {
         console.error("[ERROR] Fallback submission creation also failed:", fallbackError);
-        throw new Error(`Failed to create submission: ${fallbackError.message}`);
+        const errorMessage = fallbackError instanceof Error 
+          ? fallbackError.message 
+          : String(fallbackError);
+        throw new Error(`Failed to create submission: ${errorMessage}`);
       }
     }
   }

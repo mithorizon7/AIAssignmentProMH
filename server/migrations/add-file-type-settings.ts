@@ -29,7 +29,8 @@ export async function createFileTypeSettingsTable() {
         console.log('[Migration] Created content_type enum');
       } catch (error) {
         // Enum might already exist, which is fine
-        console.log('[Migration] content_type enum already exists or error creating it:', error.message);
+        console.log('[Migration] content_type enum already exists or error creating it:', 
+          error instanceof Error ? error.message : String(error));
       }
       
       // Create the file_type_settings table
@@ -110,7 +111,8 @@ export async function createFileTypeSettingsTable() {
     
     return true;
   } catch (error) {
-    console.error('[Migration] Error creating file_type_settings table:', error);
+    console.error('[Migration] Error creating file_type_settings table:', 
+      error instanceof Error ? error.message : String(error));
     return false;
   }
 }
