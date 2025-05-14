@@ -261,7 +261,7 @@ export class GeminiAdapter implements AIAdapter {
         } else {
           parsedContent = JSON.parse(text);
         }
-      } catch (e) {
+      } catch (e: unknown) {
         console.error("Failed to parse JSON from Gemini response:", e);
         console.log("Raw response:", text);
         // Attempt to extract structured data even from non-JSON response
