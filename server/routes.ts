@@ -862,14 +862,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Filter submissions to get those that need review
       const pendingReviews = submissionsQuery.filter(
-        s => s.status === 'completed' 
+        (s: { status: string }) => s.status === 'completed' 
       ).length;
       
       // Calculate average score (if available in feedback)
       const feedbackItems = await db.select().from(feedback);
       const scores = feedbackItems
-        .map(f => f.score)
-        .filter(score => score !== null && score !== undefined) as number[];
+        .map((f: { score: number | null | undefined }) => f.score)
+        .filter((score: number | null | undefined) => score !== null && score !== undefined) as number[];
       
       const averageScore = scores.length > 0
         ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
@@ -883,14 +883,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       
       const submissionsLastWeek = submissionsQuery.filter(
-        s => new Date(s.createdAt) >= oneWeekAgo
+        (s: { createdAt: string | Date }) => new Date(s.createdAt) >= oneWeekAgo
       ).length;
       
       const previousWeekStart = new Date(oneWeekAgo);
       previousWeekStart.setDate(previousWeekStart.getDate() - 7);
       
       const submissionsPreviousWeek = submissionsQuery.filter(
-        s => new Date(s.createdAt) >= previousWeekStart && new Date(s.createdAt) < oneWeekAgo
+        (s: { createdAt: string | Date }) => new Date(s.createdAt) >= previousWeekStart && new Date(s.createdAt) < oneWeekAgo
       ).length;
       
       const submissionsIncrease = submissionsPreviousWeek > 0
