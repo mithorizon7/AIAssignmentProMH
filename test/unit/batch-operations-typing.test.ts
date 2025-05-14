@@ -4,7 +4,7 @@ import { db } from '../../server/db';
 import { and, eq, inArray } from 'drizzle-orm';
 import { stringify } from 'csv-stringify/sync';
 
-// Mock the DB and related dependencies
+// Mock the DB and related dependencies with comprehensive functionality
 vi.mock('../../server/db', () => ({
   db: {
     select: vi.fn().mockReturnThis(),
@@ -15,6 +15,10 @@ vi.mock('../../server/db', () => ({
     insert: vi.fn().mockReturnThis(),
     values: vi.fn().mockReturnThis(),
     returning: vi.fn(),
+    innerJoin: vi.fn().mockReturnThis(),
+    leftJoin: vi.fn().mockReturnThis(),
+    count: vi.fn().mockReturnThis(),
+    groupBy: vi.fn().mockReturnThis()
   }
 }));
 
@@ -24,6 +28,30 @@ vi.mock('drizzle-orm', () => ({
   inArray: vi.fn(),
   sql: vi.fn(),
   desc: vi.fn(),
+  count: vi.fn()
+}));
+
+// Mock the storage implementation to avoid DB dependency
+vi.mock('../../server/storage', () => ({
+  storage: {
+    getAssignment: vi.fn().mockResolvedValue({
+      id: 1,
+      title: 'Test Assignment'
+    }),
+    getCourse: vi.fn().mockResolvedValue({
+      id: 1,
+      name: 'Test Course'
+    }),
+    getUser: vi.fn().mockResolvedValue({
+      id: 1,
+      name: 'Test User'
+    }),
+    createEnrollment: vi.fn().mockResolvedValue({
+      id: 1,
+      userId: 1,
+      courseId: 1
+    })
+  }
 }));
 
 vi.mock('csv-stringify/sync', () => ({
@@ -33,8 +61,32 @@ vi.mock('csv-stringify/sync', () => ({
 describe('BatchOperationsService Type Safety', () => {
   let batchOperations: BatchOperationsService;
   
+  // Import storage for easier access to the mock
+  const { storage } = await import('../../server/storage');
+  
   beforeEach(() => {
     vi.resetAllMocks();
+    
+    // Setup mock returns
+    (storage.getCourse as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 1,
+      name: 'Test Course',
+      code: 'TEST101',
+      description: 'Test Course Description'
+    });
+    
+    (storage.getUser as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 1,
+      name: 'Test User',
+      username: 'testuser',
+      email: 'test@example.com',
+      role: 'student'
+    });
+    
+    // Reset DB mocks for each test
+    (db.execute as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (db.returning as ReturnType<typeof vi.fn>).mockResolvedValue([{id: 1}]);
+    
     batchOperations = new BatchOperationsService();
   });
   

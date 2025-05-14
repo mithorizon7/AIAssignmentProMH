@@ -3,10 +3,32 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 // Variable to store our CSRF token
 let csrfToken: string | null = null;
 
-async function throwIfResNotOk(res: Response) {
+/**
+ * Custom error class for API responses
+ */
+export class ApiError extends Error {
+  status: number;
+  statusText: string;
+  responseBody: string;
+
+  constructor(status: number, statusText: string, responseBody: string) {
+    super(`${status}: ${responseBody || statusText}`);
+    this.name = 'ApiError';
+    this.status = status;
+    this.statusText = statusText;
+    this.responseBody = responseBody;
+  }
+}
+
+/**
+ * Throws an ApiError if the response is not OK
+ * @param res The fetch Response object
+ * @throws ApiError if the response is not OK
+ */
+async function throwIfResNotOk(res: Response): Promise<void> {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    throw new ApiError(res.status, res.statusText, text);
   }
 }
 
@@ -38,10 +60,10 @@ async function fetchCsrfToken(): Promise<string> {
 }
 
 // Enhanced API request function with CSRF token
-export async function apiRequest(
+export async function apiRequest<TData = unknown>(
   method: string,
   url: string,
-  data?: unknown | undefined,
+  data?: TData | undefined,
 ): Promise<Response> {
   // Prepare request headers
   const headers: Record<string, string> = {
@@ -102,9 +124,16 @@ export async function apiRequest(
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
+/**
+ * Creates a query function for use with TanStack Query
+ * @template TResponse The expected response type from the API
+ * @param options Configuration options
+ * @param options.on401 How to handle 401 unauthorized responses
+ * @returns QueryFunction that returns the expected response type or null (if on401 is "returnNull")
+ */
+export const getQueryFn: <TResponse>(options: {
   on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
+}) => QueryFunction<TResponse | null> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     // For GET requests we don't typically need a CSRF token, but we include it anyway
@@ -152,3 +181,67 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+/**
+ * Creates a type-safe API client for a specific endpoint
+ * @template TResponse The expected response type from the API
+ * @template TRequestBody The expected request body type
+ * @param baseUrl The base URL for this API client
+ * @returns An object with methods for each HTTP verb
+ */
+export function createTypedApiClient<TResponse, TRequestBody = unknown>(baseUrl: string) {
+  return {
+    /**
+     * Performs a GET request to the specified endpoint
+     * @param id Optional ID to append to the URL
+     * @returns Promise resolving to the expected response type
+     */
+    get: async (id?: number | string): Promise<TResponse> => {
+      const url = id ? `${baseUrl}/${id}` : baseUrl;
+      const res = await apiRequest<never>('GET', url);
+      return await res.json();
+    },
+    
+    /**
+     * Performs a POST request to the specified endpoint
+     * @param data The data to send in the request body
+     * @returns Promise resolving to the expected response type
+     */
+    post: async (data: TRequestBody): Promise<TResponse> => {
+      const res = await apiRequest<TRequestBody>('POST', baseUrl, data);
+      return await res.json();
+    },
+    
+    /**
+     * Performs a PUT request to the specified endpoint
+     * @param id The ID to append to the URL
+     * @param data The data to send in the request body
+     * @returns Promise resolving to the expected response type
+     */
+    put: async (id: number | string, data: TRequestBody): Promise<TResponse> => {
+      const res = await apiRequest<TRequestBody>('PUT', `${baseUrl}/${id}`, data);
+      return await res.json();
+    },
+    
+    /**
+     * Performs a PATCH request to the specified endpoint
+     * @param id The ID to append to the URL
+     * @param data The data to send in the request body
+     * @returns Promise resolving to the expected response type
+     */
+    patch: async (id: number | string, data: Partial<TRequestBody>): Promise<TResponse> => {
+      const res = await apiRequest<Partial<TRequestBody>>('PATCH', `${baseUrl}/${id}`, data);
+      return await res.json();
+    },
+    
+    /**
+     * Performs a DELETE request to the specified endpoint
+     * @param id The ID to append to the URL
+     * @returns Promise resolving to the expected response type
+     */
+    delete: async (id: number | string): Promise<TResponse> => {
+      const res = await apiRequest<never>('DELETE', `${baseUrl}/${id}`);
+      return await res.json();
+    }
+  };
+}
