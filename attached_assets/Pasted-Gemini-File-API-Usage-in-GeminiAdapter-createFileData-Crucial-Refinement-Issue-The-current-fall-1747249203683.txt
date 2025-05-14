@@ -1,0 +1,13 @@
+Gemini File API Usage in GeminiAdapter.createFileData (Crucial Refinement):
+
+Issue: The current fallback in GeminiAdapter.createFileData to create a data URI and use it as fileData.fileUri needs to be carefully evaluated. While data URIs can be used for inlineData for images, the fileData.fileUri field in a prompt part is typically meant for URIs returned by the Gemini File API (e.g., files/XXX) or supported cloud storage (like gs://...). Directly using a lengthy data URI in fileData.fileUri might not be the intended or most efficient way to use the File API's slot.
+Updated Fix Instruction: "AI Coder, in server/adapters/gemini-adapter.ts, the createFileData(content: Buffer, mimeType: string) method is responsible for preparing files for the Gemini API. Primary Path:
+Ensure it correctly uses this.generativeAI.uploadFile({ file: { data: content, mimeType: mimeType }}) (or the equivalent method in your SDK version, like this.generativeAI.createFile) to upload the file buffer directly to the Gemini File API.
+The successful response from uploadFile will contain a file.uri (e.g., files/your-file-id). This is the URI that should be used in the fileData: { mimeType, fileUri } part of the prompt sent to generateContent. Fallback for uploadFile Failure:
+If the uploadFile call itself fails (e.g., API error, unsupported type by File API despite being in SUPPORTED_MIME_TYPES), log this error.
+For Images (and only images if they are small enough): If the File API upload fails for an image and it's reasonably small (e.g., under 2MB-4MB, check Gemini limits for inline data), you can fall back to providing the image as inlineData: { mimeType, data: content.toString('base64') }.
+For Other File Types (PDFs, Videos, Audio, Large Images): If uploadFile fails for these, a data URI in fileData.fileUri is unlikely to work as a robust replacement for a File API URI. In this scenario:
+Log a warning that the binary content could not be processed via the File API.
+If textContent was extracted (e.g., from a PDF by processFileForMultimodal), the AI prompt should proceed using only this textContent.
+If no textContent is available, the prompt should clearly state that the binary content of the specified mimeType could not be analyzed by the AI. Avoid sending a potentially malformed or unsupported fileData part.
+The goal is to always prefer the Gemini File API for non-text files and have a graceful degradation path if that API call fails, rather than constructing a fileData part that the generateContent API might not interpret correctly.
