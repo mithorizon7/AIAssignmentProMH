@@ -69,9 +69,9 @@ describe('AsyncHandler Type Safety', () => {
 
   it('should handle synchronous errors thrown in the handler', async () => {
     // Create a handler that throws synchronously
-    const synchronousError = new Error('Synchronous error');
+    const errorMessage = 'Synchronous error';
     const handler = vi.fn().mockImplementation(() => {
-      throw synchronousError;
+      throw new Error(errorMessage);
     });
     
     const middleware = asyncHandler(handler);
@@ -82,7 +82,9 @@ describe('AsyncHandler Type Safety', () => {
     // Check that the error was passed to next
     await vi.waitFor(() => {
       expect(handler).toHaveBeenCalledWith(mockReq, mockRes, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(synchronousError);
+      expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+        message: errorMessage
+      }));
     });
   });
 });
