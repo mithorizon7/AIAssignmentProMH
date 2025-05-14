@@ -4,6 +4,7 @@ import path from 'path';
 import { promisify } from 'util';
 
 import { AIAdapter, MultimodalPromptPart } from './ai-adapter';
+import { CriteriaScore } from '@shared/schema';
 import { fileToDataURI } from '../utils/multimodal-processor';
 
 const readFileAsync = promisify(fs.readFile);
@@ -130,8 +131,9 @@ export class GeminiAdapter implements AIAdapter {
         fileUri: dataUri,
         mimeType: mimeType
       } as unknown as FileData;
-    } catch (error: any) {
-      console.error('Error creating file with Gemini File API:', error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error creating file with Gemini File API:', errorMessage);
       
       // Even if API call fails, provide a fallback that won't break the application
       try {
@@ -143,7 +145,7 @@ export class GeminiAdapter implements AIAdapter {
         } as unknown as FileData;
       } catch (fallbackError) {
         console.error('Both Gemini File API and fallback failed:', fallbackError);
-        throw error; // Throw the original error if fallback also fails
+        throw error instanceof Error ? error : new Error(String(error)); // Throw the original error if fallback also fails
       }
     }
   }
@@ -223,9 +225,10 @@ export class GeminiAdapter implements AIAdapter {
         modelName: this.modelName,
         tokenCount: estimatedTokens
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Gemini API error:", error);
-      throw new Error(`AI generation failed: ${error.message || String(error)}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`AI generation failed: ${errorMessage}`);
     }
   }
   
@@ -253,8 +256,8 @@ export class GeminiAdapter implements AIAdapter {
         });
       }
       
-      // Track any file objects for cleanup
-      const fileObjects: any[] = [];
+      // Track file objects for cleanup
+      const fileObjects: FileData[] = [];
       
       // Process each part based on its type
       for (const part of parts) {
