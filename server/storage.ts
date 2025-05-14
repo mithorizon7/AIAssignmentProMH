@@ -231,16 +231,14 @@ export class DatabaseStorage implements IStorage {
           : null
       };
       
-      // Use raw SQL to avoid type issues
+      // Use fully parameterized SQL to avoid type issues and prevent SQL injection
       const sql = `
         INSERT INTO assignments (
           title, description, course_id, due_date, status, 
           shareable_code, rubric, instructor_context
         )
         VALUES (
-          $1, $2, $3, $4, $5, $6, 
-          ${assignmentData.rubric ? '$7' : 'NULL'}, 
-          ${assignmentData.instructorContext ? '$8' : 'NULL'}
+          $1, $2, $3, $4, $5, $6, $7, $8
         )
         RETURNING *;
       `;
@@ -251,17 +249,10 @@ export class DatabaseStorage implements IStorage {
         assignmentData.courseId,
         assignmentData.dueDate,
         assignmentData.status || 'upcoming',
-        assignmentData.shareableCode || null
+        assignmentData.shareableCode || null,
+        assignmentData.rubric ? JSON.stringify(assignmentData.rubric) : null,
+        assignmentData.instructorContext ? JSON.stringify(assignmentData.instructorContext) : null
       ];
-      
-      // Add JSON params if they exist
-      if (assignmentData.rubric) {
-        params.push(JSON.stringify(assignmentData.rubric));
-      }
-      
-      if (assignmentData.instructorContext) {
-        params.push(JSON.stringify(assignmentData.instructorContext));
-      }
       
       const result = await db.execute(sql, params);
       return result.rows[0];
