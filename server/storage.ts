@@ -212,7 +212,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAssignment(insertAssignment: InsertAssignment): Promise<Assignment> {
-    const [assignment] = await db.insert(assignments).values(insertAssignment).returning();
+    const [assignment] = await db.insert(assignments).values([insertAssignment]).returning();
     return assignment;
   }
 
@@ -294,7 +294,7 @@ export class DatabaseStorage implements IStorage {
         safeSubmission.contentType = insertSubmission.contentType;
       }
       
-      const [submission] = await db.insert(submissions).values(safeSubmission).returning();
+      const [submission] = await db.insert(submissions).values([safeSubmission]).returning();
       console.log(`[INFO] Submission created successfully: ${submission.id}`);
       return submission;
     } catch (error) {
@@ -336,16 +336,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async listSubmissionsForUser(userId: number, assignmentId?: number): Promise<Submission[]> {
-    let query = db.select()
-      .from(submissions)
-      .where(eq(submissions.userId, userId))
-      .orderBy(desc(submissions.createdAt));
-    
     if (assignmentId) {
-      query = query.where(eq(submissions.assignmentId, assignmentId));
+      return db.select()
+        .from(submissions)
+        .where(and(
+          eq(submissions.userId, userId),
+          eq(submissions.assignmentId, assignmentId)
+        ))
+        .orderBy(desc(submissions.createdAt));
+    } else {
+      return db.select()
+        .from(submissions)
+        .where(eq(submissions.userId, userId))
+        .orderBy(desc(submissions.createdAt));
     }
-    
-    return query;
   }
 
   async listSubmissionsForAssignment(assignmentId: number): Promise<Submission[]> {
@@ -495,7 +499,7 @@ export class DatabaseStorage implements IStorage {
       };
       
       console.log('[INFO] Creating feedback with validated data structure');
-      const result = await db.insert(feedback).values(validatedFeedback).returning();
+      const result = await db.insert(feedback).values([validatedFeedback]).returning();
       return result[0];
     } catch (error: any) {
       console.error('[ERROR] Error creating feedback:', error);
