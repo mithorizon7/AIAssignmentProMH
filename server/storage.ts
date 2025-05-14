@@ -216,8 +216,59 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAssignment(insertAssignment: InsertAssignment): Promise<Assignment> {
-    const [assignment] = await db.insert(assignments).values([insertAssignment]).returning();
-    return assignment;
+    try {
+      // Extract the basic fields first
+      const { rubric, instructorContext, ...basicFields } = insertAssignment;
+      
+      // Create a properly formatted assignment object that matches the schema's expected types
+      const assignmentData = {
+        ...basicFields,
+        // Handle rubric correctly - store as native JSON for Drizzle to handle
+        rubric: rubric ? (typeof rubric === 'string' ? JSON.parse(rubric) : rubric) : null,
+        // Handle instructorContext correctly - store as native JSON for Drizzle to handle
+        instructorContext: instructorContext 
+          ? (typeof instructorContext === 'string' ? JSON.parse(instructorContext) : instructorContext) 
+          : null
+      };
+      
+      // Use raw SQL to avoid type issues
+      const sql = `
+        INSERT INTO assignments (
+          title, description, course_id, due_date, status, 
+          shareable_code, rubric, instructor_context
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, 
+          ${assignmentData.rubric ? '$7' : 'NULL'}, 
+          ${assignmentData.instructorContext ? '$8' : 'NULL'}
+        )
+        RETURNING *;
+      `;
+      
+      const params = [
+        assignmentData.title,
+        assignmentData.description || null,
+        assignmentData.courseId,
+        assignmentData.dueDate,
+        assignmentData.status || 'upcoming',
+        assignmentData.shareableCode || null
+      ];
+      
+      // Add JSON params if they exist
+      if (assignmentData.rubric) {
+        params.push(JSON.stringify(assignmentData.rubric));
+      }
+      
+      if (assignmentData.instructorContext) {
+        params.push(JSON.stringify(assignmentData.instructorContext));
+      }
+      
+      const result = await db.execute(sql, params);
+      return result.rows[0];
+    } catch (error) {
+      console.error("[ERROR] Error creating assignment:", error);
+      throw error;
+    }
   }
 
   async listAssignments(courseId?: number): Promise<Assignment[]> {
@@ -484,17 +535,44 @@ export class DatabaseStorage implements IStorage {
         return [];
       };
       
-      // Create a properly formatted feedback object with validated arrays
-      const validatedFeedback = {
-        ...insertFeedback,
-        strengths: ensureArray(insertFeedback.strengths),
-        improvements: ensureArray(insertFeedback.improvements),
-        suggestions: ensureArray(insertFeedback.suggestions),
+      // Helper function for ensuring correct JSON format
+      const ensureJsonField = (field: any): string | null => {
+        if (!field) return null;
+        if (typeof field === 'string') return field;
+        return JSON.stringify(field);
       };
-      
+
       console.log('[INFO] Creating feedback with validated data structure');
-      const result = await db.insert(feedback).values([validatedFeedback]).returning();
-      return result[0];
+      
+      // Use raw SQL to avoid type issues
+      const sql = `
+        INSERT INTO feedback (
+          submission_id, strengths, improvements, suggestions,
+          summary, score, criteria_scores, processing_time,
+          raw_response, token_count, model_name, created_at
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW()
+        )
+        RETURNING *;
+      `;
+      
+      const params = [
+        insertFeedback.submissionId,
+        JSON.stringify(ensureArray(insertFeedback.strengths)),
+        JSON.stringify(ensureArray(insertFeedback.improvements)),
+        JSON.stringify(ensureArray(insertFeedback.suggestions)),
+        insertFeedback.summary || null,
+        insertFeedback.score || null,
+        insertFeedback.criteriaScores ? JSON.stringify(insertFeedback.criteriaScores) : null,
+        insertFeedback.processingTime,
+        insertFeedback.rawResponse ? JSON.stringify(insertFeedback.rawResponse) : null,
+        insertFeedback.tokenCount || null,
+        insertFeedback.modelName || null
+      ];
+      
+      const result = await db.execute(sql, params);
+      return result.rows[0];
     } catch (error: any) {
       console.error('[ERROR] Error creating feedback:', error);
       
