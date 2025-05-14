@@ -204,31 +204,40 @@ ${params.studentSubmissionContent}
     const startTime = Date.now();
     
     try {
+      console.log(`[AIService] Analyzing multimodal submission: ${params.fileName} (${params.mimeType})`);
+      
       // Process the file to extract content based on file type
+      // This now automatically handles both local paths and remote URLs (S3, HTTP)
       const processedFile = await processFileForMultimodal(
         params.filePath,
         params.fileName,
         params.mimeType
       );
       
+      console.log(`[AIService] File processed, content type: ${processedFile.contentType}`);
+      
       // If the adapter doesn't support multimodal input, fallback to text analysis
       if (!this.adapter.generateMultimodalCompletion) {
-        console.log('AI adapter does not support multimodal content; falling back to text-only analysis');
+        console.log('[AIService] AI adapter does not support multimodal content; falling back to text-only analysis');
         
         // Use extracted text content if available
         let textContent = params.textContent || '';
         if (processedFile.textContent) {
           textContent = processedFile.textContent;
+          console.log('[AIService] Using extracted text content for fallback analysis');
         } else if (typeof processedFile.content === 'string') {
           textContent = processedFile.content;
+          console.log('[AIService] Using raw string content for fallback analysis');
         } else {
           textContent = `[This submission contains ${processedFile.contentType} content that could not be automatically processed as text]`;
+          console.log('[AIService] No text content available, using placeholder');
         }
         
         return this.analyzeSubmission({
           studentSubmissionContent: textContent,
           assignmentTitle: params.assignmentTitle,
           assignmentDescription: params.assignmentDescription,
+          instructorContext: params.instructorContext,
           rubric: params.rubric
         });
       }
@@ -240,16 +249,9 @@ ${params.studentSubmissionContent}
       promptParts.push({
         type: processedFile.contentType as ContentType,
         content: processedFile.content,
-        mimeType: params.mimeType
+        mimeType: params.mimeType,
+        textContent: processedFile.textContent // Pass through any extracted text content
       });
-      
-      // If there's extracted text content, add it
-      if (processedFile.textContent) {
-        promptParts.push({
-          type: 'text',
-          content: processedFile.textContent
-        });
-      }
       
       // Build a system prompt for assignment context
       let systemPrompt = `You are an expert AI Teaching Assistant analyzing a ${processedFile.contentType} submission. `;
@@ -279,17 +281,20 @@ into your evaluation logic while keeping the actual guidance confidential.`;
         }
       }
       
+      console.log(`[AIService] Sending multimodal request to AI adapter with content type: ${processedFile.contentType}`);
+      
       // Generate the completion using multimodal capabilities
       const response = await this.adapter.generateMultimodalCompletion(promptParts, systemPrompt);
       
       const processingTime = Date.now() - startTime;
+      console.log(`[AIService] Multimodal analysis completed in ${processingTime}ms`);
       
       return {
         ...response,
         processingTime
       };
     } catch (error: unknown) {
-      console.error('AI multimodal submission analysis error:', error);
+      console.error('[AIService] AI multimodal submission analysis error:', error);
       if (error instanceof Error) {
         throw new Error(`Failed to analyze multimodal submission: ${error.message}`);
       } else {

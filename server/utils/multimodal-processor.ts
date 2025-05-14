@@ -4,6 +4,7 @@
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
+import fetch from 'node-fetch';
 import { MultimodalPromptPart } from '../adapters/ai-adapter';
 import { 
   getContentTypeFromMimeType, 
@@ -12,10 +13,13 @@ import {
   getExtensionFromFilename,
   ContentType
 } from './file-type-settings';
+import os from 'os';
+import crypto from 'crypto';
 
 const readFileAsync = promisify(fs.readFile);
 const existsAsync = promisify(fs.exists);
 const unlinkAsync = promisify(fs.unlink);
+const writeFileAsync = promisify(fs.writeFile);
 
 /**
  * Interface for file metadata
@@ -211,6 +215,89 @@ export function fileToDataURI(content: Buffer, mimeType: string): string {
 }
 
 /**
+ * Check if a path is a remote URL (S3 or HTTP)
+ * @param path Path to check
+ * @returns Boolean indicating if the path is a remote URL
+ */
+export function isRemoteUrl(path: string): boolean {
+  return path.startsWith('http://') || 
+         path.startsWith('https://') || 
+         path.startsWith('s3://');
+}
+
+/**
+ * Download a file from a remote URL (S3, HTTP, HTTPS) 
+ * @param url The URL to download from
+ * @param mimeType Optional MIME type of the file (useful for S3 URLs that might not provide Content-Type)
+ * @returns An object containing the file buffer and temporary local path
+ */
+export async function downloadFromUrl(url: string, mimeType?: string): Promise<{ 
+  buffer: Buffer, 
+  localPath: string,
+  cleanup: () => Promise<void>
+}> {
+  try {
+    console.log(`[INFO] Downloading file from URL: ${url}`);
+    
+    // Generate a temporary file path
+    const tempDir = os.tmpdir();
+    const randomName = crypto.randomBytes(16).toString('hex');
+    const extension = mimeType ? 
+      `.${mimeType.split('/')[1]}` : 
+      path.extname(url) || '.tmp';
+    
+    const localPath = path.join(tempDir, `${randomName}${extension}`);
+    
+    // Handle different URL types
+    let fileBuffer: Buffer;
+    
+    if (url.startsWith('s3://')) {
+      // For future S3 integration
+      // This would use AWS S3 SDK for direct access
+      // For now, we'll throw an error
+      throw new Error('Direct S3 URL downloads not yet implemented. Use HTTP/HTTPS URLs from S3 instead.');
+    } else {
+      // Standard HTTP/HTTPS URLs
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+      }
+      
+      // Get content type from response if not provided
+      if (!mimeType && response.headers.get('content-type')) {
+        mimeType = response.headers.get('content-type') || undefined;
+      }
+      
+      // Get the file buffer
+      fileBuffer = Buffer.from(await response.arrayBuffer());
+      
+      // Write to temp file for operations that need a file path
+      await writeFileAsync(localPath, fileBuffer);
+    }
+    
+    // Return file buffer and local path
+    return { 
+      buffer: fileBuffer, 
+      localPath,
+      // Function to clean up the temporary file
+      cleanup: async () => {
+        try {
+          if (fs.existsSync(localPath)) {
+            await unlinkAsync(localPath);
+          }
+        } catch (error) {
+          console.warn(`Failed to clean up temporary file ${localPath}:`, error);
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Error downloading file from URL:', error);
+    throw error;
+  }
+}
+
+/**
  * Interface representing a processed file for multimodal content
  */
 export interface ProcessedFile {
@@ -222,7 +309,7 @@ export interface ProcessedFile {
 
 /**
  * Process a file for multimodal AI analysis
- * @param filePath Path to the file
+ * @param filePath Path to the file or URL to download from
  * @param fileName Original name of the file
  * @param mimeType MIME type of the file
  * @returns ProcessedFile object containing the file content and metadata
@@ -232,9 +319,27 @@ export async function processFileForMultimodal(
   fileName: string, 
   mimeType: string
 ): Promise<ProcessedFile> {
+  let temporaryFilePath: string | null = null;
+  let cleanup: (() => Promise<void>) | null = null;
+
   try {
-    // Read the file
-    const fileContent = await fs.promises.readFile(filePath);
+    // Check if the file path is a remote URL or a local path
+    let fileContent: Buffer;
+    let actualFilePath = filePath;
+
+    if (isRemoteUrl(filePath)) {
+      // Download from remote URL (S3, HTTP/HTTPS)
+      console.log(`[INFO] File path is a remote URL: ${filePath}`);
+      const result = await downloadFromUrl(filePath, mimeType);
+      fileContent = result.buffer;
+      actualFilePath = result.localPath;
+      temporaryFilePath = result.localPath;
+      cleanup = result.cleanup;
+    } else {
+      // Read from local file path
+      console.log(`[INFO] File path is a local path: ${filePath}`);
+      fileContent = await fs.promises.readFile(filePath);
+    }
     
     // Determine content type from the mime type and filename
     const contentType = getContentTypeFromMimeType(mimeType);
@@ -245,7 +350,7 @@ export async function processFileForMultimodal(
       try {
         // The filename extension might be needed for some document types
         const extension = path.extname(fileName).toLowerCase();
-        textContent = await extractTextContent(filePath, mimeType, extension);
+        textContent = await extractTextContent(actualFilePath, mimeType, extension);
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.warn(`Failed to extract text from ${fileName}: ${errorMessage}`);
@@ -264,5 +369,14 @@ export async function processFileForMultimodal(
     console.error(`Error processing file ${fileName} for multimodal analysis:`, error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to process file for multimodal analysis: ${errorMessage}`);
+  } finally {
+    // Clean up any temporary files
+    if (cleanup) {
+      try {
+        await cleanup();
+      } catch (cleanupError) {
+        console.warn('Error cleaning up temporary file:', cleanupError);
+      }
+    }
   }
 }
