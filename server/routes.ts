@@ -12,7 +12,7 @@ import { OpenAIAdapter } from "./adapters/openai-adapter";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
-import { submissions, feedback, users } from "@shared/schema";
+import { submissions, feedback, users, type User } from "@shared/schema";
 import { v4 as uuidv4 } from "uuid";
 import { defaultRateLimiter, submissionRateLimiter } from "./middleware/rate-limiter";
 import adminRoutes from "./routes/admin";
@@ -812,7 +812,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalCount = allStudents.length;
         
         // Get paginated students
-        students = allStudents.slice((page - 1) * pageSize, page * pageSize).map(student => ({
+        students = allStudents.slice((page - 1) * pageSize, page * pageSize).map((student: User) => ({
           id: student.id,
           name: student.name,
           email: student.email,
@@ -823,7 +823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Apply search filter
       if (searchQuery) {
-        students = students.filter(student => 
+        students = students.filter((student: { name: string; email: string }) => 
           student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           student.email.toLowerCase().includes(searchQuery.toLowerCase())
         );
@@ -831,7 +831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Apply status filter
       if (statusFilter !== 'all') {
-        students = students.filter(student => student.status === statusFilter);
+        students = students.filter((student: { status: string }) => student.status === statusFilter);
       }
       
       // Calculate pagination

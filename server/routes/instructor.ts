@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { storage } from '../storage';
 import { db } from '../db';
-import { submissions, users, courses, assignments, feedback, enrollments } from '@shared/schema';
+import { submissions, users, courses, assignments, feedback, enrollments, type Submission } from '@shared/schema';
 import { eq, count, and, desc, sql, inArray } from 'drizzle-orm';
 import { batchOperations } from '../services/batch-operations';
 import { metricsService } from '../services/metrics-service';
