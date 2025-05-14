@@ -65,8 +65,7 @@ router.get('/students/progress/:courseId', requireInstructor, asyncHandler(async
 }));
 
 // Bulk enroll students in a course
-router.post('/course/:courseId/enroll-students', requireInstructor, async (req: Request, res: Response) => {
-  try {
+router.post('/course/:courseId/enroll-students', requireInstructor, asyncHandler(async (req: Request, res: Response) => {
     const courseId = parseInt(req.params.courseId);
     const { studentIds } = req.body;
     
@@ -90,15 +89,10 @@ router.post('/course/:courseId/enroll-students', requireInstructor, async (req: 
       failed: result.failed,
       total: studentIds.length
     });
-  } catch (error) {
-    console.error('Error bulk enrolling students:', error);
-    res.status(500).json({ message: 'Failed to enroll students', error: (error as Error).message });
-  }
-});
+}));
 
 // Get all submissions for an assignment with detailed metrics
-router.get('/assignments/:id/submissions', requireInstructor, async (req: Request, res: Response) => {
-  try {
+router.get('/assignments/:id/submissions', requireInstructor, asyncHandler(async (req: Request, res: Response) => {
     const assignmentId = parseInt(req.params.id);
     
     // Validate assignment exists and instructor has access
@@ -153,15 +147,10 @@ router.get('/assignments/:id/submissions', requireInstructor, async (req: Reques
       submissions: result,
       metrics: metrics[0] || null
     });
-  } catch (error) {
-    console.error('Error fetching assignment submissions:', error);
-    res.status(500).json({ message: 'Failed to fetch submissions', error: (error as Error).message });
-  }
-});
+}));
 
 // Export grades as CSV
-router.get('/export/grades/:courseId', requireInstructor, async (req: Request, res: Response) => {
-  try {
+router.get('/export/grades/:courseId', requireInstructor, asyncHandler(async (req: Request, res: Response) => {
     const courseId = parseInt(req.params.courseId);
     
     // Validate course exists and instructor has access
@@ -179,10 +168,6 @@ router.get('/export/grades/:courseId', requireInstructor, async (req: Request, r
     res.setHeader('Content-Disposition', `attachment; filename="grades-course-${courseId}.csv"`);
     
     res.send(csvData);
-  } catch (error) {
-    console.error('Error exporting grades:', error);
-    res.status(500).json({ message: 'Failed to export grades', error: (error as Error).message });
-  }
-});
+}));
 
 export default router;
