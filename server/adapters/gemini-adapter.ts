@@ -13,7 +13,7 @@ const readFileAsync = promisify(fs.readFile);
 // https://ai.google.dev/gemini-api/docs/video-understanding
 // https://ai.google.dev/gemini-api/docs/audio
 // https://ai.google.dev/gemini-api/docs/document-processing
-const SUPPORTED_MIME_TYPES = {
+export const SUPPORTED_MIME_TYPES = {
   // Images (inlineData for small, fileData for large)
   image: [
     'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'

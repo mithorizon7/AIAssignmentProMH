@@ -7,7 +7,7 @@ import multer from "multer";
 import path from "path";
 import { StorageService } from "./services/storage-service";
 import { AIService } from "./services/ai-service";
-import { GeminiAdapter } from "./adapters/gemini-adapter";
+import { GeminiAdapter, SUPPORTED_MIME_TYPES } from "./adapters/gemini-adapter";
 import { OpenAIAdapter } from "./adapters/openai-adapter";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
