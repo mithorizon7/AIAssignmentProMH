@@ -19,6 +19,7 @@ import adminRoutes from "./routes/admin";
 import instructorRoutes from "./routes/instructor";
 import { determineContentType, isFileTypeAllowed, ContentType } from "./utils/file-type-settings";
 import { processFileForMultimodal } from "./utils/multimodal-processor";
+import { asyncHandler } from "./lib/error-handler";
 
 // Helper function to generate a unique shareable code for assignments
 function generateShareableCode(length = 8): string {
