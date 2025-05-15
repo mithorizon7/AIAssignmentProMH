@@ -158,43 +158,145 @@ export class GeminiAdapter implements AIAdapter {
         }
       }
       
+      // Check if the text seems to discuss an image
+      const isImageAnalysis = text.toLowerCase().includes('image shows') || 
+                             text.toLowerCase().includes('the image') ||
+                             text.toLowerCase().includes('in the image') ||
+                             text.toLowerCase().includes('this image depicts');
+                             
+      // For image analysis, we need to extract content differently
+      if (isImageAnalysis) {
+        console.log('[GEMINI] Detected image analysis content, using specialized extraction');
+        
+        // Create a summary from the first few sentences or paragraphs
+        const paragraphs = text.split(/\n{2,}/);
+        let imageSummary = paragraphs[0] || '';
+        
+        // If it's a short paragraph, include the next one too
+        if (imageSummary.length < 100 && paragraphs.length > 1) {
+          imageSummary += ' ' + paragraphs[1];
+        }
+        
+        // For images, create a default set of strengths/improvements based on content
+        result.summary = imageSummary.trim();
+        
+        // Try to identify positive aspects
+        const positiveRegex = /(?:strength|positive|excellent|good|effective|successful|well|beautiful|impressive|creative|innovative|strong)/i;
+        const positiveMatches = text.match(new RegExp(`[^.!?]*(?:${positiveRegex.source})[^.!?]*[.!?]`, 'gi')) || [];
+        
+        // Try to identify improvement aspects
+        const negativeRegex = /(?:improvement|could be better|lacking|needs|should|would benefit|consider|try|might|missing|weak|unclear|confusing)/i;
+        const negativeMatches = text.match(new RegExp(`[^.!?]*(?:${negativeRegex.source})[^.!?]*[.!?]`, 'gi')) || [];
+        
+        // Filter and clean up matches
+        result.strengths = positiveMatches
+          .map(s => s.trim())
+          .filter(s => s.length > 10 && s.length < 200)
+          .slice(0, 3);
+          
+        result.improvements = negativeMatches
+          .map(s => s.trim())
+          .filter(s => s.length > 10 && s.length < 200)
+          .slice(0, 3);
+        
+        // Generate a simple suggestion based on improvements
+        if (result.improvements.length > 0) {
+          result.suggestions = [
+            `Consider addressing: ${result.improvements[0].replace(/^you should|consider|try|i suggest/i, '').trim()}`
+          ];
+        }
+        
+        // Infer a score based on the overall tone
+        const positiveCount = (text.match(positiveRegex) || []).length;
+        const negativeCount = (text.match(negativeRegex) || []).length;
+        
+        if (positiveCount + negativeCount > 0) {
+          // Calculate a score between 60-95 based on the ratio of positive to total matches
+          const positiveRatio = positiveCount / (positiveCount + negativeCount);
+          result.score = Math.round(60 + (positiveRatio * 35));
+        } else {
+          // Default score if no clear indicators
+          result.score = 75;
+        }
+        
+        console.log(`[GEMINI] Extracted image analysis with ${result.strengths.length} strengths and ${result.improvements.length} improvements`);
+        
+        return result;
+      }
+      
       // If JSON objects aren't found or valid, try to extract sections
       
-      // Extract strengths section
-      const strengthsMatch = text.match(/(?:Strengths|STRENGTHS|Strengths:)[\s\S]*?(?=Improvements|IMPROVEMENTS|Suggestions|SUGGESTIONS|Summary|SUMMARY|$)/i);
+      // Extract strengths section - More flexible pattern matching
+      const strengthsMatch = text.match(/(?:Strengths|STRENGTHS|Strengths:|Positive aspects|Strong points)[\s\S]*?(?=Improvements|IMPROVEMENTS|Suggestions|SUGGESTIONS|Summary|SUMMARY|$)/i);
       if (strengthsMatch) {
         const strengthsText = strengthsMatch[0];
-        const items = strengthsText.match(/(?:^|\n)[*•-]\s*(.*?)(?=\n[*•-]|\n\n|$)/g);
+        // Enhanced pattern to match more types of lists (numbered, bulleted, etc.)
+        const items = strengthsText.match(/(?:^|\n)(?:[*•-]|\d+\.)\s*(.*?)(?=\n(?:[*•-]|\d+\.)|$)/g);
         
-        if (items) {
-          result.strengths = items.map(item => item.replace(/^[*•-\s\n]+/, '').trim());
+        if (items && items.length > 0) {
+          result.strengths = items.map(item => item.replace(/^[*•\d\s.-]+/, '').trim()).filter(i => i.length > 0);
+        } else {
+          // If no list markers found, try to split by lines or sentences
+          const cleanText = strengthsText.replace(/(?:Strengths|STRENGTHS|Strengths:|Positive aspects|Strong points)[:\s]*/i, '').trim();
+          const lines = cleanText.split(/\n+/).filter(line => line.trim().length > 0);
+          
+          if (lines.length > 1) {
+            result.strengths = lines.map(line => line.trim());
+          } else if (cleanText.includes('.')) {
+            // Split by sentences
+            result.strengths = cleanText.split(/\.(?:\s+|\s*$)/).map(s => s.trim() + '.').filter(s => s.length > 3);
+          }
         }
       }
       
-      // Extract improvements section
-      const improvementsMatch = text.match(/(?:Improvements|IMPROVEMENTS|Improvements:)[\s\S]*?(?=Suggestions|SUGGESTIONS|Summary|SUMMARY|$)/i);
+      // Extract improvements section - More flexible pattern matching
+      const improvementsMatch = text.match(/(?:Improvements|IMPROVEMENTS|Improvements:|Areas for improvement|To improve)[\s\S]*?(?=Suggestions|SUGGESTIONS|Summary|SUMMARY|$)/i);
       if (improvementsMatch) {
         const improvementsText = improvementsMatch[0];
-        const items = improvementsText.match(/(?:^|\n)[*•-]\s*(.*?)(?=\n[*•-]|\n\n|$)/g);
+        // Enhanced pattern to match more types of lists
+        const items = improvementsText.match(/(?:^|\n)(?:[*•-]|\d+\.)\s*(.*?)(?=\n(?:[*•-]|\d+\.)|$)/g);
         
-        if (items) {
-          result.improvements = items.map(item => item.replace(/^[*•-\s\n]+/, '').trim());
+        if (items && items.length > 0) {
+          result.improvements = items.map(item => item.replace(/^[*•\d\s.-]+/, '').trim()).filter(i => i.length > 0);
+        } else {
+          // If no list markers found, try to split by lines or sentences
+          const cleanText = improvementsText.replace(/(?:Improvements|IMPROVEMENTS|Improvements:|Areas for improvement|To improve)[:\s]*/i, '').trim();
+          const lines = cleanText.split(/\n+/).filter(line => line.trim().length > 0);
+          
+          if (lines.length > 1) {
+            result.improvements = lines.map(line => line.trim());
+          } else if (cleanText.includes('.')) {
+            // Split by sentences
+            result.improvements = cleanText.split(/\.(?:\s+|\s*$)/).map(s => s.trim() + '.').filter(s => s.length > 3);
+          }
         }
       }
       
-      // Extract suggestions section
-      const suggestionsMatch = text.match(/(?:Suggestions|SUGGESTIONS|Suggestions:)[\s\S]*?(?=Summary|SUMMARY|$)/i);
+      // Extract suggestions section - More flexible pattern matching
+      const suggestionsMatch = text.match(/(?:Suggestions|SUGGESTIONS|Suggestions:|Recommendations|Next steps)[\s\S]*?(?=Summary|SUMMARY|Conclusion|$)/i);
       if (suggestionsMatch) {
         const suggestionsText = suggestionsMatch[0];
-        const items = suggestionsText.match(/(?:^|\n)[*•-]\s*(.*?)(?=\n[*•-]|\n\n|$)/g);
+        // Enhanced pattern to match more types of lists
+        const items = suggestionsText.match(/(?:^|\n)(?:[*•-]|\d+\.)\s*(.*?)(?=\n(?:[*•-]|\d+\.)|$)/g);
         
-        if (items) {
-          result.suggestions = items.map(item => item.replace(/^[*•-\s\n]+/, '').trim());
+        if (items && items.length > 0) {
+          result.suggestions = items.map(item => item.replace(/^[*•\d\s.-]+/, '').trim()).filter(i => i.length > 0);
+        } else {
+          // If no list markers found, try to split by lines or sentences
+          const cleanText = suggestionsText.replace(/(?:Suggestions|SUGGESTIONS|Suggestions:|Recommendations|Next steps)[:\s]*/i, '').trim();
+          const lines = cleanText.split(/\n+/).filter(line => line.trim().length > 0);
+          
+          if (lines.length > 1) {
+            result.suggestions = lines.map(line => line.trim());
+          } else if (cleanText.includes('.')) {
+            // Split by sentences
+            result.suggestions = cleanText.split(/\.(?:\s+|\s*$)/).map(s => s.trim() + '.').filter(s => s.length > 3);
+          }
         }
       }
       
-      // Extract summary
-      const summaryMatch = text.match(/(?:Summary|SUMMARY|Summary:)\s*([\s\S]*?)(?=\n\n|$)/i);
+      // Extract summary - Enhanced pattern matching
+      const summaryMatch = text.match(/(?:Summary|SUMMARY|Summary:|Overall|Conclusion|Assessment)[:.]?\s*([\s\S]*?)(?=\n\n|$)/i);
       if (summaryMatch && summaryMatch[1]) {
         result.summary = summaryMatch[1].trim();
       } else {
@@ -205,25 +307,133 @@ export class GeminiAdapter implements AIAdapter {
         }
       }
       
-      // Extract score - look for numeric values
-      const scoreMatch = text.match(/(?:Score|SCORE|Score:)\s*([0-9.]+)/i);
+      // Extract score - more flexible pattern matching
+      // Try different score formats: "Score: 85", "85/100", "Grade: B (85%)", "85 out of 100"
+      let scoreValue = null;
+      
+      // Format: "Score: 85" or "Rating: 8.5"
+      const scoreMatch = text.match(/(?:Score|SCORE|Score:|Rating|Grade|Points|Mark)s?:?\s*([0-9.]+)/i);
       if (scoreMatch && scoreMatch[1]) {
-        result.score = parseFloat(scoreMatch[1]);
+        scoreValue = parseFloat(scoreMatch[1]);
+      }
+      
+      // Format: "85/100" or "8.5/10"
+      if (!scoreValue) {
+        const fractionMatch = text.match(/\b([0-9.]+)\s*\/\s*(10|100)\b/i);
+        if (fractionMatch) {
+          const numerator = parseFloat(fractionMatch[1]);
+          const denominator = parseFloat(fractionMatch[2]);
+          
+          // Convert to a score out of 100
+          if (denominator === 10) {
+            scoreValue = numerator * 10; // Scale up to 100
+          } else {
+            scoreValue = numerator; // Already out of 100
+          }
+        }
+      }
+      
+      // Format: "85 out of 100" or "8.5 out of 10"
+      if (!scoreValue) {
+        const verbalMatch = text.match(/\b([0-9.]+)\s*out\s*of\s*(10|100)\b/i);
+        if (verbalMatch) {
+          const numerator = parseFloat(verbalMatch[1]);
+          const denominator = parseFloat(verbalMatch[2]);
+          
+          // Convert to a score out of 100
+          if (denominator === 10) {
+            scoreValue = numerator * 10; // Scale up to 100
+          } else {
+            scoreValue = numerator; // Already out of 100
+          }
+        }
+      }
+      
+      // Format: Letter grades with percentages like "Grade: A (95%)"
+      if (!scoreValue) {
+        const percentMatch = text.match(/Grade:?\s*[A-F][+-]?\s*\(([0-9.]+)%\)/i);
+        if (percentMatch && percentMatch[1]) {
+          scoreValue = parseFloat(percentMatch[1]);
+        }
+      }
+      
+      // If we found a valid score, set it
+      if (scoreValue !== null) {
+        // Normalize between 0-100
+        if (scoreValue > 0 && scoreValue <= 5) {
+          // Likely a 5-point scale
+          result.score = scoreValue * 20;
+        } else if (scoreValue > 0 && scoreValue <= 10) {
+          // Likely a 10-point scale
+          result.score = scoreValue * 10;
+        } else {
+          // Assume it's already a percentage
+          result.score = scoreValue;
+        }
+        
+        // Ensure we're in the range 0-100
+        result.score = Math.max(0, Math.min(100, result.score));
       }
       
       // Fill in missing sections if needed
       if (result.strengths.length === 0 && result.improvements.length === 0) {
-        console.log(`[GEMINI] No structured sections found, using fallback parsing`);
+        console.log(`[GEMINI] No structured sections found, using semantic parsing fallback`);
         
-        // Look for bullet points anywhere in the text
-        const bulletPoints = text.match(/(?:^|\n)[*•-]\s*(.*?)(?=\n[*•-]|\n\n|$)/g);
+        // First try bullet points anywhere in the text
+        const bulletPoints = text.match(/(?:^|\n)(?:[*•-]|\d+\.)\s*(.*?)(?=\n(?:[*•-]|\d+\.)|$)/g);
         if (bulletPoints && bulletPoints.length > 0) {
-          const cleanPoints = bulletPoints.map(item => item.replace(/^[*•-\s\n]+/, '').trim());
+          const cleanPoints = bulletPoints.map(item => item.replace(/^[*•\d\s.-]+/, '').trim());
           
-          // Split points between strengths and improvements
-          const midpoint = Math.ceil(cleanPoints.length / 2);
-          result.strengths = cleanPoints.slice(0, midpoint);
-          result.improvements = cleanPoints.slice(midpoint);
+          if (cleanPoints.length > 1) {
+            // Try to categorize each point as a strength or improvement based on language
+            const positiveRegex = /\b(?:good|great|excellent|impressive|effective|strong|well|success|positive|creative|accurate|clear|valuable)\b/i;
+            const negativeRegex = /\b(?:improve|better|could|should|consider|try|issue|problem|lack|miss|weak|confusing|unclear|inconsistent)\b/i;
+            
+            const strengths = [];
+            const improvements = [];
+            
+            for (const point of cleanPoints) {
+              if (positiveRegex.test(point)) {
+                strengths.push(point);
+              } else if (negativeRegex.test(point)) {
+                improvements.push(point);
+              } else {
+                // If can't determine, add to strengths by default
+                strengths.push(point);
+              }
+            }
+            
+            if (strengths.length > 0) result.strengths = strengths;
+            if (improvements.length > 0) result.improvements = improvements;
+          } else {
+            // If we have just one bullet point or can't categorize, split evenly
+            const midpoint = Math.ceil(cleanPoints.length / 2);
+            result.strengths = cleanPoints.slice(0, midpoint);
+            result.improvements = cleanPoints.slice(midpoint);
+          }
+        } else {
+          // If no bullet points found, try to extract sentences and categorize them
+          const sentences = text.split(/[.!?]+\s+/).filter(s => s.trim().length > 10);
+          
+          if (sentences.length > 1) {
+            // Use sentiment analysis to categorize
+            const positiveRegex = /\b(?:good|great|excellent|impressive|effective|strong|well|success|positive|creative|accurate|clear|valuable)\b/i;
+            const negativeRegex = /\b(?:improve|better|could|should|consider|try|issue|problem|lack|miss|weak|confusing|unclear|inconsistent)\b/i;
+            
+            const strengths = [];
+            const improvements = [];
+            
+            for (const sentence of sentences) {
+              if (positiveRegex.test(sentence)) {
+                strengths.push(sentence);
+              } else if (negativeRegex.test(sentence)) {
+                improvements.push(sentence);
+              }
+            }
+            
+            if (strengths.length > 0) result.strengths = strengths.slice(0, 3);
+            if (improvements.length > 0) result.improvements = improvements.slice(0, 3);
+          }
         }
       }
       
