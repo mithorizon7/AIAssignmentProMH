@@ -989,18 +989,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get target assignment if specified
       let targetAssignment = undefined;
       if (assignmentId) {
-        targetAssignment = await storage.getAssignment(assignmentId);
-        console.log("Target assignment found:", targetAssignment ? "Yes" : "No");
+        try {
+          // Extra precaution - ensure assignmentId is a valid positive integer
+          if (typeof assignmentId === 'number' && !isNaN(assignmentId) && assignmentId > 0 && Number.isInteger(assignmentId)) {
+            console.log(`Attempting to fetch assignment with ID: ${assignmentId} (type: ${typeof assignmentId})`);
+            targetAssignment = await storage.getAssignment(assignmentId);
+            console.log("Target assignment found:", targetAssignment ? "Yes" : "No");
+          } else {
+            console.error(`Invalid assignmentId detected: ${assignmentId}, type: ${typeof assignmentId}`);
+          }
+        } catch (error) {
+          console.error("Error fetching target assignment:", error);
+          // Continue without the target assignment
+        }
       }
       
       // Get all submissions (filtered by assignment if specified)
       let submissionsQuery = await db.select().from(submissions);
-      if (assignmentId) {
-        submissionsQuery = submissionsQuery.filter((s: any) => s.assignmentId === assignmentId);
-      } else if (courseId) {
-        // Filter submissions by course (need to join with assignments)
-        const assignmentIds = allAssignments.map(a => a.id);
-        submissionsQuery = submissionsQuery.filter((s: any) => assignmentIds.includes(s.assignmentId));
+      
+      try {
+        if (assignmentId && typeof assignmentId === 'number' && !isNaN(assignmentId)) {
+          console.log(`Filtering submissions by assignmentId: ${assignmentId}`);
+          submissionsQuery = submissionsQuery.filter((s: any) => {
+            return s && s.assignmentId === assignmentId;
+          });
+          console.log(`Found ${submissionsQuery.length} submissions for assignment ID ${assignmentId}`);
+        } else if (courseId && typeof courseId === 'number' && !isNaN(courseId)) {
+          // Filter submissions by course (need to join with assignments)
+          const assignmentIds = allAssignments.map(a => a.id);
+          console.log(`Filtering submissions by course-related assignments: [${assignmentIds.join(', ')}]`);
+          
+          submissionsQuery = submissionsQuery.filter((s: any) => {
+            return s && s.assignmentId && assignmentIds.includes(s.assignmentId);
+          });
+          console.log(`Found ${submissionsQuery.length} submissions for course ID ${courseId}`);
+        } else {
+          console.log(`No filtering applied to submissions. Total: ${submissionsQuery.length}`);
+        }
+      } catch (error) {
+        console.error("Error while filtering submissions:", error);
       }
       
       // Get enrolled students (for the selected course or all courses)
