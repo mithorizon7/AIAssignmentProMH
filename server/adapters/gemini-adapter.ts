@@ -338,11 +338,22 @@ export class GeminiAdapter implements AIAdapter {
       // Convert Buffer to base64 string
       if (Buffer.isBuffer(content)) {
         console.log(`[GEMINI] Converting Buffer of size ${content.length} bytes to base64`);
+        
+        // Validate the image buffer before processing
+        this.validateImageBuffer(content, mimeType);
+        
         base64Data = content.toString('base64');
       } 
       // Handle data URI format (data:image/jpeg;base64,/9j/4AAQ...)
       else if (typeof content === 'string' && content.startsWith('data:')) {
         console.log(`[GEMINI] Processing data URI string (length: ${content.length})`);
+        
+        // Extract MIME type from data URI if not specified explicitly
+        if (content.startsWith('data:image/') && content.includes(';base64,')) {
+          const extractedMimeType = content.substring(5, content.indexOf(';base64,'));
+          console.log(`[GEMINI] Extracted MIME type from data URI: ${extractedMimeType}`);
+        }
+        
         base64Data = content.replace(/^data:image\/\w+;base64,/, '');
       } 
       // Handle direct base64 string
@@ -356,11 +367,17 @@ export class GeminiAdapter implements AIAdapter {
       
       console.log(`[GEMINI] Successfully prepared base64 image data (length: ${base64Data.length})`);
       
-      // Ensure the image data is valid base64 by checking a sample
-      const sampleCheck = base64Data.substring(0, 100).match(/^[A-Za-z0-9+/=]+$/);
-      if (!sampleCheck) {
-        console.warn(`[GEMINI] Warning: Image data doesn't appear to be valid base64`);
-      }
+      // Comprehensive validation of base64 data
+      this.validateBase64Image(base64Data, mimeType);
+      
+      // Log detailed information about the image for debugging
+      console.log(`[GEMINI] Image details:`, {
+        mimeType,
+        base64Length: base64Data.length,
+        estimatedSizeKB: Math.round(base64Data.length * 0.75 / 1024),
+        firstChars: base64Data.substring(0, 20) + '...',
+        lastChars: '...' + base64Data.substring(base64Data.length - 20)
+      });
       
       contentParts.push({
         inlineData: {
@@ -377,6 +394,94 @@ export class GeminiAdapter implements AIAdapter {
         text: `[IMAGE: Failed to process as inline data - ${error instanceof Error ? error.message : String(error)}]`
       });
     }
+  }
+  
+  /**
+   * Validate an image buffer to ensure it's a valid image file
+   * @param buffer The image buffer to validate
+   * @param mimeType The expected MIME type
+   * @throws Error if the image is invalid
+   */
+  private validateImageBuffer(buffer: Buffer, mimeType: string): void {
+    // Check minimum size
+    if (buffer.length < 100) {
+      throw new Error(`Image buffer too small (${buffer.length} bytes) - likely not a valid image`);
+    }
+    
+    // Check for known image headers
+    if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+      // JPEG starts with bytes FF D8
+      if (buffer.length < 2 || buffer[0] !== 0xFF || buffer[1] !== 0xD8) {
+        throw new Error('Invalid JPEG image - missing JPEG signature (FF D8)');
+      }
+    } else if (mimeType === 'image/png') {
+      // PNG starts with the bytes 89 50 4E 47 0D 0A 1A 0A
+      if (buffer.length < 8 || 
+          buffer[0] !== 0x89 || 
+          buffer[1] !== 0x50 ||
+          buffer[2] !== 0x4E ||
+          buffer[3] !== 0x47 ||
+          buffer[4] !== 0x0D ||
+          buffer[5] !== 0x0A ||
+          buffer[6] !== 0x1A ||
+          buffer[7] !== 0x0A) {
+        throw new Error('Invalid PNG image - missing PNG signature');
+      }
+    } else if (mimeType === 'image/gif') {
+      // GIF starts with "GIF87a" or "GIF89a"
+      if (buffer.length < 6 || 
+          buffer[0] !== 0x47 || // G
+          buffer[1] !== 0x49 || // I
+          buffer[2] !== 0x46) { // F
+        throw new Error('Invalid GIF image - missing GIF signature');
+      }
+    } else if (mimeType === 'image/webp') {
+      // WebP starts with "RIFF" followed by file size and "WEBP"
+      if (buffer.length < 12 || 
+          buffer[0] !== 0x52 || // R
+          buffer[1] !== 0x49 || // I
+          buffer[2] !== 0x46 || // F
+          buffer[3] !== 0x46 || // F
+          buffer[8] !== 0x57 || // W
+          buffer[9] !== 0x45 || // E
+          buffer[10] !== 0x42 || // B
+          buffer[11] !== 0x50) { // P
+        throw new Error('Invalid WebP image - missing WebP signature');
+      }
+    }
+    
+    console.log(`[GEMINI] Image buffer validation passed for ${mimeType}`);
+  }
+  
+  /**
+   * Validate a base64 string to ensure it's a valid image
+   * @param base64Data The base64 string to validate
+   * @param mimeType The expected MIME type
+   * @throws Error if the base64 string is invalid
+   */
+  private validateBase64Image(base64Data: string, mimeType: string): void {
+    // Check for empty string
+    if (!base64Data || base64Data.length === 0) {
+      throw new Error('Base64 image data is empty');
+    }
+    
+    // Check if the string is valid base64
+    const isValidBase64 = /^[A-Za-z0-9+/=]+$/.test(base64Data.substring(0, 100));
+    if (!isValidBase64) {
+      throw new Error('Invalid base64 data - contains non-base64 characters');
+    }
+    
+    // Size validation - too small = likely invalid
+    if (base64Data.length < 50) {
+      throw new Error(`Base64 data too small (${base64Data.length} chars) - likely not a valid image`);
+    }
+    
+    // Size validation - warn if very large (might exceed API limits)
+    if (base64Data.length > 5000000) { // ~5MB after base64 decoding
+      console.warn(`[GEMINI] Very large image: ${Math.round(base64Data.length * 0.75 / 1024 / 1024)}MB decoded. May exceed API limits.`);
+    }
+    
+    console.log(`[GEMINI] Base64 validation passed for ${mimeType} image`);
   }
 
   async generateCompletion(prompt: string) {
