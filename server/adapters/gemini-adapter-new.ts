@@ -480,11 +480,15 @@ export class GeminiAdapter implements AIAdapter {
       
       // Try to parse the text as JSON first
       try {
+        // Log the raw text in development for debugging
+        console.log(`[GEMINI] Attempting to parse direct structured response`);
+        console.log(`[GEMINI] Response preview for debugging: ${text.substring(0, 100)}`);
+        
         parsedContent = JSON.parse(text);
         console.log(`[GEMINI] Successfully parsed direct JSON response for multimodal content`);
       } catch (error) {
-        console.warn(`[GEMINI] Direct JSON parsing failed: ${error instanceof Error ? error.message : String(error)}`);
-        console.log(`[GEMINI] Falling back to manual parsing methods`);
+        console.warn(`[GEMINI] Failed to parse direct response: ${error instanceof Error ? error.message : String(error)}`);
+        console.log(`[GEMINI] Falling back to manual parsing for multimodal content`);
         
         // Try to find JSON block in markdown
         const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)```/;
@@ -494,7 +498,7 @@ export class GeminiAdapter implements AIAdapter {
           try {
             const jsonText = jsonMatch[1].trim();
             parsedContent = JSON.parse(jsonText);
-            console.log(`[GEMINI] Successfully extracted JSON from markdown code block`);
+            console.log(`[GEMINI] Successfully extracted JSON from markdown `);
           } catch (error) {
             console.warn(`[GEMINI] Failed to parse JSON from markdown block: ${error instanceof Error ? error.message : String(error)}`);
             
