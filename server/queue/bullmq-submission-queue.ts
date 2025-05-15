@@ -464,9 +464,36 @@ export const queueApi = {
             // Analyze the submission with AI based on file type
             let feedbackResult;
             if (isMultimodal) {
-              // In production, fileUrl would be a path to cloud storage
-              // Here we use a server-local path for simplicity
-              const filePath = submission.fileUrl || '';
+              // The fileUrl is now a path in GCS storage
+              // The multimodal processor will handle retrieving from GCS as needed
+              let filePath = submission.fileUrl || '';
+              
+              // Check if this is a GCS path without a signed URL
+              // If so, we need to generate a signed URL for access
+              if (filePath && !filePath.startsWith('http')) {
+                try {
+                  // Import only when needed to avoid circular dependencies
+                  const { generateSignedUrl, isGcsConfigured } = require('../utils/gcs-client');
+                  
+                  // Generate a signed URL for temporary access if GCS is configured
+                  if (isGcsConfigured()) {
+                    const signedUrl = await generateSignedUrl(filePath, 60); // 60 minute expiration
+                    logger.info(`Generated signed URL for GCS file access`, {
+                      submissionId,
+                      objectPath: filePath
+                    });
+                    
+                    // Use the signed URL for file processing
+                    filePath = signedUrl;
+                  }
+                } catch (urlError) {
+                  logger.warn(`Failed to generate signed URL for GCS file, using path directly`, {
+                    submissionId,
+                    error: (urlError instanceof Error) ? urlError.message : String(urlError)
+                  });
+                  // Continue with the original path - the processor will handle it
+                }
+              }
               
               console.log(`[DEVELOPMENT] Processing multimodal submission ${submissionId} of type ${submission.mimeType}`);
               

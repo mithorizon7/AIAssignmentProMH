@@ -164,6 +164,7 @@ export {
   uploadBuffer,
   generateSignedUrl,
   getPublicUrl,
+  getBucket,
   storage,
   bucketName
 };
