@@ -282,6 +282,89 @@ export function isRemoteUrl(path: string): boolean {
 }
 
 /**
+ * Download a file directly from Google Cloud Storage
+ * @param gcsUrl The GCS URL (gs://bucket-name/path/to/file)
+ * @param mimeType Optional MIME type of the file
+ * @returns An object containing the file buffer and metadata
+ */
+export async function downloadFromGCS(gcsUrl: string, mimeType?: string): Promise<{
+  buffer: Buffer, 
+  metadata?: { contentType?: string, [key: string]: any }
+}> {
+  try {
+    if (!gcsUrl || !gcsUrl.startsWith('gs://')) {
+      throw new Error(`Invalid GCS URL format: ${gcsUrl}. Expected format: gs://bucket-name/path/to/file`);
+    }
+    
+    console.log(`[GCS_DOWNLOAD] Attempting to download file from GCS URL: ${gcsUrl}`);
+    
+    // Import the GCS client
+    const gcsClient = require('./gcs-client');
+    const { storage, bucketName, isGcsConfigured } = gcsClient;
+    
+    // Verify GCS is configured
+    if (!isGcsConfigured()) {
+      throw new Error('GCS not configured. Check GOOGLE_APPLICATION_CREDENTIALS and GCS_BUCKET_NAME environment variables.');
+    }
+    
+    // Parse the GCS URL (format: gs://bucket-name/path/to/file)
+    const gcsPath = gcsUrl.replace('gs://', '');
+    const [bucketFromUrl, ...objectPathParts] = gcsPath.split('/');
+    
+    if (!objectPathParts || objectPathParts.length === 0) {
+      throw new Error(`Invalid GCS URL format: ${gcsUrl}. Cannot parse object path.`);
+    }
+    
+    const objectPath = objectPathParts.join('/');
+    const targetBucket = bucketFromUrl || bucketName;
+    
+    if (!targetBucket) {
+      throw new Error('No bucket specified in GCS URL and no default bucket configured');
+    }
+    
+    console.log(`[GCS_DOWNLOAD] Accessing bucket: ${targetBucket}, object: ${objectPath}`);
+    
+    // Get a reference to the file
+    const bucket = storage.bucket(targetBucket);
+    const file = bucket.file(objectPath);
+    
+    // First, try to get the file metadata to check if it exists
+    try {
+      const [metadata] = await file.getMetadata();
+      console.log(`[GCS_DOWNLOAD] File exists. Size: ${metadata.size}, Content-Type: ${metadata.contentType}`);
+      
+      // Now download the file
+      const [fileContents] = await file.download();
+      console.log(`[GCS_DOWNLOAD] Successfully downloaded ${fileContents.length} bytes from GCS`);
+      
+      return {
+        buffer: fileContents,
+        metadata: {
+          contentType: metadata.contentType,
+          size: metadata.size,
+          updated: metadata.updated,
+          timeCreated: metadata.timeCreated
+        }
+      };
+    } catch (metadataError) {
+      console.warn(`[GCS_DOWNLOAD] Error getting file metadata: ${metadataError instanceof Error ? metadataError.message : String(metadataError)}`);
+      console.log(`[GCS_DOWNLOAD] Attempting direct download without metadata check`);
+      
+      // Try direct download as fallback
+      const [fileContents] = await file.download();
+      console.log(`[GCS_DOWNLOAD] Successfully downloaded ${fileContents.length} bytes from GCS via direct download`);
+      
+      return { 
+        buffer: fileContents 
+      };
+    }
+  } catch (error) {
+    console.error(`[GCS_DOWNLOAD] Error downloading from GCS URL ${gcsUrl}:`, error);
+    throw new Error(`Failed to download from GCS (${gcsUrl}): ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
  * Download a file from a remote URL (GCS, HTTP, HTTPS) 
  * @param url The URL to download from
  * @param mimeType Optional MIME type of the file (useful for GCS URLs that might not provide Content-Type)
@@ -333,72 +416,22 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
     let fileBuffer: Buffer;
     
     if (url.startsWith('gs://')) {
-      // For direct GCS URLs, we need to use the Google Cloud Storage SDK
+      // For direct GCS URLs, use our specialized downloadFromGCS function
       console.log(`[DOWNLOAD] Detected GCS URL (gs:// protocol): ${url}`);
       try {
-        // Import the GCS client only when needed
-        const gcsClient = require('./gcs-client');
-        const { getBucket, bucketName, generateSignedUrl, isGcsConfigured } = gcsClient;
+        // Use our dedicated GCS download function
+        const { buffer, metadata } = await downloadFromGCS(url, mimeType);
+        fileBuffer = buffer;
         
-        // Verify GCS is configured before proceeding
-        if (!isGcsConfigured()) {
-          throw new Error('GCS not configured. Check GOOGLE_APPLICATION_CREDENTIALS and GCS_BUCKET_NAME environment variables.');
-        }
-        
-        // Parse the GCS URL (format: gs://bucket-name/path/to/file)
-        const gcsPath = url.replace('gs://', '');
-        const [bucketFromUrl, ...objectPathParts] = gcsPath.split('/');
-        
-        // Validate that we have a non-empty object path
-        if (!objectPathParts || objectPathParts.length === 0) {
-          throw new Error(`Invalid GCS URL format: ${url}. Expected format: gs://bucket-name/path/to/file`);
-        }
-        
-        const objectPath = objectPathParts.join('/');
-        
-        // Determine which bucket to use (from URL or default)
-        const targetBucket = bucketFromUrl || bucketName;
-        if (!targetBucket) {
-          throw new Error('No bucket specified in GCS URL and no default bucket configured');
-        }
-        
-        console.log(`[DOWNLOAD] GCS bucket: ${targetBucket}, object path: ${objectPath}`);
-        
-        // Try two approaches:
-        // 1. First, attempt to get a signed URL and use HTTP fetch (more reliable for large files)
-        // 2. If that fails, fall back to direct download
-        try {
-          console.log(`[DOWNLOAD] Attempting to get signed URL for GCS object`);
-          const signedUrl = await generateSignedUrl(objectPath, 60); // 60 minutes expiration
-          
-          console.log(`[DOWNLOAD] Successfully got signed URL, downloading via HTTP`);
-          const response = await fetch(signedUrl);
-          
-          if (!response.ok) {
-            throw new Error(`Failed to download from signed URL: ${response.status} ${response.statusText}`);
-          }
-          
-          const arrayBuffer = await response.arrayBuffer();
-          fileBuffer = Buffer.from(arrayBuffer);
-          console.log(`[DOWNLOAD] Successfully downloaded from GCS signed URL, file size: ${fileBuffer.length} bytes`);
-        } catch (error) { 
-          const signedUrlError = error as Error;
-          console.warn(`[DOWNLOAD] Failed to use signed URL approach: ${signedUrlError.message}, falling back to direct download`);
-          
-          // Get the bucket and file objects for direct download
-          const bucket = getBucket(targetBucket);
-          const file = bucket.file(objectPath);
-          
-          // Download the file to a buffer
-          console.log(`[DOWNLOAD] Downloading directly from GCS bucket: ${targetBucket}, object: ${objectPath}`);
-          const [fileData] = await file.download();
-          fileBuffer = fileData;
-          console.log(`[DOWNLOAD] Successfully downloaded directly from GCS, file size: ${fileBuffer.length} bytes`);
+        // If we got metadata with content type, use it when no explicit type was provided
+        if (metadata?.contentType && !mimeType) {
+          mimeType = metadata.contentType;
+          console.log(`[DOWNLOAD] Using content type from GCS metadata: ${mimeType}`);
         }
         
         // Write to temp file for operations that need a file path
         await writeFileAsync(localPath, fileBuffer);
-        console.log(`[DOWNLOAD] Wrote GCS file data to temporary path: ${localPath}`);
+        console.log(`[DOWNLOAD] Wrote GCS file data to temporary path: ${localPath} (${fileBuffer.length} bytes)`);
       } catch (gcsError) {
         console.error('[DOWNLOAD] Error downloading from GCS:', gcsError);
         throw new Error(`Failed to download file from GCS: ${gcsError instanceof Error ? gcsError.message : String(gcsError)}`);
@@ -507,50 +540,18 @@ export async function processFileForMultimodal(
         !filePath.startsWith('http')) {
       
       console.log(`[MULTIMODAL] File path is a GCS object path: ${filePath}`);
+      const gcsClient = require('./gcs-client');
+      const { bucketName, isGcsConfigured } = gcsClient;
       
-      try {
-        // Dynamically import GCS client to handle dependencies
-        const gcsClient = require('./gcs-client');
-        const { generateSignedUrl, isGcsConfigured, getBucket, bucketName } = gcsClient;
-        
-        // Check if GCS credentials are available
-        if (isGcsConfigured()) {
-          try {
-            console.log(`[MULTIMODAL] GCS configured, generating signed URL for path: ${filePath}`);
-            
-            // First try: Generate a signed URL with 60-minute expiration
-            const signedUrl = await generateSignedUrl(filePath, 60);
-            
-            if (signedUrl && signedUrl.startsWith('http')) {
-              console.log(`[MULTIMODAL] Successfully generated signed URL (${signedUrl.length} chars)`);
-              // Update the file path to use the signed URL
-              filePath = signedUrl;
-            } else {
-              console.warn(`[MULTIMODAL] Generated URL was invalid: ${signedUrl ? signedUrl.substring(0, 30) + '...' : 'undefined'}`);
-              throw new Error('Invalid signed URL generated');
-            }
-          } catch (signedUrlError) {
-            console.warn(`[MULTIMODAL] Could not generate signed URL, attempting direct GCS access:`, signedUrlError);
-            
-            // Second try: Direct download with GCS SDK
-            try {
-              console.log(`[MULTIMODAL] Attempting direct GCS access for: ${filePath}`);
-              // Prepare for direct GCS download in downloadFromUrl by converting to gs:// URL format
-              filePath = `gs://${bucketName}/${filePath}`;
-              console.log(`[MULTIMODAL] Converted to GCS URI format: ${filePath}`);
-            } catch (conversionError) {
-              console.error(`[MULTIMODAL] Error during GCS path conversion:`, conversionError);
-              // Keep the original path as is
-            }
-          }
-        } else {
-          console.warn(`[MULTIMODAL] GCS not configured. Check GOOGLE_APPLICATION_CREDENTIALS and GCS_BUCKET_NAME environment variables.`);
-          // If GCS is not configured, we need to check if the necessary environment variables exist
-          console.log(`[MULTIMODAL] Checking for GCS credentials: GOOGLE_APPLICATION_CREDENTIALS ${process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'exists' : 'missing'}, GCS_BUCKET_NAME ${process.env.GCS_BUCKET_NAME ? 'exists' : 'missing'}`);
-        }
-      } catch (gcsError) {
-        console.error(`[MULTIMODAL] GCS client error:`, gcsError);
-        // Don't throw here, let downloadFromUrl try to handle the path
+      // Check if GCS credentials are available
+      if (isGcsConfigured()) {
+        // Convert to proper gs:// format for our specialized downloadFromGCS function
+        filePath = `gs://${bucketName}/${filePath}`;
+        console.log(`[MULTIMODAL] Converted to GCS URI format for direct download: ${filePath}`);
+      } else {
+        console.warn(`[MULTIMODAL] GCS not configured. Check GOOGLE_APPLICATION_CREDENTIALS and GCS_BUCKET_NAME environment variables.`);
+        // Log diagnostics about available environment variables
+        console.log(`[MULTIMODAL] Checking for GCS credentials: GOOGLE_APPLICATION_CREDENTIALS ${process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'exists' : 'missing'}, GCS_BUCKET_NAME ${process.env.GCS_BUCKET_NAME ? 'exists' : 'missing'}`);
       }
     }
 
