@@ -251,11 +251,12 @@ export function isRemoteUrl(path: string): boolean {
     }
     
     // Check for potential GCS object paths that should be converted to signed URLs
+    // Logic fix: proper grouping of conditions with parentheses to avoid incorrect evaluation
     const isPotentialGcsPath = 
       path.startsWith('/') === false && // Not an absolute local path
       path.includes('/') && // Has at least one folder separator
       !path.includes('\\') && // Not a Windows-style path
-      path.startsWith('submissions/') || path.startsWith('anonymous-submissions/'); // Specific GCS path patterns
+      (path.startsWith('submissions/') || path.startsWith('anonymous-submissions/')); // Specific GCS path patterns
     
     if (isPotentialGcsPath) {
       console.log('[MULTIMODAL] Path is a GCS object path (matches submission pattern)');
@@ -309,19 +310,34 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
     
     if (url.startsWith('gs://')) {
       // For direct GCS URLs, we need to use the Google Cloud Storage SDK
-      console.log(`[DOWNLOAD] Detected GCS URL (gs:// protocol), using GCS SDK`);
+      console.log(`[DOWNLOAD] Detected GCS URL (gs:// protocol): ${url}`);
       try {
         // Import the GCS client only when needed
         const gcsClient = require('./gcs-client');
-        const { getBucket, bucketName, generateSignedUrl } = gcsClient;
+        const { getBucket, bucketName, generateSignedUrl, isGcsConfigured } = gcsClient;
+        
+        // Verify GCS is configured before proceeding
+        if (!isGcsConfigured()) {
+          throw new Error('GCS not configured. Check GOOGLE_APPLICATION_CREDENTIALS and GCS_BUCKET_NAME environment variables.');
+        }
         
         // Parse the GCS URL (format: gs://bucket-name/path/to/file)
         const gcsPath = url.replace('gs://', '');
         const [bucketFromUrl, ...objectPathParts] = gcsPath.split('/');
+        
+        // Validate that we have a non-empty object path
+        if (!objectPathParts || objectPathParts.length === 0) {
+          throw new Error(`Invalid GCS URL format: ${url}. Expected format: gs://bucket-name/path/to/file`);
+        }
+        
         const objectPath = objectPathParts.join('/');
         
         // Determine which bucket to use (from URL or default)
         const targetBucket = bucketFromUrl || bucketName;
+        if (!targetBucket) {
+          throw new Error('No bucket specified in GCS URL and no default bucket configured');
+        }
+        
         console.log(`[DOWNLOAD] GCS bucket: ${targetBucket}, object path: ${objectPath}`);
         
         // Try two approaches:
@@ -466,31 +482,51 @@ export async function processFileForMultimodal(
     if ((filePath.startsWith('submissions/') || filePath.startsWith('anonymous-submissions/')) && 
         !filePath.startsWith('http')) {
       
-      console.log(`[MULTIMODAL] File path is a GCS object path, attempting to generate signed URL first`);
+      console.log(`[MULTIMODAL] File path is a GCS object path: ${filePath}`);
       
       try {
-        // Import GCS client
-        const { generateSignedUrl, isGcsConfigured } = require('./gcs-client');
+        // Dynamically import GCS client to handle dependencies
+        const gcsClient = require('./gcs-client');
+        const { generateSignedUrl, isGcsConfigured, getBucket, bucketName } = gcsClient;
         
+        // Check if GCS credentials are available
         if (isGcsConfigured()) {
-          // Generate a signed URL with 60-minute expiration
-          const signedUrl = await generateSignedUrl(filePath, 60);
-          
-          if (signedUrl && signedUrl.startsWith('http')) {
-            console.log(`[MULTIMODAL] Successfully generated signed URL for GCS path (${signedUrl.length} chars)`);
-            // Update the file path to use the signed URL
-            filePath = signedUrl;
-          } else {
-            console.error(`[MULTIMODAL] Failed to generate valid signed URL for GCS path: ${filePath}`);
-            throw new Error('Invalid signed URL generated for GCS path');
+          try {
+            console.log(`[MULTIMODAL] GCS configured, generating signed URL for path: ${filePath}`);
+            
+            // First try: Generate a signed URL with 60-minute expiration
+            const signedUrl = await generateSignedUrl(filePath, 60);
+            
+            if (signedUrl && signedUrl.startsWith('http')) {
+              console.log(`[MULTIMODAL] Successfully generated signed URL (${signedUrl.length} chars)`);
+              // Update the file path to use the signed URL
+              filePath = signedUrl;
+            } else {
+              console.warn(`[MULTIMODAL] Generated URL was invalid: ${signedUrl ? signedUrl.substring(0, 30) + '...' : 'undefined'}`);
+              throw new Error('Invalid signed URL generated');
+            }
+          } catch (signedUrlError) {
+            console.warn(`[MULTIMODAL] Could not generate signed URL, attempting direct GCS access:`, signedUrlError);
+            
+            // Second try: Direct download with GCS SDK
+            try {
+              console.log(`[MULTIMODAL] Attempting direct GCS access for: ${filePath}`);
+              // Prepare for direct GCS download in downloadFromUrl by converting to gs:// URL format
+              filePath = `gs://${bucketName}/${filePath}`;
+              console.log(`[MULTIMODAL] Converted to GCS URI format: ${filePath}`);
+            } catch (conversionError) {
+              console.error(`[MULTIMODAL] Error during GCS path conversion:`, conversionError);
+              // Keep the original path as is
+            }
           }
         } else {
-          console.warn(`[MULTIMODAL] GCS not configured, cannot generate signed URL`);
-          // Continue with the original path and let downloadFromUrl handle it
+          console.warn(`[MULTIMODAL] GCS not configured. Check GOOGLE_APPLICATION_CREDENTIALS and GCS_BUCKET_NAME environment variables.`);
+          // If GCS is not configured, we need to check if the necessary environment variables exist
+          console.log(`[MULTIMODAL] Checking for GCS credentials: GOOGLE_APPLICATION_CREDENTIALS ${process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'exists' : 'missing'}, GCS_BUCKET_NAME ${process.env.GCS_BUCKET_NAME ? 'exists' : 'missing'}`);
         }
-      } catch (gcsError: any) {
-        console.error(`[MULTIMODAL] Error generating signed URL for GCS path:`, gcsError);
-        // Don't fail here, try to continue with the original path
+      } catch (gcsError) {
+        console.error(`[MULTIMODAL] GCS client error:`, gcsError);
+        // Don't throw here, let downloadFromUrl try to handle the path
       }
     }
 
