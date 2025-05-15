@@ -1,9 +1,8 @@
 /**
- * Fixed Google Gemini AI adapter
- * Using @google/genai SDK with the latest API patterns for version 0.14.0+
+ * Google Gemini AI adapter
+ * Using @google/genai SDK with correct API pattern for version 0.14.0
  */
 import { GoogleGenAI } from '@google/genai';
-import type { GenerateContentResponse } from '@google/genai';
 
 // Define our own types since we can't find the shared ones
 interface MultimodalPromptPart {
@@ -89,7 +88,6 @@ function extractSummary(text: string): string {
 
 /**
  * Google Gemini AI adapter for generating feedback
- * Using the latest API methods from the @google/genai SDK
  */
 export class GeminiAdapter {
   private genAI: GoogleGenAI;
@@ -182,46 +180,35 @@ export class GeminiAdapter {
         modifiedPrompt = modifier(modifiedPrompt);
       }
       
-      // Prepare parts
-      const parts: any[] = [];
+      // Prepare generation config
+      const genConfig: any = {
+        temperature: 0.2,
+        topP: 0.8,
+        topK: 40,
+        maxOutputTokens: 1024
+      };
       
-      // Add system prompt if provided
-      if (systemPrompt) {
-        parts.push({ text: systemPrompt + "\n\n" });
+      // Configure response format if schema provided
+      if (responseSchema) {
+        genConfig.responseMimeType = "application/json";
+        genConfig.responseSchema = responseSchema;
       }
       
-      // Add main prompt
-      parts.push({ text: modifiedPrompt });
+      // Set up content parts for the request
+      const parts = [{ text: modifiedPrompt }];
       
       // Log the prompt being sent
       console.log(`[GEMINI] Sending prompt to Gemini API (${modifiedPrompt.length} chars)`);
       
-      // Generation config
-      const temperature = 0.2;
-      const topP = 0.8;
-      const topK = 40;
-      const maxOutputTokens = 1024;
-      
-      // Prepare the request
-      const requestParams: any = {
+      // Generate content with the model - using the correct API method from SDK
+      const result = await this.genAI.models.generateContent({
         model: this.modelName,
         contents: [{ role: 'user', parts }],
-        temperature,
-        topP,
-        topK,
-        maxOutputTokens
-      };
+        // Pass generation config as string-keyed object
+        ...genConfig
+      });
       
-      // Add response schema if provided
-      if (responseSchema) {
-        requestParams.responseMimeType = "application/json";
-        requestParams.responseSchema = responseSchema;
-      }
-      
-      // Generate content with the model
-      const result: GenerateContentResponse = await this.genAI.models.generateContent(requestParams);
-      
-      // Extract text from the response
+      // Extract text from the response - correct path with current SDK
       let text = '';
       
       if (result.candidates && 
@@ -295,8 +282,8 @@ export class GeminiAdapter {
       // Try to get token usage from response metadata, fall back to estimation
       let tokenCount = 0;
       
-      if (result.usageMetadata) {
-        const usageMetadata = result.usageMetadata;
+      if (result.response.usageMetadata) {
+        const usageMetadata = result.response.usageMetadata;
         if ('promptTokenCount' in usageMetadata && 'candidatesTokenCount' in usageMetadata) {
           // Sum prompt and candidates token counts
           tokenCount = (usageMetadata.promptTokenCount || 0) + (usageMetadata.candidatesTokenCount || 0);
@@ -369,20 +356,12 @@ export class GeminiAdapter {
         }
       }
       
-      // Generation config parameters
-      const temperature = 0.2;
-      const topP = 0.8;
-      const topK = 40;
-      const maxOutputTokens = 1024;
-      
-      // Prepare the request with JSON response format
-      const requestParams: any = {
-        model: this.modelName,
-        contents: [{ role: 'user', parts: apiParts }],
-        temperature,
-        topP,
-        topK,
-        maxOutputTokens,
+      // Prepare generation config with JSON response format
+      const genConfig: any = {
+        temperature: 0.2,
+        topP: 0.8,
+        topK: 40,
+        maxOutputTokens: 1024,
         responseMimeType: "application/json",
         responseSchema: {
           type: "object",
@@ -409,22 +388,26 @@ export class GeminiAdapter {
       console.log(`[GEMINI] Content parts summary:`, contentSummary);
       
       // Generate content with the correct API method from SDK
-      const result: GenerateContentResponse = await this.genAI.models.generateContent(requestParams);
+      const result = await this.genAI.models.generateContent({
+        model: this.modelName,
+        contents: [{ role: 'user', parts: apiParts }],
+        generationConfig: genConfig
+      });
       
       console.log(`[GEMINI] Successfully received response from Gemini API`);
       
       // Extract text from the response - correct path with current SDK
       let text = '';
       
-      if (result.candidates && 
-          result.candidates.length > 0 && 
-          result.candidates[0]?.content?.parts) {
-        const firstPart = result.candidates[0].content.parts[0];
+      if (result.response && 
+          result.response.candidates && 
+          result.response.candidates[0]?.content?.parts) {
+        const firstPart = result.response.candidates[0].content.parts[0];
         if (firstPart.text) {
           text = firstPart.text;
         } else {
           console.warn('[GEMINI] Response text not found in expected location');
-          text = JSON.stringify(result);
+          text = JSON.stringify(result.response);
         }
       } else {
         console.warn('[GEMINI] Could not extract text response from standard structure');
@@ -487,8 +470,8 @@ export class GeminiAdapter {
       // Try to get token usage from response metadata, fall back to estimation
       let tokenCount = 0;
       
-      if (result.usageMetadata) {
-        const usageMetadata = result.usageMetadata;
+      if (result.response.usageMetadata) {
+        const usageMetadata = result.response.usageMetadata;
         if ('promptTokenCount' in usageMetadata && 'candidatesTokenCount' in usageMetadata) {
           // Sum prompt and candidates token counts
           tokenCount = (usageMetadata.promptTokenCount || 0) + (usageMetadata.candidatesTokenCount || 0);
