@@ -1355,7 +1355,8 @@ Please analyze the above submission and provide feedback in the following JSON f
             // Try to extract just the valid parts
             try {
               // Sometimes the AI doesn't properly close lists/objects - try to fix that
-              const partialJsonMatch = jsonContent.match(/\{\s*"strengths"\s*:\s*\[(.*?)\]/s);
+              // Use a more compatible regex pattern without the 's' flag
+              const partialJsonMatch = jsonContent.match(/\{\s*"strengths"\s*:\s*\[([\s\S]*?)\]/);
               if (partialJsonMatch) {
                 const strengths = extractListItemsManually(partialJsonMatch[1]);
                 parsedContent.strengths = strengths;
@@ -1363,9 +1364,10 @@ Please analyze the above submission and provide feedback in the following JSON f
               }
               
               // Try to extract improvements similarly
-              const improvementsMatch = jsonContent.match(/"improvements"\s*:\s*\[(.*?)\]/s);
+              // Use a more compatible regex pattern without the 's' flag
+              const improvementsMatch = jsonContent.match(/"improvements"\s*:\s*\[([\s\S]*?)\]/);
               if (improvementsMatch) {
-                const improvements = this.extractListItemsManually(improvementsMatch[1]);
+                const improvements = extractListItemsManually(improvementsMatch[1]);
                 parsedContent.improvements = improvements;
                 console.log('[GEMINI] Recovered improvements using regex:', improvements.length);
               }
@@ -1387,7 +1389,7 @@ Please analyze the above submission and provide feedback in the following JSON f
           if (this.modelName.includes('gemini-2.5')) {
             console.log('[GEMINI] Attempting to parse direct structured response');
             try {
-              const cleanedJson = this.cleanJsonString(text);
+              const cleanedJson = cleanJsonString(text);
               parsedContent = JSON.parse(cleanedJson);
             } catch (directError) {
               console.log('[GEMINI] Failed to parse direct response:', directError.message);
@@ -1400,7 +1402,7 @@ Please analyze the above submission and provide feedback in the following JSON f
             if (jsonMatch) {
               console.log('[GEMINI] Found JSON block in response');
               try {
-                const cleanedJson = this.cleanJsonString(jsonMatch[0]);
+                const cleanedJson = cleanJsonString(jsonMatch[0]);
                 parsedContent = JSON.parse(cleanedJson);
               } catch (jsonError) {
                 console.log('[GEMINI] Failed to parse extracted JSON:', jsonError.message);
@@ -1408,7 +1410,7 @@ Please analyze the above submission and provide feedback in the following JSON f
             } else {
               console.log('[GEMINI] No JSON block found, trying direct parse as fallback');
               try {
-                const cleanedJson = this.cleanJsonString(text);
+                const cleanedJson = cleanJsonString(text);
                 parsedContent = JSON.parse(cleanedJson);
               } catch (fallbackError) {
                 console.log('[GEMINI] Failed fallback parse:', fallbackError.message);
