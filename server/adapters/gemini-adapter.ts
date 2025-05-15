@@ -118,10 +118,10 @@ export class GeminiAdapter implements AIAdapter {
     }
     
     // Initialize the Google Generative AI client
-    this.genAI = new GoogleGenAI(apiKey);
+    this.genAI = new GoogleGenAI({ apiKey });
     
-    // Use a generally available model that supports multimodal
-    this.modelName = "gemini-pro-vision";
+    // Using the specified model from Google's documentation
+    this.modelName = "gemini-2.5-flash-preview-04-17";
     
     console.log(`[GEMINI] Initializing with model: ${this.modelName}`);
   }
@@ -335,9 +335,17 @@ export class GeminiAdapter implements AIAdapter {
       const parsedKeys = Object.keys(parsedContent);
       console.log(`[GEMINI] Parsed JSON keys: ${parsedKeys.join(', ')}`);
       
-      // Estimate token usage (Gemini doesn't always provide it directly)
-      const estimatedTokens = Math.ceil(text.length / 4);
-      console.log(`[GEMINI] Estimated token count: ${estimatedTokens}`);
+      // Try to get token usage from response metadata, fall back to estimation
+      let tokenCount = 0;
+      if (result.usageMetadata && 'promptTokenCount' in result.usageMetadata && 'candidatesTokenCount' in result.usageMetadata) {
+        // Sum prompt and candidates token counts
+        tokenCount = (result.usageMetadata.promptTokenCount || 0) + (result.usageMetadata.candidatesTokenCount || 0);
+      } else {
+        // Estimate token count based on response length (~4 chars per token)
+        tokenCount = Math.ceil(text.length / 4);
+        console.log(`[GEMINI] Token count not available from Gemini API response, using estimation method`);
+      }
+      console.log(`[GEMINI] Estimated token count: ${tokenCount}`);
       
       return {
         strengths: parsedContent.strengths || [],
@@ -654,8 +662,9 @@ Please analyze the above submission and provide feedback in the following JSON f
       
       // Try to get token usage from response metadata, fall back to estimation
       let tokenCount = 0;
-      if (result.usageMetadata?.totalTokens) {
-        tokenCount = result.usageMetadata.totalTokens;
+      if (result.usageMetadata && 'promptTokenCount' in result.usageMetadata && 'candidatesTokenCount' in result.usageMetadata) {
+        // Sum prompt and candidates token counts
+        tokenCount = (result.usageMetadata.promptTokenCount || 0) + (result.usageMetadata.candidatesTokenCount || 0);
       } else {
         // Estimate token count based on response length (~4 chars per token)
         tokenCount = Math.ceil(text.length / 4);
