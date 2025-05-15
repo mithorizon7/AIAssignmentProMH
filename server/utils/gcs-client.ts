@@ -53,10 +53,13 @@ const uploadFile = async (
       return `https://storage.googleapis.com/${bucketName}/${destinationPath}`;
     }
 
+    // Normalize destination path (remove leading slash if present)
+    const normalizedPath = destinationPath.startsWith('/') ? destinationPath.substring(1) : destinationPath;
+    
     // Upload the file to GCS
     const bucket = getBucket();
     const [file] = await bucket.upload(filePath, {
-      destination: destinationPath,
+      destination: normalizedPath,
       metadata: {
         contentType: mimeType,
       },
@@ -129,9 +132,12 @@ const generateSignedUrl = async (
       return `https://storage.googleapis.com/${bucketName}/${objectPath}`;
     }
     
+    // Normalize object path (remove leading slash if present)
+    const normalizedPath = objectPath.startsWith('/') ? objectPath.substring(1) : objectPath;
+    
     // Generate a signed URL
     const bucket = getBucket();
-    const file = bucket.file(objectPath);
+    const file = bucket.file(normalizedPath);
     
     const options: GetSignedUrlConfig = {
       version: 'v4',

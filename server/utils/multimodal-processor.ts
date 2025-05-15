@@ -215,15 +215,23 @@ export function fileToDataURI(content: Buffer, mimeType: string): string {
 }
 
 /**
- * Check if a path is a remote URL (GCS, HTTP, or HTTPS)
+ * Check if a path is a remote URL or a GCS object path
  * @param path Path to check
- * @returns Boolean indicating if the path is a remote URL
+ * @returns Boolean indicating if the path is a remote URL or GCS path
  */
 export function isRemoteUrl(path: string): boolean {
+  if (!path) return false;
+  
+  // Handle various URL formats
   return path.startsWith('http://') || 
          path.startsWith('https://') || 
          path.startsWith('gs://') ||
-         path.includes('storage.googleapis.com');
+         path.includes('storage.googleapis.com') ||
+         // Detect GCS object paths that we should convert to signed URLs
+         (path.startsWith('/') === false && // Not an absolute local path
+          path.includes('/') && // Has at least one folder separator
+          !path.includes('\\') && // Not a Windows-style path
+          !fs.existsSync(path)); // Not an existing local file
 }
 
 /**
@@ -253,9 +261,35 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
     let fileBuffer: Buffer;
     
     if (url.startsWith('gs://')) {
-      // If using direct GCS integration, we would use the Google Cloud Storage SDK
-      // For now, we'll throw an error suggesting to use signed URLs instead
-      throw new Error('Direct GCS URL downloads not implemented. Use HTTP/HTTPS signed URLs from GCS instead.');
+      // For direct GCS URLs, we need to use the Google Cloud Storage SDK
+      try {
+        // Import the GCS client only when needed
+        const { getBucket, bucketName } = require('./gcs-client');
+        
+        // Parse the GCS URL (format: gs://bucket-name/path/to/file)
+        const gcsPath = url.replace('gs://', '');
+        const [bucketFromUrl, ...objectPathParts] = gcsPath.split('/');
+        const objectPath = objectPathParts.join('/');
+        
+        // Determine which bucket to use (from URL or default)
+        const targetBucket = bucketFromUrl || bucketName;
+        
+        // Get the bucket and file objects
+        const bucket = getBucket(targetBucket);
+        const file = bucket.file(objectPath);
+        
+        // Download the file to a buffer
+        const [fileData] = await file.download();
+        fileBuffer = fileData;
+        
+        // Write to temp file for operations that need a file path
+        await writeFileAsync(localPath, fileBuffer);
+        
+        console.log(`[GCS] Successfully downloaded file from: ${url}`);
+      } catch (gcsError) {
+        console.error('[GCS] Error downloading from GCS:', gcsError);
+        throw new Error(`Failed to download file from GCS: ${gcsError instanceof Error ? gcsError.message : String(gcsError)}`);
+      }
     } else {
       // Standard HTTP/HTTPS URLs (including GCS signed URLs)
       const response = await fetch(url);
