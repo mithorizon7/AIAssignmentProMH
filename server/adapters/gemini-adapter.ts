@@ -121,7 +121,7 @@ export class GeminiAdapter implements AIAdapter {
     this.genAI = new GoogleGenAI(apiKey);
     
     // Use a generally available model that supports multimodal
-    this.modelName = "gemini-2.5-flash-preview-04-17";
+    this.modelName = "gemini-pro-vision";
     
     console.log(`[GEMINI] Initializing with model: ${this.modelName}`);
   }
