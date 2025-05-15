@@ -425,7 +425,7 @@ export class GeminiAdapter implements AIAdapter {
           console.log(`[GEMINI] Retrying without problematic media format`);
           
           // Filter to only keep text parts
-          const textOnlyParts = apiParts.filter(part => 'text' in part);
+          const textOnlyParts: Part[] = apiParts.filter(part => 'text' in part);
           
           // Add a placeholder message about the image
           textOnlyParts.push({ 

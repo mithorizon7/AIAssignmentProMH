@@ -22,9 +22,9 @@ if (!process.env.GEMINI_API_KEY) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Test file paths
-const TEST_IMAGE_FILE = path.resolve('./attached_assets/Screenshot 2025-05-15 at 11.08.05 AM.png');
-const TEST_TEXT_FILE = path.resolve('./test_submission.txt');
+// Test file paths - use full path
+const TEST_IMAGE_FILE = '/home/runner/workspace/attached_assets/Screenshot 2025-05-15 at 2.00.26 PM.png';
+const TEST_TEXT_FILE = '/home/runner/workspace/test_submission.txt';
 
 async function main() {
   try {
@@ -59,8 +59,8 @@ async function main() {
     const __dirname = path.dirname(__filename);
     
     // Test file paths (same as in the parent script)
-    const TEST_IMAGE_FILE = '${TEST_IMAGE_FILE}';
-    const TEST_TEXT_FILE = '${TEST_TEXT_FILE}';
+    const TEST_IMAGE_FILE = '/home/runner/workspace/attached_assets/Screenshot 2025-05-15 at 2.00.26 PM.png';
+    const TEST_TEXT_FILE = '/home/runner/workspace/test_submission.txt';
     
     /**
      * Test multimodal content processing with Gemini
@@ -123,11 +123,13 @@ async function main() {
         const result = await genAI.models.generateContent({
           model: MODEL_NAME,
           contents: [{ role: 'user', parts: contentParts }],
-          temperature: 0.2,
-          topP: 0.8,
-          maxOutputTokens: 1024,
-          responseMimeType: "application/json",
-          responseSchema: responseSchema
+          generationConfig: {
+            temperature: 0.2,
+            topP: 0.8,
+            maxOutputTokens: 1024,
+            responseMimeType: "application/json",
+            responseSchema: responseSchema
+          }
         });
         const endTime = Date.now();
         
