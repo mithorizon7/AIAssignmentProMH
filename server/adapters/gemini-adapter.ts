@@ -143,11 +143,10 @@ export class GeminiAdapter implements AIAdapter {
     
     this.generativeAI = new GoogleGenerativeAI(apiKey);
     
-    // Using the newest model as specified from Google's latest documentation
-    // "gemini-2.5-flash-preview-0514" is the latest model as of May 2025
-    // This model has enhanced support for text, images, video, audio, and document inputs
-    // Note: This model name is different from the older "gemini-2.5-flash-preview-04-17"
-    this.modelName = "gemini-2.5-flash-preview-0514";
+    // Using a supported model from Google's documentation
+    // Update with the correct available model name
+    // The futuristic model name "gemini-2.5-flash-preview-0514" is not actually available
+    this.modelName = "gemini-pro-vision";
     
     console.log(`[GEMINI] Initializing with model: ${this.modelName}`);
     
