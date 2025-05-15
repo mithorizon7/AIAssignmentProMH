@@ -1,28 +1,4 @@
-/**
- * Test script for the new Gemini adapter implementation
- */
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import path from 'path';
-import { exec } from 'child_process';
-import fs from 'fs';
 
-// Load environment variables
-dotenv.config();
-
-// Only run this if we have the API key
-if (!process.env.GEMINI_API_KEY) {
-  console.error("ERROR: Missing GEMINI_API_KEY in environment variables");
-  process.exit(1);
-}
-
-async function main() {
-  try {
-    console.log("Testing new Gemini adapter implementation...");
-    
-    // Create a temporary wrapper that runs a broader test with both text and multimodal
-    const tempFile = path.resolve('./temp-adapter-test.mjs');
-    const wrapperCode = `
     import { GoogleGenAI } from '@google/genai';
     import * as dotenv from 'dotenv';
     import fs from 'fs';
@@ -70,7 +46,7 @@ async function main() {
         };
         
         // 1. Test text-only prompt
-        console.log("\\nTEST 1: Text-only prompt with JSON response format");
+        console.log("\nTEST 1: Text-only prompt with JSON response format");
         console.log("Generating content with model:", MODEL_NAME);
         
         const textResult = await genAI.models.generateContent({
@@ -87,12 +63,12 @@ async function main() {
         // Process result
         if (textResult.candidates && textResult.candidates.length > 0) {
           const text = textResult.candidates[0].content.parts[0].text;
-          console.log("\\nPreview of text response:", text.substring(0, 150) + "...");
+          console.log("\nPreview of text response:", text.substring(0, 150) + "...");
           
           // Try to parse as JSON
           try {
             const parsedJson = JSON.parse(text);
-            console.log("\\nSuccessfully parsed JSON:", Object.keys(parsedJson).join(", "));
+            console.log("\nSuccessfully parsed JSON:", Object.keys(parsedJson).join(", "));
             console.log("Strengths count:", parsedJson.strengths?.length || 0);
             console.log("Improvements count:", parsedJson.improvements?.length || 0);
           } catch (e) {
@@ -100,10 +76,10 @@ async function main() {
             console.log("Raw text:", text.substring(0, 300) + "...");
           }
           
-          console.log("\\nToken usage:", textResult.usageMetadata?.totalTokenCount || "unknown");
+          console.log("\nToken usage:", textResult.usageMetadata?.totalTokenCount || "unknown");
           
           // Test passed for text generation
-          console.log("\\n✅ Text prompt test passed");
+          console.log("\n✅ Text prompt test passed");
         } else {
           console.error("No response candidates found for text prompt");
           return false;
@@ -120,49 +96,14 @@ async function main() {
     // Run the test
     testAdapter().then(success => {
       if (success) {
-        console.log("\\n✅ All adapter tests passed");
+        console.log("\n✅ All adapter tests passed");
         process.exit(0);
       } else {
-        console.error("\\n❌ Adapter tests failed");
+        console.error("\n❌ Adapter tests failed");
         process.exit(1);
       }
     }).catch(error => {
-      console.error("\\n❌ Unhandled error:", error);
+      console.error("\n❌ Unhandled error:", error);
       process.exit(1);
     });
-    `;
     
-    fs.writeFileSync(tempFile, wrapperCode);
-    
-    console.log("Running adapter tests with node...");
-    return new Promise((resolve, reject) => {
-      exec(`node ${tempFile}`, (error, stdout, stderr) => {
-        console.log(stdout);
-        if (stderr) {
-          console.error(stderr);
-        }
-        
-        // Clean up the temp file
-        fs.unlinkSync(tempFile);
-        
-        if (error) {
-          console.error("Tests failed with exit code:", error.code);
-          reject(error);
-        } else {
-          console.log("Tests completed successfully");
-          resolve(true);
-        }
-      });
-    });
-  } catch (error) {
-    console.error("Error running tests:", error.message);
-    return false;
-  }
-}
-
-main().then(result => {
-  process.exit(result ? 0 : 1);
-}).catch(error => {
-  console.error("Unhandled error:", error);
-  process.exit(1);
-});

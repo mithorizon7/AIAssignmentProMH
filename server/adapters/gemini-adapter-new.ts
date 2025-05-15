@@ -71,6 +71,123 @@ export class GeminiAdapter implements AIAdapter {
   };
   
   /**
+   * Attempt to extract structured feedback from unstructured text
+   * This is a fallback method when JSON parsing fails
+   */
+  private extractStructuredFeedback(text: string): any {
+    console.log(`[GEMINI] Attempting to extract structured feedback from text`);
+    
+    // Default structure
+    const result: any = {
+      strengths: [],
+      improvements: [],
+      suggestions: [],
+      summary: "",
+      score: 0,
+      criteriaScores: []
+    };
+    
+    try {
+      // First try to find JSON objects using regex
+      const jsonObjectRegex = /\{[\s\S]*?\}/g;
+      const potentialJsons = text.match(jsonObjectRegex);
+      
+      if (potentialJsons && potentialJsons.length > 0) {
+        for (const jsonString of potentialJsons) {
+          try {
+            // Try to parse each potential JSON string
+            const parsed = JSON.parse(jsonString);
+            
+            // If we find one with the right structure, use it
+            if (parsed.strengths || parsed.score || parsed.summary) {
+              console.log(`[GEMINI] Found valid JSON structure in text`);
+              return parsed;
+            }
+          } catch (error) {
+            // Continue with the next potential JSON
+            continue;
+          }
+        }
+      }
+      
+      // If JSON objects aren't found or valid, try to extract sections
+      
+      // Extract strengths section
+      const strengthsMatch = text.match(/(?:Strengths|STRENGTHS|Strengths:)[\s\S]*?(?=Improvements|IMPROVEMENTS|Suggestions|SUGGESTIONS|Summary|SUMMARY|$)/i);
+      if (strengthsMatch) {
+        const strengthsText = strengthsMatch[0];
+        const items = strengthsText.match(/(?:^|\n)[*•-]\s*(.*?)(?=\n[*•-]|\n\n|$)/g);
+        
+        if (items) {
+          result.strengths = items.map(item => item.replace(/^[*•-\s\n]+/, '').trim());
+        }
+      }
+      
+      // Extract improvements section
+      const improvementsMatch = text.match(/(?:Improvements|IMPROVEMENTS|Improvements:)[\s\S]*?(?=Suggestions|SUGGESTIONS|Summary|SUMMARY|$)/i);
+      if (improvementsMatch) {
+        const improvementsText = improvementsMatch[0];
+        const items = improvementsText.match(/(?:^|\n)[*•-]\s*(.*?)(?=\n[*•-]|\n\n|$)/g);
+        
+        if (items) {
+          result.improvements = items.map(item => item.replace(/^[*•-\s\n]+/, '').trim());
+        }
+      }
+      
+      // Extract suggestions section
+      const suggestionsMatch = text.match(/(?:Suggestions|SUGGESTIONS|Suggestions:)[\s\S]*?(?=Summary|SUMMARY|$)/i);
+      if (suggestionsMatch) {
+        const suggestionsText = suggestionsMatch[0];
+        const items = suggestionsText.match(/(?:^|\n)[*•-]\s*(.*?)(?=\n[*•-]|\n\n|$)/g);
+        
+        if (items) {
+          result.suggestions = items.map(item => item.replace(/^[*•-\s\n]+/, '').trim());
+        }
+      }
+      
+      // Extract summary
+      const summaryMatch = text.match(/(?:Summary|SUMMARY|Summary:)\s*([\s\S]*?)(?=\n\n|$)/i);
+      if (summaryMatch && summaryMatch[1]) {
+        result.summary = summaryMatch[1].trim();
+      } else {
+        // If no summary section found, use the first paragraph as summary
+        const firstParagraph = text.split('\n\n')[0];
+        if (firstParagraph && firstParagraph.length > 10) {
+          result.summary = firstParagraph.trim();
+        }
+      }
+      
+      // Extract score - look for numeric values
+      const scoreMatch = text.match(/(?:Score|SCORE|Score:)\s*([0-9.]+)/i);
+      if (scoreMatch && scoreMatch[1]) {
+        result.score = parseFloat(scoreMatch[1]);
+      }
+      
+      // Fill in missing sections if needed
+      if (result.strengths.length === 0 && result.improvements.length === 0) {
+        console.log(`[GEMINI] No structured sections found, using fallback parsing`);
+        
+        // Look for bullet points anywhere in the text
+        const bulletPoints = text.match(/(?:^|\n)[*•-]\s*(.*?)(?=\n[*•-]|\n\n|$)/g);
+        if (bulletPoints && bulletPoints.length > 0) {
+          const cleanPoints = bulletPoints.map(item => item.replace(/^[*•-\s\n]+/, '').trim());
+          
+          // Split points between strengths and improvements
+          const midpoint = Math.ceil(cleanPoints.length / 2);
+          result.strengths = cleanPoints.slice(0, midpoint);
+          result.improvements = cleanPoints.slice(midpoint);
+        }
+      }
+      
+      console.log(`[GEMINI] Extracted ${result.strengths.length} strengths, ${result.improvements.length} improvements, and ${result.suggestions.length} suggestions`);
+      return result;
+    } catch (error) {
+      console.error(`[GEMINI] Error extracting structured feedback:`, error instanceof Error ? error.message : String(error));
+      return result; // Return the default structure
+    }
+  };
+  
+  /**
    * Standard text completion
    */
   async generateCompletion(prompt: string) {
@@ -144,26 +261,14 @@ export class GeminiAdapter implements AIAdapter {
           } catch (error) {
             console.warn(`[GEMINI] Failed to parse JSON from markdown block: ${error instanceof Error ? error.message : String(error)}`);
             
-            // Fallback to default values
-            parsedContent = {
-              strengths: [],
-              improvements: [],
-              suggestions: [],
-              summary: "Failed to parse AI response.",
-              score: 0
-            };
-            console.log(`[GEMINI] Using default values due to parsing failure`);
+            // Use our structured feedback extractor
+            console.log(`[GEMINI] Attempting structured feedback extraction`);
+            parsedContent = this.extractStructuredFeedback(text);
           }
         } else {
-          // No markdown block found, use default
-          parsedContent = {
-            strengths: [],
-            improvements: [],
-            suggestions: [],
-            summary: "Failed to parse AI response.",
-            score: 0
-          };
-          console.log(`[GEMINI] Using default values (no JSON found)`);
+          // No markdown block found, try structured extraction
+          console.log(`[GEMINI] No JSON code blocks found, trying structured extraction`);
+          parsedContent = this.extractStructuredFeedback(text);
         }
       }
       
@@ -378,26 +483,14 @@ export class GeminiAdapter implements AIAdapter {
           } catch (error) {
             console.warn(`[GEMINI] Failed to parse JSON from markdown block: ${error instanceof Error ? error.message : String(error)}`);
             
-            // Fallback to default values
-            parsedContent = {
-              strengths: [],
-              improvements: [],
-              suggestions: [],
-              summary: "Failed to parse AI response.",
-              score: 0
-            };
-            console.log(`[GEMINI] Using default values due to parsing failure`);
+            // Use our structured feedback extractor
+            console.log(`[GEMINI] Attempting structured feedback extraction (multimodal)`);
+            parsedContent = this.extractStructuredFeedback(text);
           }
         } else {
-          // No markdown block found, use default
-          parsedContent = {
-            strengths: [],
-            improvements: [],
-            suggestions: [],
-            summary: "Failed to parse AI response.",
-            score: 0
-          };
-          console.log(`[GEMINI] Using default values (no JSON found)`);
+          // No markdown block found, try structured extraction
+          console.log(`[GEMINI] No JSON code blocks found, trying structured extraction (multimodal)`);
+          parsedContent = this.extractStructuredFeedback(text);
         }
       }
       
