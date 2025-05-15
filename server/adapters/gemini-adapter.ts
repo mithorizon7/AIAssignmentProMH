@@ -1,13 +1,10 @@
 import { 
-  GoogleGenerativeAI, 
-  GenerativeModel, 
-  Content, 
-  Part, 
-  FileData,
+  GoogleGenAI, 
   HarmCategory,
   HarmBlockThreshold,
-  GenerationConfig
-} from '@google/generative-ai';
+  FileState,
+  DeleteFileResponse
+} from '@google/genai';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
@@ -159,9 +156,10 @@ export class GeminiAdapter implements AIAdapter {
         
         // These settings help with structured assessment output format
         topP: 0.95,
-        topK: 64
+        topK: 64,
         
-        // Note: responseFormat removed as it's not supported in the current Gemini API version
+        // Specify JSON response format (supported in new @google/genai SDK)
+        responseMimeType: "application/json"
       }
       // Safety settings removed temporarily to debug API issues
     });
