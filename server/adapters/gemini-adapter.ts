@@ -523,10 +523,50 @@ export class GeminiAdapter implements AIAdapter {
       try {
         // Log the raw text in development for debugging
         console.log(`[GEMINI] Attempting to parse direct structured response`);
-        console.log(`[GEMINI] Response preview for debugging: ${text.substring(0, 100)}`);
         
-        parsedContent = JSON.parse(text);
-        console.log(`[GEMINI] Successfully parsed direct JSON response for multimodal content`);
+        // Limit the logged text to prevent console flooding
+        const logPreview = text.length > 200 ? 
+          `${text.substring(0, 100)}...${text.substring(text.length - 100)}` : 
+          text;
+        console.log(`[GEMINI] Response preview for debugging: ${logPreview}`);
+        
+        // First try to repair any truncated JSON before parsing
+        let jsonToUse = text;
+        
+        // Check if the JSON string appears to be truncated
+        const lastChar = text.trim().slice(-1);
+        if (lastChar !== '}' && lastChar !== ']' && text.includes('{')) {
+          console.log('[GEMINI] Response appears to be truncated JSON, attempting repair');
+          
+          // Extract just the valid JSON portion if possible
+          const firstBrace = text.indexOf('{');
+          if (firstBrace !== -1) {
+            // Find the last balanced closing brace
+            let openBraces = 0;
+            let lastBalancedIndex = -1;
+            
+            for (let i = firstBrace; i < text.length; i++) {
+              if (text[i] === '{') openBraces++;
+              else if (text[i] === '}') {
+                openBraces--;
+                if (openBraces === 0) lastBalancedIndex = i;
+              }
+            }
+            
+            if (lastBalancedIndex !== -1) {
+              jsonToUse = text.substring(firstBrace, lastBalancedIndex + 1);
+              console.log(`[GEMINI] Extracted balanced JSON object from position ${firstBrace} to ${lastBalancedIndex}`);
+            } else {
+              // Simple completion approach for unbalanced JSON
+              jsonToUse = text.substring(firstBrace) + '}';
+              console.log('[GEMINI] Added closing brace to truncated JSON');
+            }
+          }
+        }
+        
+        // Attempt to parse the potentially repaired JSON
+        parsedContent = JSON.parse(jsonToUse);
+        console.log(`[GEMINI] Successfully parsed JSON response for multimodal content`);
       } catch (error) {
         console.warn(`[GEMINI] Failed to parse direct response: ${error instanceof Error ? error.message : String(error)}`);
         console.log(`[GEMINI] Falling back to manual parsing for multimodal content`);
