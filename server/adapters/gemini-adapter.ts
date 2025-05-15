@@ -111,10 +111,9 @@ export class GeminiAdapter implements AIAdapter {
     
     this.generativeAI = new GoogleGenerativeAI(apiKey);
     
-    // Update to use the latest model that supports all features
-    // The newest model is "gemini-1.0-pro-vision" for vision/image analysis
-    // "gemini-2.5-flash-preview-04-17" might not have full vision support
-    this.modelName = "gemini-1.0-pro-vision"; 
+    // Using the newest model as specified
+    // "gemini-2.5-flash-preview-04-17" is the latest model that supports text, images, video, and audio inputs
+    this.modelName = "gemini-2.5-flash-preview-04-17";
     
     console.log(`[GEMINI] Initializing with model: ${this.modelName}`);
     
@@ -122,7 +121,10 @@ export class GeminiAdapter implements AIAdapter {
       model: this.modelName,
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 8192
+        maxOutputTokens: 8192,
+        // These settings help with structured output for our assessment format
+        topP: 0.95,
+        topK: 64
       }
     });
   }
@@ -191,33 +193,47 @@ export class GeminiAdapter implements AIAdapter {
    */
   private async createFileData(content: Buffer, mimeType: string): Promise<GeminiFileData> {
     try {
-      console.log(`[GEMINI] Creating file data for image of size ${content.length} bytes with MIME type: ${mimeType}`);
+      console.log(`[GEMINI] Creating file data for file of size ${content.length} bytes with MIME type: ${mimeType}`);
       
-      // List out available methods on the generativeAI instance for debugging
-      const availableMethods = Object.keys(this.generativeAI).filter(
-        key => typeof (this.generativeAI as any)[key] === 'function'
-      );
-      console.log(`[GEMINI] Available methods on generativeAI instance: ${availableMethods.join(', ')}`);
+      // Check if the content appears to be valid
+      if (content.length === 0) {
+        throw new Error('Empty file content provided to createFileData');
+      }
       
-      // Primary path: Upload file to Gemini File API using proper method
-      // First check if the GenerativeAI instance has the createFile method (latest API version)
+      // For the latest Gemini API version (2.5 models), the File API method is exposed directly on the model
+      // See: https://ai.google.dev/gemini-api/docs/files
+      if (this.model && typeof (this.model as any).createFile === 'function') {
+        console.log(`[GEMINI] Using model.createFile method (recommended for gemini-2.5-*)`);
+        try {
+          const fileData = await (this.model as any).createFile({
+            data: content,
+            mimeType
+          }) as GeminiFileData;
+          
+          console.log(`[GEMINI] Successfully created file using model.createFile, URI: ${this.getFileUri(fileData)}`);
+          return fileData;
+        } catch (modelCreateFileError) {
+          console.error(`[GEMINI] model.createFile method failed:`, modelCreateFileError);
+          // Fall through to try other methods
+        }
+      }
+      
+      // For older Gemini API versions, the createFile might be directly on the generativeAI instance
       if (this.generativeAI.createFile && typeof this.generativeAI.createFile === 'function') {
-        console.log(`[GEMINI] Using createFile method to upload to Gemini File API`);
+        console.log(`[GEMINI] Using generativeAI.createFile method`);
         try {
           const fileData = await this.generativeAI.createFile({
             data: content,
             mimeType
           }) as GeminiFileData;
           
-          console.log(`[GEMINI] Successfully uploaded file to Gemini File API, fileData:`, fileData);
+          const fileUri = this.getFileUri(fileData);
+          console.log(`[GEMINI] Successfully uploaded file to Gemini File API, fileUri: ${fileUri}`);
           return fileData;
         } catch (createFileError) {
-          console.error(`[GEMINI] createFile method failed:`, createFileError);
-          // Don't throw yet, try the next method
-          throw createFileError;
+          console.error(`[GEMINI] generativeAI.createFile method failed:`, createFileError);
+          // Try next method
         }
-      } else {
-        console.log(`[GEMINI] createFile method not available, trying alternatives`);
       }
       
       // Try alternative method: createBlob for older API versions
@@ -229,40 +245,51 @@ export class GeminiAdapter implements AIAdapter {
             mimeType
           }) as GeminiFileData;
           
-          console.log(`[GEMINI] Successfully uploaded file to Gemini File API (using createBlob), fileData:`, fileData);
+          console.log(`[GEMINI] Successfully uploaded file using createBlob, fileUri: ${this.getFileUri(fileData)}`);
           return fileData;
         } catch (createBlobError) {
           console.error(`[GEMINI] createBlob method failed:`, createBlobError);
-          // Don't throw yet, try the next fallback
-          throw createBlobError;
         }
-      } else {
-        console.log(`[GEMINI] createBlob method not available, trying alternatives`);
       }
       
-      // If we reach here, File API methods are not available
-      console.error('[GEMINI] No Gemini File API methods (createFile/createBlob) are available! Using inline data for images instead.');
+      // Final attempt: check if the model itself has a file method (some newer API versions)
+      const modelMethods = Object.keys(this.model).filter(
+        key => typeof (this.model as any)[key] === 'function'
+      );
+      console.log(`[GEMINI] Available methods on model instance: ${modelMethods.join(', ')}`);
       
-      // For small images (< 4MB), we can use inlineData directly instead of throwing an error
+      // If File API methods are not available, log detailed debugging information
+      console.error('[GEMINI] All Gemini File API methods failed. File Handling Debug Info:', {
+        modelName: this.modelName,
+        contentSize: content.length,
+        mimeType,
+        modelMethods,
+        generativeAIMethods: Object.keys(this.generativeAI).filter(
+          key => typeof (this.generativeAI as any)[key] === 'function'
+        )
+      });
+      
+      // For small images (< 4MB), we can fallback to inlineData
       if (content.length < 4 * 1024 * 1024 && mimeType.startsWith('image/')) {
-        console.log(`[GEMINI] Image is small enough (${content.length} bytes) to use as inlineData`);
+        console.log(`[GEMINI] Image is small enough (${content.length} bytes) to fall back to inlineData`);
         
-        // Return a mock FileData object that will be handled properly by the calling code
+        // Return a mock FileData object indicating we should use inline data instead
         return {
           mimeType,
-          // This is just a placeholder - the calling code will actually use inline data
-          data: Buffer.from('INLINE_DATA_FALLBACK')
+          // This special flag tells our code to use inline data instead
+          useInlineData: true,
+          // Include the original data so it can be used directly
+          data: content
         } as unknown as GeminiFileData;
       }
       
-      throw new Error('Gemini File API methods (createFile/createBlob) not available and content too large for inline');
+      throw new Error(`Gemini File API methods unavailable for model ${this.modelName}. Content size: ${content.length} bytes, MIME type: ${mimeType}`);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('[GEMINI] Error creating file with Gemini File API:', errorMessage);
       
-      // We don't want to directly use data URI as fileUri - it's not the intended use
-      // Instead we'll throw the error and let the calling code handle it based on content type
-      throw error instanceof Error ? error : new Error(String(error));
+      // Rethrow with more context
+      throw new Error(`Failed to create file with Gemini API: ${errorMessage}`);
     }
   }
   
@@ -279,34 +306,67 @@ export class GeminiAdapter implements AIAdapter {
     // Detect content category from MIME type
     const contentCategory = this.getContentCategoryFromMimeType(mimeType);
     
+    // Log detailed context about the failure for diagnostics
+    console.warn('[GEMINI] File upload failure handling - details:', {
+      contentCategory,
+      mimeType,
+      contentSize: content.length,
+      hasTextContent: !!textContent,
+      textContentLength: textContent?.length || 0,
+      model: this.modelName
+    });
+    
     // For images (only) that are small enough, we can fallback to inlineData
     if (contentCategory === 'image' && content.length < 4 * 1024 * 1024) { // 4MB limit for inline
-      console.warn('Falling back to inlineData for image after File API failure');
-      return {
-        inlineData: {
-          mimeType: mimeType,
-          data: content.toString('base64')
-        }
-      };
+      console.warn('[GEMINI] Falling back to inlineData for image after File API failure');
+      
+      // Validate the image buffer before using it as inline data
+      try {
+        this.validateImageBuffer(content, mimeType);
+        
+        // Convert buffer to base64 and validate
+        const base64Data = content.toString('base64');
+        this.validateBase64Image(base64Data, mimeType);
+        
+        // Log successful validation
+        console.log(`[GEMINI] Image validation successful, using as inlineData (${base64Data.length} base64 chars)`);
+        
+        return {
+          inlineData: {
+            mimeType: mimeType,
+            data: base64Data
+          }
+        };
+      } catch (validationError) {
+        console.error('[GEMINI] Image validation failed:', validationError);
+        return { text: `[Image validation failed: ${validationError instanceof Error ? validationError.message : String(validationError)}]` };
+      }
     }
     
     // For text-based documents, fall back to text content
     if (contentCategory === 'document' && 
         ['text/plain', 'text/csv', 'text/html', 'text/markdown', 'application/json'].includes(mimeType)) {
-      console.warn('Falling back to text content for document after File API failure');
-      return { text: content.toString('utf8') };
+      console.warn('[GEMINI] Falling back to text content for document after File API failure');
+      try {
+        const textData = content.toString('utf8');
+        return { text: textData };
+      } catch (textError) {
+        console.error('[GEMINI] Error converting document to text:', textError);
+        return { text: `[Document conversion failed: ${textError instanceof Error ? textError.message : String(textError)}]` };
+      }
     }
     
     // For all other file types, if we have extracted text, use that
-    if (textContent) {
-      console.warn(`Using extracted text content for ${mimeType} after File API failure`);
+    if (textContent && textContent.trim().length > 0) {
+      console.warn(`[GEMINI] Using extracted text content for ${mimeType} after File API failure`);
       return { text: textContent };
     }
     
-    // Last resort - just inform that the content couldn't be processed
-    console.error(`Unable to process ${mimeType} file after File API failure`);
+    // Last resort - create a detailed error message with context to help diagnose the issue
+    console.error(`[GEMINI] No fallback available for content type ${contentCategory} with MIME type ${mimeType}`);
+    
     return { 
-      text: `[CONTENT UNAVAILABLE: ${mimeType} file could not be processed. File API error.]` 
+      text: `[The AI system encountered difficulty processing this specific file type (${mimeType}). Try uploading in a different format or contact support if this persists.]` 
     };
   }
   
