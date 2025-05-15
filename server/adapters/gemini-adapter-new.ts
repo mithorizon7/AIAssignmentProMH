@@ -220,11 +220,6 @@ export class GeminiAdapter implements AIAdapter {
       // Prepare content parts in the format expected by the API
       const apiParts: any[] = [];
       
-      // Add system prompt as first text part if provided
-      if (systemPrompt) {
-        apiParts.push({ text: `${systemPrompt}\n\n` });
-      }
-      
       // Content type conversion for debugging
       const contentSummary = parts.map(part => {
         if (part.type === 'text') {
@@ -239,21 +234,45 @@ export class GeminiAdapter implements AIAdapter {
         }
       });
       
-      // Process each part by type
+      console.log(`[GEMINI] Content parts summary:`, contentSummary);
+      
+      // Process parts to match the expected API format
       for (const part of parts) {
+        // Text content handling
         if (part.type === 'text' && typeof part.content === 'string') {
           apiParts.push({ text: part.content });
-        } else if (part.content instanceof Buffer && part.mimeType) {
+          continue;
+        }
+        
+        // Buffer data handling (images, etc.)
+        if (part.content instanceof Buffer && part.mimeType) {
+          // Skip unsupported mime types (like SVG)
+          if (part.mimeType === 'image/svg+xml') {
+            console.warn(`[GEMINI] Skipping unsupported MIME type: ${part.mimeType}`);
+            apiParts.push({ text: "Image format not supported (SVG). Please use PNG or JPEG." });
+            continue;
+          }
+          
           // Convert Buffer to base64 for the API
           const base64Data = part.content.toString('base64');
           
+          // Use inlineData format for API
           apiParts.push({
             inlineData: {
               data: base64Data,
               mimeType: part.mimeType
             }
           });
+          
+          console.log(`[GEMINI] Added ${part.mimeType} data of size ${Math.round(part.content.length / 1024)}KB`);
         }
+      }
+      
+      // Add system prompt as text part - needs to go after other parts for proper context
+      if (systemPrompt) {
+        // Prepend the system prompt for proper instruction order
+        apiParts.unshift({ text: `${systemPrompt}` });
+        console.log(`[GEMINI] Added system prompt (${systemPrompt.length} chars)`);
       }
       
       // Generation config parameters
@@ -274,10 +293,44 @@ export class GeminiAdapter implements AIAdapter {
         responseSchema: this.responseSchema
       };
       
-      console.log(`[GEMINI] Content parts summary:`, contentSummary);
+      console.log(`[GEMINI] Making API request to model: ${this.modelName}`);
+      console.log(`[GEMINI] Request has ${apiParts.length} content parts`);
       
-      // Generate content with the correct API method from SDK
-      const result = await this.genAI.models.generateContent(requestParams);
+      // Generate content with the model
+      let result: GenerateContentResponse;
+      try {
+        result = await this.genAI.models.generateContent(requestParams);
+        console.log(`[GEMINI] API request successful`);
+      } catch (apiError) {
+        // Log detailed error info for debugging
+        console.error(`[GEMINI] API request failed:`, apiError instanceof Error ? apiError.message : String(apiError));
+        if (apiError instanceof Error && apiError.stack) {
+          console.error(`[GEMINI] Error stack:`, apiError.stack);
+        }
+        
+        // Check for common errors like format issues
+        const errorMsg = apiError instanceof Error ? apiError.message : String(apiError);
+        
+        if (errorMsg.includes('MIME type') || errorMsg.includes('format')) {
+          // Try again without the image if there was a format error
+          console.log(`[GEMINI] Retrying without problematic media format`);
+          
+          // Filter to only keep text parts
+          const textOnlyParts = apiParts.filter(part => 'text' in part);
+          
+          // Add a placeholder message about the image
+          textOnlyParts.push({ 
+            text: "Note: An image was included but could not be processed due to format limitations." 
+          });
+          
+          // Retry with text-only
+          requestParams.contents = [{ role: 'user', parts: textOnlyParts }];
+          result = await this.genAI.models.generateContent(requestParams);
+        } else {
+          // If not a recoverable error, rethrow
+          throw apiError;
+        }
+      }
       
       console.log(`[GEMINI] Successfully received response from Gemini API`);
       
