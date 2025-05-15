@@ -101,10 +101,31 @@ export default function InstructorDashboard() {
   }
 
   const { data: stats = {} as Stats, isLoading: statsLoading } = useQuery<Stats>({
-    queryKey: [
-      `${API_ROUTES.ASSIGNMENTS}/stats`,
-      { courseId: selectedCourse, assignmentId: selectedAssignment }
-    ],
+    queryKey: [`${API_ROUTES.ASSIGNMENTS}/stats`],
+    queryFn: async () => {
+      // Build URL with query parameters properly
+      let url = `${API_ROUTES.ASSIGNMENTS}/stats`;
+      const params = new URLSearchParams();
+      
+      if (selectedCourse) {
+        params.append('courseId', selectedCourse);
+      }
+      
+      if (selectedAssignment) {
+        params.append('assignmentId', selectedAssignment);
+      }
+      
+      // Only add the query string if we have parameters
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Failed to fetch stats');
+      }
+      return response.json();
+    },
     enabled: activeTab === "overview" && (!!selectedCourse || !!selectedAssignment),
   });
   
