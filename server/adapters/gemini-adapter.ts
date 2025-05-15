@@ -78,6 +78,39 @@ export class GeminiAdapter implements AIAdapter {
   private model: any; // Using any temporarily since types differ 
   private modelName: string;
 
+  // Define response schema structure once for reuse
+  private responseSchema = {
+    type: "object",
+    properties: {
+      strengths: {
+        type: "array",
+        items: { type: "string" }
+      },
+      improvements: {
+        type: "array",
+        items: { type: "string" }
+      },
+      suggestions: {
+        type: "array",
+        items: { type: "string" }
+      },
+      summary: { type: "string" },
+      score: { type: "number" },
+      criteriaScores: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            criteriaId: { type: "number" },
+            score: { type: "number" },
+            feedback: { type: "string" }
+          }
+        }
+      }
+    },
+    required: ["strengths", "improvements", "suggestions", "summary", "score"]
+  };
+
   constructor() {
     // Check for API key
     const apiKey = process.env.GEMINI_API_KEY;
@@ -92,7 +125,7 @@ export class GeminiAdapter implements AIAdapter {
     
     console.log(`[GEMINI] Initializing with model: ${this.modelName}`);
     
-    // Get the model with our default configuration
+    // Get the model with our default configuration including responseSchema
     this.model = this.genAI.getGenerativeModel({ 
       model: this.modelName,
       generationConfig: {
@@ -100,7 +133,8 @@ export class GeminiAdapter implements AIAdapter {
         maxOutputTokens: 8192,
         topP: 0.95,
         topK: 64,
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        responseSchema: this.responseSchema
       }
     });
   }
@@ -165,13 +199,14 @@ export class GeminiAdapter implements AIAdapter {
    */
   async generateCompletion(prompt: string) {
     try {
-      // Configure for consistent JSON responses
+      // Configure for consistent JSON responses with schema validation
       const genConfig = {
         temperature: 0.7,
         maxOutputTokens: 2048,
         topP: 0.95,
         topK: 64,
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        responseSchema: this.responseSchema
       };
       
       console.log(`[GEMINI] Sending text completion request with responseMimeType: application/json`);
@@ -193,32 +228,89 @@ export class GeminiAdapter implements AIAdapter {
       console.log(`[GEMINI] Response received, length: ${text.length} characters`);
       console.log(`[GEMINI] Response preview: ${text.substring(0, Math.min(100, text.length))}...`);
       
-      // Parse JSON response with multiple fallback strategies
+      // Use responseSchema parsed property if available, with fallbacks
       let parsedContent: ParsedContent = {};
-      try {
-        // Try direct JSON parsing first
-        parsedContent = JSON.parse(text);
-        console.log(`[GEMINI] Successfully parsed direct JSON response`);
-      } catch (error) {
-        console.warn(`[GEMINI] Direct JSON parsing failed: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // First, check if the SDK parsed the response according to our schema
+      if (response.candidates && 
+          response.candidates[0] && 
+          response.candidates[0].parsed) {
+        // With responseSchema, we should have a parsed property
+        try {
+          parsedContent = response.candidates[0].parsed as ParsedContent;
+          console.log(`[GEMINI] Successfully used SDK-parsed response`);
+        } catch (error) {
+          console.warn(`[GEMINI] Error accessing parsed response: ${error instanceof Error ? error.message : String(error)}`);
+          // Continue to fallbacks
+        }
+      } else {
+        console.log(`[GEMINI] No parsed response available from SDK, falling back to manual parsing`);
+      }
+      
+      // If parsed content is empty or missing required fields, fall back to manual parsing
+      if (!parsedContent || 
+          !parsedContent.strengths || 
+          !parsedContent.improvements || 
+          parsedContent.strengths.length === 0) {
+          
+        console.log(`[GEMINI] Parsed content missing required fields, trying direct JSON parsing`);
         
-        // Try to extract from markdown code block
-        const markdownMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (markdownMatch && markdownMatch[1]) {
-          try {
-            parsedContent = JSON.parse(markdownMatch[1]);
-            console.log(`[GEMINI] Successfully extracted JSON from markdown`);
-          } catch (mdError) {
-            console.warn(`[GEMINI] Markdown JSON extraction failed: ${mdError instanceof Error ? mdError.message : String(mdError)}`);
-            
-            // Try to find JSON-like content
+        try {
+          // Try direct JSON parsing first
+          parsedContent = JSON.parse(text);
+          console.log(`[GEMINI] Successfully parsed direct JSON response`);
+        } catch (error) {
+          console.warn(`[GEMINI] Direct JSON parsing failed: ${error instanceof Error ? error.message : String(error)}`);
+          
+          // Try to extract from markdown code block
+          const markdownMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+          if (markdownMatch && markdownMatch[1]) {
+            try {
+              parsedContent = JSON.parse(markdownMatch[1]);
+              console.log(`[GEMINI] Successfully extracted JSON from markdown`);
+            } catch (mdError) {
+              console.warn(`[GEMINI] Markdown JSON extraction failed: ${mdError instanceof Error ? mdError.message : String(mdError)}`);
+              
+              // Try to find JSON-like content
+              const jsonMatch = text.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                try {
+                  parsedContent = JSON.parse(jsonMatch[0]);
+                  console.log(`[GEMINI] Successfully extracted JSON pattern`);
+                } catch (jsonError) {
+                  console.warn(`[GEMINI] JSON pattern extraction failed`);
+                  
+                  // Manual extraction as last resort
+                  parsedContent = {
+                    strengths: extractListItems(text, "strengths"),
+                    improvements: extractListItems(text, "improvements"),
+                    suggestions: extractListItems(text, "suggestions"),
+                    summary: extractSummary(text),
+                    score: extractScore(text)
+                  };
+                  console.log(`[GEMINI] Using manually extracted content`);
+                }
+              } else {
+                // Fallback to manual extraction
+                parsedContent = {
+                  strengths: extractListItems(text, "strengths"),
+                  improvements: extractListItems(text, "improvements"),
+                  suggestions: extractListItems(text, "suggestions"),
+                  summary: extractSummary(text),
+                  score: extractScore(text)
+                };
+                console.log(`[GEMINI] Using manually extracted content (no JSON found)`);
+              }
+            }
+          } else {
+            // No markdown block found, try for raw JSON
             const jsonMatch = text.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
               try {
                 parsedContent = JSON.parse(jsonMatch[0]);
-                console.log(`[GEMINI] Successfully extracted JSON pattern`);
+                console.log(`[GEMINI] Successfully extracted raw JSON`);
               } catch (jsonError) {
-                console.warn(`[GEMINI] JSON pattern extraction failed`);
+                console.warn(`[GEMINI] Raw JSON extraction failed`);
                 
                 // Manual extraction as last resort
                 parsedContent = {
@@ -241,37 +333,6 @@ export class GeminiAdapter implements AIAdapter {
               };
               console.log(`[GEMINI] Using manually extracted content (no JSON found)`);
             }
-          }
-        } else {
-          // No markdown block found, try for raw JSON
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            try {
-              parsedContent = JSON.parse(jsonMatch[0]);
-              console.log(`[GEMINI] Successfully extracted raw JSON`);
-            } catch (jsonError) {
-              console.warn(`[GEMINI] Raw JSON extraction failed`);
-              
-              // Manual extraction as last resort
-              parsedContent = {
-                strengths: extractListItems(text, "strengths"),
-                improvements: extractListItems(text, "improvements"),
-                suggestions: extractListItems(text, "suggestions"),
-                summary: extractSummary(text),
-                score: extractScore(text)
-              };
-              console.log(`[GEMINI] Using manually extracted content`);
-            }
-          } else {
-            // Fallback to manual extraction
-            parsedContent = {
-              strengths: extractListItems(text, "strengths"),
-              improvements: extractListItems(text, "improvements"),
-              suggestions: extractListItems(text, "suggestions"),
-              summary: extractSummary(text),
-              score: extractScore(text)
-            };
-            console.log(`[GEMINI] Using manually extracted content (no JSON found)`);
           }
         }
       }
@@ -438,13 +499,14 @@ Please analyze the above submission and provide feedback in the following JSON f
 `
       });
       
-      // Configure with responseMimeType for JSON responses
+      // Configure with responseMimeType and responseSchema for structured JSON responses
       const genConfig = {
         temperature: 0.7,
         maxOutputTokens: 2048,
         topP: 0.95,
         topK: 64,
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        responseSchema: this.responseSchema
       };
       
       console.log(`[GEMINI] Using responseMimeType: application/json for ${this.modelName}`);
@@ -482,31 +544,86 @@ Please analyze the above submission and provide feedback in the following JSON f
       // Parse the response as JSON with fallbacks
       let parsedContent: ParsedContent = {};
       
-      console.log(`[GEMINI] Attempting to parse direct structured response`);
-      try {
-        parsedContent = JSON.parse(text);
-        console.log(`[GEMINI] Successfully parsed JSON response`);
-      } catch (parseError) {
-        console.warn(`[GEMINI] Failed to parse direct response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
-        
-        // Try to extract from markdown code block
-        const markdownMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (markdownMatch && markdownMatch[1]) {
-          try {
-            parsedContent = JSON.parse(markdownMatch[1]);
-            console.log(`[GEMINI] Successfully extracted JSON from markdown`);
-          } catch (mdError) {
-            console.warn(`[GEMINI] Markdown JSON extraction failed: ${mdError instanceof Error ? mdError.message : String(mdError)}`);
-            
-            // Try to find JSON-like content
+      // First, check if we have a parsed response from the SDK using our responseSchema
+      if (response.candidates && 
+          response.candidates[0] && 
+          response.candidates[0].parsed) {
+        // With responseSchema, we should have a parsed property
+        try {
+          parsedContent = response.candidates[0].parsed as ParsedContent;
+          console.log(`[GEMINI] Successfully used SDK-parsed response for multimodal content`);
+        } catch (error) {
+          console.warn(`[GEMINI] Error accessing parsed response for multimodal: ${error instanceof Error ? error.message : String(error)}`);
+          // Continue to fallbacks
+        }
+      } else {
+        console.log(`[GEMINI] No parsed response available from SDK for multimodal, falling back to manual parsing`);
+      }
+      
+      // If parsed content is empty or missing required fields, fall back to manual parsing
+      if (!parsedContent || 
+          !parsedContent.strengths || 
+          !parsedContent.improvements || 
+          parsedContent.strengths.length === 0) {
+      
+        console.log(`[GEMINI] Attempting to parse direct structured response`);
+        try {
+          parsedContent = JSON.parse(text);
+          console.log(`[GEMINI] Successfully parsed JSON response`);
+        } catch (parseError) {
+          console.warn(`[GEMINI] Failed to parse direct response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+          
+          // Try to extract from markdown code block
+          const markdownMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+          if (markdownMatch && markdownMatch[1]) {
+            try {
+              parsedContent = JSON.parse(markdownMatch[1]);
+              console.log(`[GEMINI] Successfully extracted JSON from markdown`);
+            } catch (mdError) {
+              console.warn(`[GEMINI] Markdown JSON extraction failed: ${mdError instanceof Error ? mdError.message : String(mdError)}`);
+              
+              // Try to find JSON-like content
+              const jsonMatch = text.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                try {
+                  const cleanedJson = cleanJsonString(jsonMatch[0]);
+                  parsedContent = JSON.parse(cleanedJson);
+                  console.log(`[GEMINI] Successfully extracted JSON pattern`);
+                } catch (jsonError) {
+                  console.warn(`[GEMINI] JSON pattern extraction failed`);
+                  
+                  // Manual extraction as last resort
+                  parsedContent = {
+                    strengths: extractListItems(text, "strengths"),
+                    improvements: extractListItems(text, "improvements"),
+                    suggestions: extractListItems(text, "suggestions"),
+                    summary: extractSummary(text),
+                    score: extractScore(text)
+                  };
+                  console.log(`[GEMINI] Using manually extracted content`);
+                }
+              } else {
+                // Fallback to manual extraction
+                parsedContent = {
+                  strengths: extractListItems(text, "strengths"),
+                  improvements: extractListItems(text, "improvements"),
+                  suggestions: extractListItems(text, "suggestions"),
+                  summary: extractSummary(text),
+                  score: extractScore(text)
+                };
+                console.log(`[GEMINI] Using manually extracted content (no JSON found)`);
+              }
+            }
+          } else {
+            // No markdown block found, try for raw JSON
             const jsonMatch = text.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
               try {
                 const cleanedJson = cleanJsonString(jsonMatch[0]);
                 parsedContent = JSON.parse(cleanedJson);
-                console.log(`[GEMINI] Successfully extracted JSON pattern`);
+                console.log(`[GEMINI] Successfully extracted raw JSON`);
               } catch (jsonError) {
-                console.warn(`[GEMINI] JSON pattern extraction failed`);
+                console.warn(`[GEMINI] Raw JSON extraction failed`);
                 
                 // Manual extraction as last resort
                 parsedContent = {
@@ -529,38 +646,6 @@ Please analyze the above submission and provide feedback in the following JSON f
               };
               console.log(`[GEMINI] Using manually extracted content (no JSON found)`);
             }
-          }
-        } else {
-          // No markdown block found, try for raw JSON
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            try {
-              const cleanedJson = cleanJsonString(jsonMatch[0]);
-              parsedContent = JSON.parse(cleanedJson);
-              console.log(`[GEMINI] Successfully extracted raw JSON`);
-            } catch (jsonError) {
-              console.warn(`[GEMINI] Raw JSON extraction failed`);
-              
-              // Manual extraction as last resort
-              parsedContent = {
-                strengths: extractListItems(text, "strengths"),
-                improvements: extractListItems(text, "improvements"),
-                suggestions: extractListItems(text, "suggestions"),
-                summary: extractSummary(text),
-                score: extractScore(text)
-              };
-              console.log(`[GEMINI] Using manually extracted content`);
-            }
-          } else {
-            // Fallback to manual extraction
-            parsedContent = {
-              strengths: extractListItems(text, "strengths"),
-              improvements: extractListItems(text, "improvements"),
-              suggestions: extractListItems(text, "suggestions"),
-              summary: extractSummary(text),
-              score: extractScore(text)
-            };
-            console.log(`[GEMINI] Using manually extracted content (no JSON found)`);
           }
         }
       }
