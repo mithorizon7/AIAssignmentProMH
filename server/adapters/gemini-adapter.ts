@@ -448,7 +448,7 @@ export class GeminiAdapter implements AIAdapter {
   /**
    * Standard text completion
    */
-  async generateCompletion(prompt: string) {
+  async generateCompletion(prompt: string, systemPrompt?: string) {
     try {
       console.log(`[GEMINI] Generating completion with prompt length: ${prompt.length} chars`);
       
@@ -468,9 +468,15 @@ export class GeminiAdapter implements AIAdapter {
           topK,
           maxOutputTokens,
           responseMimeType: "application/json",
-          responseSchema: this.responseSchema
+          responseSchema: this.responseSchema,
+          systemInstruction: systemPrompt ? { text: systemPrompt } : undefined
         }
       };
+      
+      // Log if system prompt was added
+      if (systemPrompt) {
+        console.log(`[GEMINI] Added system prompt as systemInstruction (${systemPrompt.length} chars)`);
+      }
       
       console.log(`[GEMINI] Sending request to Gemini API`);
       
@@ -501,12 +507,75 @@ export class GeminiAdapter implements AIAdapter {
       // Parse the response as JSON with fallbacks
       let parsedContent: any = {};
       
-      // Try to parse the text as JSON first
+      // Try to parse the text as JSON first (with advanced repair if needed)
       try {
-        parsedContent = JSON.parse(text);
-        console.log(`[GEMINI] Successfully parsed direct JSON response`);
+        // First attempt direct parse
+        let jsonToUse = text;
+        
+        try {
+          parsedContent = JSON.parse(jsonToUse);
+          console.log(`[GEMINI] Successfully parsed direct JSON response`);
+        } catch (jsonError) {
+          console.warn(`[GEMINI] Initial JSON parsing failed: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`);
+          console.log(`[GEMINI] Attempting to repair JSON response before parsing`);
+          
+          // Advanced JSON repair for truncated responses
+          if (jsonToUse.trim().startsWith('{') && !jsonToUse.trim().endsWith('}')) {
+            // Fix incomplete JSON - handle truncated responses
+            console.log(`[GEMINI] Detected potential truncated JSON, attempting repair`);
+            
+            // First, try simple unclosed brace fix
+            let fixedJson = jsonToUse;
+            
+            // Count open/close braces and brackets to match them
+            const openingBraces = (jsonToUse.match(/{/g) || []).length;
+            const closingBraces = (jsonToUse.match(/}/g) || []).length;
+            const openingBrackets = (jsonToUse.match(/\[/g) || []).length;
+            const closingBrackets = (jsonToUse.match(/\]/g) || []).length;
+            
+            if (openingBraces > closingBraces || openingBrackets > closingBrackets) {
+              console.log(`[GEMINI] Imbalanced braces/brackets detected: ${openingBraces}:{, ${closingBraces}:}, ${openingBrackets}:[, ${closingBrackets}:]`);
+              
+              // Check for unclosed quotes
+              const doubleQuotes = (jsonToUse.match(/"/g) || []).length;
+              if (doubleQuotes % 2 !== 0) {
+                console.log(`[GEMINI] Detected odd number of quotes, attempting to fix last property`);
+                
+                // Find the last properly formatted key-value pair
+                const lastValidPropertyRegex = /"([^"]+)"\s*:\s*(?:"([^"]*)"(?=\s*[,}])|([0-9.]+)(?=\s*[,}])|(\[[^\]]*\])(?=\s*[,}])|(\{[^}]*\})(?=\s*[,}])|true(?=\s*[,}])|false(?=\s*[,}])|null(?=\s*[,}]))/g;
+                
+                let lastMatch;
+                let lastIndex = 0;
+                
+                let match;
+                while ((match = lastValidPropertyRegex.exec(jsonToUse)) !== null) {
+                  lastMatch = match;
+                  lastIndex = match.index + match[0].length;
+                }
+                
+                if (lastMatch && lastIndex) {
+                  // Truncate at the last valid property
+                  fixedJson = jsonToUse.substring(0, lastIndex);
+                  console.log(`[GEMINI] Truncated JSON at the last valid property ending at position ${lastIndex}`);
+                }
+              }
+              
+              // Add missing closing braces/brackets
+              let suffix = '';
+              for (let i = 0; i < openingBraces - closingBraces; i++) suffix += '}';
+              for (let i = 0; i < openingBrackets - closingBrackets; i++) suffix += ']';
+              
+              jsonToUse = fixedJson + suffix;
+              console.log(`[GEMINI] Advanced JSON repair: added ${openingBraces - closingBraces} braces and ${openingBrackets - closingBrackets} brackets`);
+            }
+          }
+          
+          // Attempt to parse the potentially repaired JSON
+          parsedContent = JSON.parse(jsonToUse);
+          console.log(`[GEMINI] Successfully parsed repaired JSON response`);
+        }
       } catch (error) {
-        console.warn(`[GEMINI] Direct JSON parsing failed: ${error instanceof Error ? error.message : String(error)}`);
+        console.warn(`[GEMINI] JSON parsing failed after repair attempts: ${error instanceof Error ? error.message : String(error)}`);
         console.log(`[GEMINI] Falling back to manual parsing methods`);
         
         // Try to find JSON block in markdown

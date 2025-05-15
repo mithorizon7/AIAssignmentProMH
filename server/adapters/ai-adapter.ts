@@ -12,7 +12,7 @@ export interface MultimodalPromptPart {
 
 export interface AIAdapter {
   // Standard text completion
-  generateCompletion(prompt: string): Promise<{
+  generateCompletion(prompt: string, systemPrompt?: string): Promise<{
     strengths: string[];
     improvements: string[];
     suggestions: string[];
