@@ -123,7 +123,7 @@ export class GeminiAdapter implements AIAdapter {
    * This is a fallback method when JSON parsing fails
    */
   private extractStructuredFeedback(text: string): any {
-    console.log(`[GEMINI] Attempting to extract structured feedback from text`);
+    console.log(`[GEMINI] Attempting to extract structured feedback from text (${text.length} chars)`);
     
     // Default structure
     const result: any = {
@@ -134,6 +134,31 @@ export class GeminiAdapter implements AIAdapter {
       score: 0,
       criteriaScores: []
     };
+    
+    // Enhanced initial approach - try to find valid JSON first
+    // Look for complete JSON objects enclosed in braces
+    const jsonObjectRegex = /(\{[\s\S]*?\})/g;
+    const potentialJsons = text.match(jsonObjectRegex);
+    
+    if (potentialJsons && potentialJsons.length > 0) {
+      console.log(`[GEMINI] Found ${potentialJsons.length} potential JSON objects in the text`);
+      
+      // Try each potential JSON object from largest to smallest (more likely to be complete)
+      const sortedJsons = [...potentialJsons].sort((a, b) => b.length - a.length);
+      
+      for (const jsonCandidate of sortedJsons) {
+        try {
+          const parsed = JSON.parse(jsonCandidate);
+          // If we have strengths or improvements, we likely have a valid response
+          if (parsed.strengths || parsed.improvements || parsed.summary) {
+            console.log(`[GEMINI] Successfully parsed embedded JSON object (${jsonCandidate.length} chars)`);
+            return parsed;
+          }
+        } catch (e) {
+          // Continue to the next candidate
+        }
+      }
+    }
     
     try {
       // First try to find JSON objects using regex
@@ -812,127 +837,102 @@ export class GeminiAdapter implements AIAdapter {
         // First try to repair any truncated JSON before parsing
         let jsonToUse = text;
         
-        // Check if the JSON string appears to be truncated
-        const lastChar = text.trim().slice(-1);
-        if (lastChar !== '}' && lastChar !== ']' && text.includes('{')) {
-          console.log('[GEMINI] Response appears to be truncated JSON, attempting repair');
+        try {
+          // First attempt direct parsing
+          parsedContent = JSON.parse(jsonToUse);
+          console.log(`[GEMINI] Successfully parsed direct JSON response`);
+        } catch (initialParseError) {
+          // JSON repair needed
+          console.log('[GEMINI] Initial JSON parsing failed, attempting repair');
           
-          // Fix common truncation issues like missing closing braces/quotes
-          try {
-            // Advanced repair option 1: Try parsing with relaxed JSON parsing
-            const normalizedJSON = text
-              .replace(/(\w+)(?=:)/g, '"$1"')              // Add quotes to unquoted keys
-              .replace(/,\s*([}\]])/g, '$1')               // Remove trailing commas
-              .replace(/([^{[:])"(?=\s*[,}\]])/g, '$1"')   // Close unclosed quotes before commas or ending braces
-              .replace(/([^"]),(\s*})/, '$1$2')            // Remove trailing commas before ending braces
-              .replace(/,\s*$/, '')                        // Remove trailing commas at the end
-              .replace(/"([^"]*?)("|$)/g, '"$1"');         // Ensure all strings have closing quotes
+          // Check if the JSON string appears to be truncated
+          const lastChar = text.trim().slice(-1);
+          const startsWithOpenBrace = text.trim().startsWith('{');
+          const needsRepair = (lastChar !== '}' && lastChar !== ']' && text.includes('{')) || 
+              (startsWithOpenBrace && !text.trim().endsWith('}'));
+              
+          if (needsRepair) {
+            console.log('[GEMINI] Response appears to be truncated or malformed JSON');
             
-            try {
-              // Try to parse the normalized JSON
-              const parsedContent = JSON.parse(normalizedJSON);
-              console.log('[GEMINI] Successfully repaired and parsed JSON with normalization');
-              return parsedContent; // Return the parsed content directly if successful
-            } catch (normalizationError) {
-              // Continue with other approaches
-              console.log('[GEMINI] Normalization failed, trying other repair methods');
+            // APPROACH 1: Find complete JSON objects in the text
+            const jsonObjectRegex = /(\{[\s\S]*?\})/g;
+            const potentialJsons = text.match(jsonObjectRegex);
+            
+            if (potentialJsons && potentialJsons.length > 0) {
+              console.log(`[GEMINI] Found ${potentialJsons.length} complete JSON objects in the text`);
+              
+              // Sort by length (largest first - more likely to be complete)
+              const sortedJsons = [...potentialJsons].sort((a, b) => b.length - a.length);
+              
+              for (const jsonCandidate of sortedJsons) {
+                try {
+                  const parsed = JSON.parse(jsonCandidate);
+                  // Check if it has typical response fields
+                  if (parsed.strengths || parsed.improvements || parsed.summary) {
+                    console.log(`[GEMINI] Successfully extracted valid JSON object (${jsonCandidate.length} chars)`);
+                    jsonToUse = jsonCandidate;
+                    break;
+                  }
+                } catch (e) {
+                  // Continue to next candidate
+                }
+              }
             }
-          } catch (relaxedParseError) {
-            // Continue with other approaches
-            console.log('[GEMINI] Relaxed JSON parsing failed, trying other repair methods');
+            
+            // APPROACH 2: Try normalized JSON parsing
+            if (jsonToUse === text) {
+              try {
+                const normalizedJSON = text
+                  .replace(/(\w+)(?=:)/g, '"$1"')              // Add quotes to unquoted keys
+                  .replace(/,\s*([}\]])/g, '$1')               // Remove trailing commas
+                  .replace(/,\s*$/, '')                        // Remove trailing commas at the end
+                  .replace(/([^"]),(\s*})/, '$1$2');           // Remove trailing commas before ending braces
+                  
+                const parsed = JSON.parse(normalizedJSON);
+                if (parsed && (parsed.strengths || parsed.improvements || parsed.summary)) {
+                  console.log('[GEMINI] Successfully repaired and parsed JSON with normalization');
+                  jsonToUse = normalizedJSON;
+                }
+              } catch (normalizationError) {
+                // Continue with other approaches
+                console.log('[GEMINI] Normalization failed, trying other repair methods');
+              }
+            }
+            
+            // APPROACH 3: Balance braces
+            if (jsonToUse === text) {
+              const firstBrace = text.indexOf('{');
+              if (firstBrace !== -1) {
+                // Count unmatched braces and brackets
+                const openingBraces = (text.match(/{/g) || []).length;
+                const closingBraces = (text.match(/}/g) || []).length;
+                const openingBrackets = (text.match(/\[/g) || []).length;
+                const closingBrackets = (text.match(/\]/g) || []).length;
+                
+                // Add missing closing braces/brackets
+                if (openingBraces > closingBraces || openingBrackets > closingBrackets) {
+                  let suffix = '';
+                  for (let i = 0; i < openingBraces - closingBraces; i++) suffix += '}';
+                  for (let i = 0; i < openingBrackets - closingBrackets; i++) suffix += ']';
+                  
+                  const fixedJson = text.substring(firstBrace);
+                  jsonToUse = fixedJson + suffix;
+                  console.log(`[GEMINI] Added ${openingBraces - closingBraces} braces and ${openingBrackets - closingBrackets} brackets`);
+                }
+              }
+            }
           }
           
-          // Extract just the valid JSON portion if possible
-          const firstBrace = text.indexOf('{');
-          if (firstBrace !== -1) {
-            // Find the last balanced closing brace
-            let openBraces = 0;
-            let openBrackets = 0;
-            let lastBalancedIndex = -1;
-            let inString = false;
-            let escapeNext = false;
-            
-            for (let i = firstBrace; i < text.length; i++) {
-              // Handle string literals correctly to avoid counting braces inside strings
-              if (text[i] === '"' && !escapeNext) {
-                inString = !inString;
-              } else if (text[i] === '\\' && !escapeNext) {
-                escapeNext = true;
-              } else {
-                escapeNext = false;
-                
-                // Only count braces if not inside a string
-                if (!inString) {
-                  if (text[i] === '{') openBraces++;
-                  else if (text[i] === '}') {
-                    openBraces--;
-                    if (openBraces === 0 && openBrackets === 0) lastBalancedIndex = i;
-                  } else if (text[i] === '[') openBrackets++;
-                  else if (text[i] === ']') {
-                    openBrackets--;
-                    if (openBraces === 0 && openBrackets === 0) lastBalancedIndex = i;
-                  }
-                }
-              }
-            }
-            
-            if (lastBalancedIndex !== -1) {
-              jsonToUse = text.substring(firstBrace, lastBalancedIndex + 1);
-              console.log(`[GEMINI] Extracted balanced JSON from positions ${firstBrace} to ${lastBalancedIndex}`);
-            } else {
-              // Advanced repair for unbalanced JSON
-              // Count how many braces and quotes are unmatched
-              const openingBraces = (text.match(/{/g) || []).length;
-              const closingBraces = (text.match(/}/g) || []).length;
-              const openingBrackets = (text.match(/\[/g) || []).length;
-              const closingBrackets = (text.match(/\]/g) || []).length;
-              const quotes = (text.match(/"/g) || []).length;
-              
-              let fixedJson = text.substring(firstBrace);
-              
-              // Fix unbalanced quotes if odd number of quotes
-              if (quotes % 2 === 1) {
-                // Add missing closing quote to the last string
-                const lastQuotePos = fixedJson.lastIndexOf('"');
-                if (lastQuotePos !== -1) {
-                  const beforeLastQuote = fixedJson.substring(0, lastQuotePos);
-                  const afterLastQuote = fixedJson.substring(lastQuotePos + 1);
-                  
-                  // Check if this is an opening or closing quote
-                  const openQuoteCount = (beforeLastQuote.match(/"/g) || []).length;
-                  if (openQuoteCount % 2 === 0) {
-                    // Last quote is opening, need to add closing
-                    // Find the next comma, bracket or brace to close before
-                    const nextTerminator = Math.min(
-                      afterLastQuote.indexOf(',') === -1 ? Infinity : afterLastQuote.indexOf(','),
-                      afterLastQuote.indexOf(']') === -1 ? Infinity : afterLastQuote.indexOf(']'),
-                      afterLastQuote.indexOf('}') === -1 ? Infinity : afterLastQuote.indexOf('}')
-                    );
-                    
-                    if (nextTerminator !== Infinity) {
-                      fixedJson = beforeLastQuote + '"' + afterLastQuote.substring(0, nextTerminator) + 
-                                '"' + afterLastQuote.substring(nextTerminator);
-                    } else {
-                      fixedJson = beforeLastQuote + '"' + afterLastQuote + '"';
-                    }
-                  }
-                }
-              }
-              
-              // Add missing closing braces/brackets
-              let suffix = '';
-              for (let i = 0; i < openingBraces - closingBraces; i++) suffix += '}';
-              for (let i = 0; i < openingBrackets - closingBrackets; i++) suffix += ']';
-              
-              jsonToUse = fixedJson + suffix;
-              console.log(`[GEMINI] Advanced JSON repair: added ${openingBraces - closingBraces} braces and ${openingBrackets - closingBrackets} brackets`);
-            }
+          // Try parsing with our repaired JSON
+          try {
+            parsedContent = JSON.parse(jsonToUse);
+            console.log(`[GEMINI] Successfully parsed repaired JSON`);
+          } catch (finalParseError) {
+            // All repair attempts failed, fallback to markdown code block extraction
+            console.log(`[GEMINI] All JSON repair attempts failed, trying other methods`);
+            throw finalParseError; // Rethrow to be caught by the outer catch block
           }
         }
-        
-        // Attempt to parse the potentially repaired JSON
-        parsedContent = JSON.parse(jsonToUse);
-        console.log(`[GEMINI] Successfully parsed JSON response for multimodal content`);
       } catch (error) {
         console.warn(`[GEMINI] Failed to parse direct response: ${error instanceof Error ? error.message : String(error)}`);
         console.log(`[GEMINI] Falling back to manual parsing for multimodal content`);
