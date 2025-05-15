@@ -814,23 +814,66 @@ export class GeminiAdapter implements AIAdapter {
                 // Validate image data before processing
                 this.validateImageBuffer(part.content, mimeType);
                 
-                // Approach depends on model version and file size
-                // For gemini-2.5-* models, the File API is recommended for all image sizes
-                if (this.modelName.includes('gemini-2.5') || isLargeFile) {
-                  console.log(`[GEMINI] Using File API for image (${isLargeFile ? 'large file' : 'gemini-2.5 model'})`);
+                // Following best practices from https://ai.google.dev/gemini-api/docs/image-understanding
+                // For gemini-2.5-* models, use the File API for ALL images to get best quality analysis
+                // Gemini 2.5 models have enhanced understanding capabilities with the File API
+                if (this.modelName.includes('gemini-2.5')) {
+                  console.log(`[GEMINI] Using File API for image with gemini-2.5 model (${part.content.length} bytes)`);
                   
-                  // For large images or gemini-2.5 models, use Gemini File API
-                  const fileData = await this.createFileData(part.content, mimeType);
-                  
-                  // Check if the createFileData method returned a special flag for inline data
-                  if (fileData && (fileData as any).useInlineData === true) {
-                    console.log(`[GEMINI] File API returned useInlineData flag, falling back to inline data`);
-                    this.addInlineImagePart(contentParts, part.content, mimeType);
-                  } else {
+                  try {
+                    // Use Gemini File API for best quality image analysis
+                    const fileData = await this.createFileData(part.content, mimeType);
                     fileObjects.push(fileData);
                     
                     // Get the file URI
                     const fileUri = this.getFileUri(fileData);
+                    if (!fileUri) {
+                      throw new Error('Failed to get valid fileUri from fileData');
+                    }
+                    
+                    console.log(`[GEMINI] Successfully created file using File API, URI: ${fileUri.substring(0, 30)}...`);
+                    
+                    // Add the file part with fileData following recommended format for gemini-2.5 models
+                    contentParts.push({
+                      fileData: {
+                        fileUri: fileUri,
+                        mimeType: mimeType
+                      }
+                    });
+                  } catch (fileApiError) {
+                    console.warn(`[GEMINI] File API failed, falling back to inline data: ${fileApiError instanceof Error ? fileApiError.message : String(fileApiError)}`);
+                    
+                    // Fallback to inline data
+                    if (part.content.length < 4 * 1024 * 1024) { // 4MB limit for inline images
+                      this.addInlineImagePart(contentParts, part.content, mimeType);
+                    } else {
+                      // Image too large for inline, and File API failed - add error message
+                      contentParts.push({
+                        text: `[IMAGE: Too large for inline data (${Math.round(part.content.length/1024/1024)}MB) and File API failed]`
+                      });
+                      
+                      // Include extracted text if available
+                      if (textContent) {
+                        contentParts.push({ text: `Image text content: ${textContent}` });
+                      }
+                    }
+                  }
+                } 
+                // Size-based approach for older models
+                else if (isLargeFile) {
+                  console.log(`[GEMINI] Using File API for large image (${part.content.length} bytes)`);
+                  
+                  try {
+                    // For large images, try to use Gemini File API
+                    const fileData = await this.createFileData(part.content, mimeType);
+                    fileObjects.push(fileData);
+                    
+                    // Get the file URI
+                    const fileUri = this.getFileUri(fileData);
+                    if (!fileUri) {
+                      throw new Error('Failed to get valid fileUri from fileData');
+                    }
+                    
                     console.log(`[GEMINI] Successfully created file, URI: ${fileUri.substring(0, 30)}...`);
                     
                     // Add the file part with fileData
@@ -840,6 +883,16 @@ export class GeminiAdapter implements AIAdapter {
                         mimeType: mimeType
                       }
                     });
+                  } catch (fileApiError) {
+                    console.warn(`[GEMINI] File API failed for large image: ${fileApiError instanceof Error ? fileApiError.message : String(fileApiError)}`);
+                    contentParts.push({ 
+                      text: `[IMAGE: ${Math.round(part.content.length/1024/1024)}MB image could not be processed]` 
+                    });
+                    
+                    // Include extracted text if available
+                    if (textContent) {
+                      contentParts.push({ text: `Image text content: ${textContent}` });
+                    }
                   }
                 } else {
                   // For smaller images with older models, use inline data (more efficient)
@@ -849,21 +902,48 @@ export class GeminiAdapter implements AIAdapter {
               } catch (error) {
                 console.error('[GEMINI] Error processing image:', error);
                 
+                // Enhanced error handling with fallback options
+                // Following recommendations from https://ai.google.dev/gemini-api/docs/error-handling
+                
+                // Attempt to extract more informative error message
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                console.warn(`[GEMINI] Image processing error details: ${errorMessage}`);
+                
                 // For any error, try to fall back to inline data if the image is small enough
-                if (part.content.length < 4 * 1024 * 1024) { // 4MB limit
+                if (part.content.length < 4 * 1024 * 1024) { // 4MB limit for inline data
                   console.warn('[GEMINI] Falling back to inline data after error');
                   try {
+                    // Try to include image as inline data as a fallback
                     this.addInlineImagePart(contentParts, part.content, mimeType);
+                    console.log('[GEMINI] Successfully fell back to inline image data');
                   } catch (inlineError) {
                     console.error('[GEMINI] Inline data fallback also failed:', inlineError);
+                    
+                    // Both File API and inline data failed, add text-only fallback
                     contentParts.push({
-                      text: `[IMAGE: The image could not be processed. Error: ${error instanceof Error ? error.message : String(error)}]`
+                      text: `[IMAGE: The image could not be processed due to technical limitations. Error: ${errorMessage}]`
                     });
+                    
+                    // Include extracted text from the image if available
+                    if (textContent) {
+                      contentParts.push({ 
+                        text: `Image text content: ${textContent}` 
+                      });
+                    }
                   }
                 } else {
+                  // Image too large for inline fallback
+                  console.warn(`[GEMINI] Image size (${Math.round(part.content.length/1024)}KB) exceeds inline data limit`);
                   contentParts.push({
-                    text: `[IMAGE: The image is too large (${Math.round(part.content.length/1024)}KB) and could not be processed]`
+                    text: `[IMAGE: The image is too large (${Math.round(part.content.length/1024/1024)}MB) and could not be processed through the Gemini API]`
                   });
+                  
+                  // Include extracted text from the image if available
+                  if (textContent) {
+                    contentParts.push({ 
+                      text: `Image text content: ${textContent}` 
+                    });
+                  }
                 }
               }
             } else if (typeof part.content === 'string') {
@@ -884,35 +964,52 @@ export class GeminiAdapter implements AIAdapter {
             // Follow Gemini API document handling guidelines
             // https://ai.google.dev/gemini-api/docs/document-processing
             if (Buffer.isBuffer(part.content)) {
+              console.log(`[GEMINI] Processing document of type ${mimeType}, size: ${part.content.length} bytes`);
+              
               // Check if MIME type is supported
               if (!this.isMimeTypeSupported(mimeType, 'document')) {
+                console.warn(`[GEMINI] Unsupported document format: ${mimeType}. Using extracted text if available.`);
                 contentParts.push({
-                  text: `[DOCUMENT: Unsupported format ${mimeType}]`
+                  text: `[DOCUMENT: Unsupported format ${mimeType}. Supported formats are: ${SUPPORTED_MIME_TYPES.document.join(', ')}]`
                 });
                 
                 // Include extracted text if available
                 if (textContent) {
+                  console.log(`[GEMINI] Using extracted text from document (${textContent.length} chars)`);
                   contentParts.push({ text: textContent });
+                } else {
+                  console.warn(`[GEMINI] No extracted text available for unsupported document format ${mimeType}`);
                 }
                 break;
               }
               
               try {
-                // For all document types, use File API (preferred method)
+                // For all document types, use File API (preferred method in Gemini 2.5+ models)
+                // This allows the model to understand document structure, not just text
+                console.log(`[GEMINI] Using File API for document processing (${mimeType})`);
                 const fileData = await this.createFileData(part.content, mimeType);
                 fileObjects.push(fileData);
                 
-                // Add the file part with fileData 
+                // Get the file URI
+                const fileUri = this.getFileUri(fileData);
+                if (!fileUri) {
+                  throw new Error(`Failed to get valid fileUri from fileData for ${mimeType} document`);
+                }
+                
+                console.log(`[GEMINI] Successfully created file for document, URI: ${fileUri.substring(0, 30)}...`);
+                
+                // Add the file part with fileData following the document processing guidelines
                 contentParts.push({
                   fileData: {
-                    fileUri: this.getFileUri(fileData),
+                    fileUri: fileUri,
                     mimeType: mimeType
                   }
                 });
               } catch (error) {
-                console.warn(`Failed to use Gemini File API for document (${mimeType}):`, error);
+                console.warn(`[GEMINI] Failed to use Gemini File API for document (${mimeType}):`, error);
                 
-                // Use our specialized handler for file upload failures that considers document type
+                // Enhanced error handling with clear error messages
+                const errorMessage = error instanceof Error ? error.message : String(error);
                 contentParts.push(
                   this.handleFileUploadFailure(part.content, mimeType, textContent)
                 );
