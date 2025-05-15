@@ -5,7 +5,8 @@ import {
   Part, 
   FileData,
   HarmCategory,
-  HarmBlockThreshold
+  HarmBlockThreshold,
+  GenerationConfig
 } from '@google/generative-ai';
 import fs from 'fs';
 import path from 'path';
@@ -49,16 +50,11 @@ interface ExtendedGenerativeAI extends GoogleGenerativeAI {
 }
 
 /**
- * Generation configuration options for Gemini API
+ * Using the GenerationConfig type from the Google Generative AI SDK
+ * No need to define our own interface as it's already provided by the SDK
+ * 
+ * @see https://ai.google.dev/api/rest/v1/GenerationConfig
  */
-interface GenerationConfig {
-  temperature?: number;
-  maxOutputTokens?: number;
-  topK?: number;
-  topP?: number;
-  responseFormat?: { type: string };
-  [key: string]: unknown;
-}
 
 /**
  * Response metadata interface for token usage information
@@ -1234,17 +1230,17 @@ Please analyze the above submission and provide feedback in the following JSON f
       });
       
       // Generate content with the parts
-      const generationConfig: GenerationConfig = {
+      const generationConfig = {
         temperature: 0.7, 
         maxOutputTokens: 2048,
         topP: 0.95,
-        topK: 64
+        topK: 64,
+        responseMimeType: "application/json"
       };
       
-      // We found that responseFormat is not supported in the current API version
-      // Removed responseFormat configuration to avoid 400 Bad Request errors
-      console.log(`[GEMINI] Using standard response format for ${this.modelName} without responseFormat option`);
-      // Note: When the API is updated to support responseFormat, we can add it back
+      // Using responseMimeType instead of deprecated responseFormat
+      console.log(`[GEMINI] Using responseMimeType: application/json for ${this.modelName}`);
+      // This directs Gemini to return proper JSON format instead of markdown-wrapped content
       
       // Log details about the request we're about to make
       console.log(`[GEMINI] Sending multimodal request to Gemini API with ${contentParts.length} parts`);
