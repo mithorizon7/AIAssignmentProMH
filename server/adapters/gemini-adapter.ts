@@ -78,22 +78,46 @@ interface ResponseMetadata {
 // https://ai.google.dev/gemini-api/docs/document-processing
 export const SUPPORTED_MIME_TYPES = {
   // Images (inlineData for small, fileData for large)
+  // Based on https://ai.google.dev/gemini-api/docs/image-understanding
   image: [
-    'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'
+    'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
+    'image/gif', 'image/bmp', 'image/svg+xml', 'image/tiff'
   ],
+  
   // Videos (always use fileData)
+  // Based on https://ai.google.dev/gemini-api/docs/video-understanding
   video: [
-    'video/mp4', 'video/mpeg', 'video/webm', 'video/quicktime', 'video/x-msvideo'
+    'video/mp4', 'video/mpeg', 'video/webm', 'video/quicktime', 'video/x-msvideo',
+    'video/x-matroska', 'video/3gpp', 'video/x-flv', 'video/x-ms-wmv'
   ],
+  
   // Audio (always use fileData)
+  // Based on https://ai.google.dev/gemini-api/docs/audio
   audio: [
-    'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/x-wav', 'audio/webm'
+    'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/x-wav', 'audio/webm',
+    'audio/aac', 'audio/ogg', 'audio/flac', 'audio/x-m4a', 'audio/mp3'
   ],
+  
   // Documents (use fileData)
+  // Based on https://ai.google.dev/gemini-api/docs/document-processing
   document: [
-    'application/pdf', 'text/csv', 'text/plain', 'application/json', 
-    'text/markdown', 'text/html', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    // Standard document formats
+    'application/pdf', 
+    // Text formats
+    'text/csv', 'text/plain', 'application/json', 'text/markdown', 'text/html',
+    // Office formats
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+    'application/msword', // .doc
+    'application/vnd.ms-excel', // .xls
+    'application/vnd.ms-powerpoint', // .ppt
+    // Open document formats
+    'application/vnd.oasis.opendocument.text', // .odt
+    'application/vnd.oasis.opendocument.spreadsheet', // .ods
+    'application/vnd.oasis.opendocument.presentation', // .odp
+    // Rich text format
+    'application/rtf'
   ]
 };
 
@@ -111,21 +135,41 @@ export class GeminiAdapter implements AIAdapter {
     
     this.generativeAI = new GoogleGenerativeAI(apiKey);
     
-    // Using the newest model as specified
-    // "gemini-2.5-flash-preview-04-17" is the latest model that supports text, images, video, and audio inputs
-    this.modelName = "gemini-2.5-flash-preview-04-17";
+    // Using the newest model as specified from Google's latest documentation
+    // "gemini-2.5-flash-preview-0514" is the latest model as of May 2025
+    // This model has enhanced support for text, images, video, audio, and document inputs
+    // Note: This model name is different from the older "gemini-2.5-flash-preview-04-17"
+    this.modelName = "gemini-2.5-flash-preview-0514";
     
     console.log(`[GEMINI] Initializing with model: ${this.modelName}`);
     
+    // Configuration optimized for educational assessment and feedback
+    // Based on best practices from https://ai.google.dev/gemini-api/docs/models/gemini
     this.model = this.generativeAI.getGenerativeModel({ 
       model: this.modelName,
       generationConfig: {
-        temperature: 0.7,
+        // Temperature balances creativity with precision
+        // Lower for more focused, consistent assessment feedback
+        temperature: 0.4,
+        
+        // Allow longer outputs for detailed feedback
         maxOutputTokens: 8192,
-        // These settings help with structured output for our assessment format
+        
+        // These settings help with structured assessment output format
         topP: 0.95,
-        topK: 64
-      }
+        topK: 64,
+        
+        // Encourage structured output but don't force JSON
+        // (we'll parse it later regardless of format)
+        responseFormat: { type: "STRUCTURED" }
+      },
+      // Add safety settings appropriate for educational content
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }
+      ]
     });
   }
   
@@ -336,6 +380,17 @@ export class GeminiAdapter implements AIAdapter {
       model: this.modelName
     });
     
+    // Following Gemini API best practices for handling file processing failures
+    // https://ai.google.dev/gemini-api/docs/error-handling
+    
+    // For documents, prioritize the extracted text content
+    if (contentCategory === 'document' && textContent) {
+      console.log(`[GEMINI] Using extracted text for document (${textContent.length} chars) after File API failure`);
+      return {
+        text: `Document content (extracted from ${mimeType}):\n\n${textContent}`
+      };
+    }
+    
     // For images (only) that are small enough, we can fallback to inlineData
     if (contentCategory === 'image' && content.length < 4 * 1024 * 1024) { // 4MB limit for inline
       console.warn('[GEMINI] Falling back to inlineData for image after File API failure');
@@ -363,30 +418,56 @@ export class GeminiAdapter implements AIAdapter {
       }
     }
     
+    // For audio files, use any extracted text content (possibly from transcription)
+    if (contentCategory === 'audio' && textContent) {
+      console.warn('[GEMINI] Using transcription for audio after File API failure');
+      return { 
+        text: `Audio content transcription:\n\n${textContent}` 
+      };
+    }
+    
+    // For video files, use any extracted text content (possibly from transcription)
+    if (contentCategory === 'video' && textContent) {
+      console.warn('[GEMINI] Using transcription/description for video after File API failure');
+      return { 
+        text: `Video content description:\n\n${textContent}` 
+      };
+    }
+    
     // For text-based documents, fall back to text content
     if (contentCategory === 'document' && 
         ['text/plain', 'text/csv', 'text/html', 'text/markdown', 'application/json'].includes(mimeType)) {
       console.warn('[GEMINI] Falling back to text content for document after File API failure');
       try {
-        const textData = content.toString('utf8');
-        return { text: textData };
+        // Only attempt this for reasonable file sizes to avoid memory issues
+        if (content.length < 10 * 1024 * 1024) { // 10MB limit
+          const textData = content.toString('utf8');
+          // Verify the text data is actually readable
+          if (textData && textData.length > 0 && /^[\x00-\x7F\xC0-\xFF]*$/.test(textData.substring(0, 1000))) {
+            return { text: textData };
+          } else {
+            console.warn('[GEMINI] Converted content appears to be binary/non-text data');
+          }
+        } else {
+          console.warn('[GEMINI] Content too large for direct UTF-8 conversion');
+        }
       } catch (textError) {
         console.error('[GEMINI] Error converting document to text:', textError);
-        return { text: `[Document conversion failed: ${textError instanceof Error ? textError.message : String(textError)}]` };
       }
     }
     
-    // For all other file types, if we have extracted text, use that
+    // For any other file type, if we have extracted text, use that
     if (textContent && textContent.trim().length > 0) {
-      console.warn(`[GEMINI] Using extracted text content for ${mimeType} after File API failure`);
+      console.log(`[GEMINI] Using extracted text content for ${mimeType} after File API failure (${textContent.length} chars)`);
       return { text: textContent };
     }
     
-    // Last resort - create a detailed error message with context to help diagnose the issue
+    // Provide detailed information about the content for better context
     console.error(`[GEMINI] No fallback available for content type ${contentCategory} with MIME type ${mimeType}`);
     
+    // Last resort - create a detailed error message with context
     return { 
-      text: `[The AI system encountered difficulty processing this specific file type (${mimeType}). Try uploading in a different format or contact support if this persists.]` 
+      text: `[File of type ${mimeType} (${Math.round(content.length/1024)}KB) could not be processed by the AI system. For best results, try uploading content in one of these formats: images (jpg, png), documents (pdf, docx), or plain text files.]` 
     };
   }
   
