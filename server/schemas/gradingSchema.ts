@@ -6,7 +6,7 @@ import { z } from "zod";
 
 // Define a schema for criteria scores
 const CriteriaScoreSchema = z.object({
-  criteriaId: z.string().or(z.number()),
+  criteriaId: z.string(), // Must be string to match shared schema
   score: z.number(),
   feedback: z.string()
 });

@@ -114,10 +114,11 @@ export class GeminiAdapter implements AIAdapter {
         items: {
           type: "object",
           properties: {
-            criteriaId: { type: "string" },
+            criteriaId: { type: "string" }, // Must be string to match shared schema
             score: { type: "number" },
             feedback: { type: "string" }
-          }
+          },
+          required: ["criteriaId", "score", "feedback"]
         }
       }
     },
