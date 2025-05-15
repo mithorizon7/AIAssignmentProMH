@@ -931,14 +931,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Assignment statistics for instructors
   app.get('/api/assignments/stats', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
-      // Get all assignments
-      const allAssignments = await storage.listAssignments();
+      // Extract and validate course/assignment IDs from query params
+      let courseId: number | undefined = undefined;
+      let assignmentId: number | undefined = undefined;
       
-      // Get all submissions
-      const submissionsQuery = await db.select().from(submissions);
+      try {
+        // Safely parse courseId
+        if (req.query.courseId) {
+          const parsedCourseId = parseInt(req.query.courseId as string);
+          if (!isNaN(parsedCourseId)) {
+            courseId = parsedCourseId;
+          }
+        }
+        
+        // Safely parse assignmentId
+        if (req.query.assignmentId) {
+          const parsedAssignmentId = parseInt(req.query.assignmentId as string);
+          if (!isNaN(parsedAssignmentId)) {
+            assignmentId = parsedAssignmentId;
+          }
+        }
+      } catch (e) {
+        console.warn('Error parsing course/assignment IDs:', e);
+        // Continue with undefined IDs if parsing fails
+      }
       
-      // Calculate stats
+      // Get all assignments (filtered by course if specified)
+      let allAssignments = await storage.listAssignments();
+      if (courseId) {
+        allAssignments = allAssignments.filter(a => a.courseId === courseId);
+      }
+      
+      // Get target assignment if specified
+      let targetAssignment = undefined;
+      if (assignmentId) {
+        targetAssignment = await storage.getAssignment(assignmentId);
+      }
+      
+      // Get all submissions (filtered by assignment if specified)
+      let submissionsQuery = await db.select().from(submissions);
+      if (assignmentId) {
+        submissionsQuery = submissionsQuery.filter((s: any) => s.assignmentId === assignmentId);
+      } else if (courseId) {
+        // Filter submissions by course (need to join with assignments)
+        const assignmentIds = allAssignments.map(a => a.id);
+        submissionsQuery = submissionsQuery.filter((s: any) => assignmentIds.includes(s.assignmentId));
+      }
+      
+      // Get enrolled students (for the selected course or all courses)
+      let totalStudents = 0;
+      if (courseId) {
+        const students = await storage.listCourseEnrollments(courseId);
+        totalStudents = students.length;
+      } else {
+        // Count all students
+        const studentCount = await db.select({ count: count() })
+          .from(users)
+          .where(eq(users.role, 'student'));
+        totalStudents = studentCount[0]?.count || 0;
+      }
+      
+      // Calculate submission metrics
       const totalSubmissions = submissionsQuery.length;
+      
+      // Count unique students who have submitted
+      const submittedStudentIds = new Set(submissionsQuery.map((s: any) => s.userId));
+      const submittedCount = submittedStudentIds.size;
+      
+      // Calculate students who haven't submitted
+      const notStartedCount = Math.max(0, totalStudents - submittedCount);
+      
+      // Calculate submission rates
+      const submissionRate = totalStudents > 0 ? Math.round((submittedCount / totalStudents) * 100) : 0;
       
       // Filter submissions to get those that need review
       const pendingReviews = submissionsQuery.filter(
@@ -946,7 +1010,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ).length;
       
       // Calculate average score (if available in feedback)
-      const feedbackItems = await db.select().from(feedback);
+      let feedbackItems = await db.select().from(feedback);
+      if (assignmentId) {
+        // Filter feedback for specific assignment
+        const submissionIds = submissionsQuery.map((s: any) => s.id);
+        feedbackItems = feedbackItems.filter((f: any) => submissionIds.includes(f.submissionId));
+      }
+      
       const scores = feedbackItems
         .map((f: { score: number | null | undefined }) => f.score)
         .filter((score: number | null | undefined) => score !== null && score !== undefined) as number[];
@@ -955,8 +1025,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
         : 0;
       
-      // Calculate feedback generation
+      // Calculate feedback generation and viewed stats
       const feedbackGenerated = feedbackItems.length;
+      const feedbackViewed = feedbackItems.filter((f: any) => f.viewed).length;
+      const feedbackViewRate = feedbackGenerated > 0 ? Math.round((feedbackViewed / feedbackGenerated) * 100) : 0;
       
       // Calculate submission increase (over last week)
       const oneWeekAgo = new Date();
@@ -977,12 +1049,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? Math.round((submissionsLastWeek - submissionsPreviousWeek) / submissionsPreviousWeek * 100)
         : 0;
       
+      // Return complete statistics object
       res.json({
+        totalStudents,
+        submittedCount,
+        notStartedCount,
+        submissionRate,
         totalSubmissions,
         pendingReviews,
         averageScore,
         feedbackGenerated,
+        feedbackViewed,
+        feedbackViewRate,
         submissionsIncrease,
+        // Include submission percentages for dashboard display
+        submittedPercentage: submissionRate,
+        notStartedPercentage: totalStudents > 0 ? Math.round((notStartedCount / totalStudents) * 100) : 0,
+        feedbackViewPercentage: feedbackViewRate
       });
   }));
 
