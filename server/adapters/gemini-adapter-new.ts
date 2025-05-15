@@ -2,7 +2,7 @@
  * Gemini AI adapter for the AI Grader platform
  * Using @google/genai SDK with the latest API patterns for version 0.14.0+
  */
-import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
+import { GoogleGenAI, GenerateContentResponse, Part } from '@google/genai';
 import { ContentType } from '../utils/file-type-settings';
 import { AIAdapter, MultimodalPromptPart } from './ai-adapter';
 import { CriteriaScore } from '@shared/schema';
@@ -200,16 +200,18 @@ export class GeminiAdapter implements AIAdapter {
       const topK = 40;
       const maxOutputTokens = 1024;
       
-      // Prepare the request with JSON response format
+      // Prepare the request with JSON response format - use proper structure with generationConfig
       const requestParams: any = {
         model: this.modelName,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        temperature,
-        topP,
-        topK,
-        maxOutputTokens,
-        responseMimeType: "application/json",
-        responseSchema: this.responseSchema
+        generationConfig: {
+          temperature,
+          topP, 
+          topK,
+          maxOutputTokens,
+          responseMimeType: "application/json",
+          responseSchema: this.responseSchema
+        }
       };
       
       console.log(`[GEMINI] Sending request to Gemini API`);
@@ -323,7 +325,7 @@ export class GeminiAdapter implements AIAdapter {
       console.log(`[GEMINI] Generating multimodal completion with ${parts.length} parts`);
       
       // Prepare content parts in the format expected by the API
-      const apiParts: any[] = [];
+      const apiParts: Part[] = [];
       
       // Content type conversion for debugging
       const contentSummary = parts.map(part => {
@@ -386,16 +388,18 @@ export class GeminiAdapter implements AIAdapter {
       const topK = 40;
       const maxOutputTokens = 1024;
       
-      // Prepare the request with JSON response format
+      // Prepare the request with JSON response format - use proper structure with generationConfig
       const requestParams: any = {
         model: this.modelName,
         contents: [{ role: 'user', parts: apiParts }],
-        temperature,
-        topP,
-        topK,
-        maxOutputTokens,
-        responseMimeType: "application/json",
-        responseSchema: this.responseSchema
+        generationConfig: {
+          temperature,
+          topP,
+          topK,
+          maxOutputTokens,
+          responseMimeType: "application/json",
+          responseSchema: this.responseSchema
+        }
       };
       
       console.log(`[GEMINI] Making API request to model: ${this.modelName}`);
@@ -428,9 +432,13 @@ export class GeminiAdapter implements AIAdapter {
             text: "Note: An image was included but could not be processed due to format limitations." 
           });
           
-          // Retry with text-only
-          requestParams.contents = [{ role: 'user', parts: textOnlyParts }];
-          result = await this.genAI.models.generateContent(requestParams);
+          // Retry with text-only, keeping the generationConfig structure
+          const retryParams = {
+            model: this.modelName,
+            contents: [{ role: 'user', parts: textOnlyParts }],
+            generationConfig: requestParams.generationConfig
+          };
+          result = await this.genAI.models.generateContent(retryParams);
         } else {
           // If not a recoverable error, rethrow
           throw apiError;
