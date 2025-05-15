@@ -532,8 +532,26 @@ export async function processFileForMultimodal(
 
     if (isRemoteUrl(filePath)) {
       // Download from remote URL (HTTP/HTTPS, GCS)
-      console.log(`[MULTIMODAL] File path is a remote URL, attempting to download`);
+      console.log(`[MULTIMODAL] File path is a remote URL, attempting to download: ${filePath.substring(0, 30)}...`);
       try {
+        // Check if this is a GCS object path without gs:// prefix
+        if ((filePath.startsWith('submissions/') || filePath.startsWith('anonymous-submissions/')) && 
+            !filePath.startsWith('http') && !filePath.startsWith('gs://')) {
+          
+          console.log(`[MULTIMODAL] Converting direct GCS path to gs:// format: ${filePath}`);
+          try {
+            // Import GCS client
+            const { bucketName } = require('./gcs-client');
+            // Convert to gs:// URL format
+            filePath = `gs://${bucketName}/${filePath}`;
+            console.log(`[MULTIMODAL] Converted to gs:// format: ${filePath}`);
+          } catch (conversionError) {
+            console.warn(`[MULTIMODAL] Failed to convert to gs:// format:`, conversionError);
+            // Continue with the original path
+          }
+        }
+        
+        // Now attempt to download
         const result = await downloadFromUrl(filePath, mimeType);
         fileContent = result.buffer;
         actualFilePath = result.localPath;
@@ -542,7 +560,49 @@ export async function processFileForMultimodal(
         console.log(`[MULTIMODAL] Successfully downloaded file from remote URL, size: ${fileContent.length} bytes`);
       } catch (downloadError: any) {
         console.error(`[MULTIMODAL] Error downloading from URL:`, downloadError);
-        throw new Error(`Failed to download file from URL: ${downloadError instanceof Error ? downloadError.message : String(downloadError)}`);
+        
+        // Try direct bucket approach as final fallback for GCS paths
+        if ((filePath.startsWith('submissions/') || filePath.startsWith('anonymous-submissions/')) || 
+            filePath.startsWith('gs://')) {
+          console.log(`[MULTIMODAL] Trying final fallback approach for GCS path: ${filePath}`);
+          try {
+            const { storage, bucketName } = require('./gcs-client');
+            const objectPath = filePath.startsWith('gs://') 
+              ? filePath.replace(`gs://${bucketName}/`, '')
+              : filePath;
+              
+            console.log(`[MULTIMODAL] Attempting direct bucket download with object path: ${objectPath}`);
+            const [fileData] = await storage.bucket(bucketName).file(objectPath).download();
+            fileContent = fileData;
+            
+            // Create a temporary file for operations that need a file path
+            const tempDir = require('os').tmpdir();
+            const randomName = require('crypto').randomBytes(16).toString('hex');
+            const extension = mimeType ? `.${mimeType.split('/')[1]}` : '.tmp';
+            actualFilePath = require('path').join(tempDir, `${randomName}${extension}`);
+            temporaryFilePath = actualFilePath;
+            
+            // Write to the temporary file
+            await fs.promises.writeFile(actualFilePath, fileContent);
+            console.log(`[MULTIMODAL] Successfully downloaded via direct bucket approach, size: ${fileContent.length} bytes`);
+            
+            // Set up cleanup function
+            cleanup = async () => {
+              try {
+                if (fs.existsSync(actualFilePath)) {
+                  await fs.promises.unlink(actualFilePath);
+                }
+              } catch (error) {
+                console.warn(`Failed to clean up temporary file ${actualFilePath}:`, error);
+              }
+            };
+          } catch (fallbackError) {
+            console.error(`[MULTIMODAL] Final fallback approach failed:`, fallbackError);
+            throw new Error(`Failed to download file: ${downloadError instanceof Error ? downloadError.message : String(downloadError)}`);
+          }
+        } else {
+          throw new Error(`Failed to download file from URL: ${downloadError instanceof Error ? downloadError.message : String(downloadError)}`);
+        }
       }
     } else {
       // Read from local file path
