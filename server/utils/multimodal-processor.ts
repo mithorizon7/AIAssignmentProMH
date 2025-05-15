@@ -246,7 +246,7 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
   cleanup: () => Promise<void>
 }> {
   try {
-    console.log(`[INFO] Downloading file from URL: ${url}`);
+    console.log(`[DOWNLOAD] Downloading file from URL: ${url.substring(0, 30)}... (url length: ${url.length})`);
     
     // Generate a temporary file path
     const tempDir = os.tmpdir();
@@ -256,12 +256,14 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
       path.extname(url) || '.tmp';
     
     const localPath = path.join(tempDir, `${randomName}${extension}`);
+    console.log(`[DOWNLOAD] Using temp file path: ${localPath}`);
     
     // Handle different URL types
     let fileBuffer: Buffer;
     
     if (url.startsWith('gs://')) {
       // For direct GCS URLs, we need to use the Google Cloud Storage SDK
+      console.log(`[DOWNLOAD] Detected GCS URL (gs:// protocol), using GCS SDK`);
       try {
         // Import the GCS client only when needed
         const { getBucket, bucketName } = require('./gcs-client');
@@ -273,41 +275,55 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
         
         // Determine which bucket to use (from URL or default)
         const targetBucket = bucketFromUrl || bucketName;
+        console.log(`[DOWNLOAD] GCS bucket: ${targetBucket}, object path: ${objectPath}`);
         
         // Get the bucket and file objects
         const bucket = getBucket(targetBucket);
         const file = bucket.file(objectPath);
         
         // Download the file to a buffer
+        console.log(`[DOWNLOAD] Downloading from GCS bucket: ${targetBucket}, object: ${objectPath}`);
         const [fileData] = await file.download();
         fileBuffer = fileData;
+        console.log(`[DOWNLOAD] Successfully downloaded from GCS, file size: ${fileBuffer.length} bytes`);
         
         // Write to temp file for operations that need a file path
         await writeFileAsync(localPath, fileBuffer);
-        
-        console.log(`[GCS] Successfully downloaded file from: ${url}`);
+        console.log(`[DOWNLOAD] Wrote GCS file data to temporary path: ${localPath}`);
       } catch (gcsError) {
-        console.error('[GCS] Error downloading from GCS:', gcsError);
+        console.error('[DOWNLOAD] Error downloading from GCS:', gcsError);
         throw new Error(`Failed to download file from GCS: ${gcsError instanceof Error ? gcsError.message : String(gcsError)}`);
       }
     } else {
       // Standard HTTP/HTTPS URLs (including GCS signed URLs)
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+      console.log(`[DOWNLOAD] Standard HTTP URL detected, using fetch`);
+      try {
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          console.error(`[DOWNLOAD] Fetch request failed with status: ${response.status}`);
+          throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+        }
+        
+        // Get content type from response if not provided
+        const responseContentType = response.headers.get('content-type');
+        if (!mimeType && responseContentType) {
+          mimeType = responseContentType;
+          console.log(`[DOWNLOAD] Got content type from response: ${mimeType}`);
+        }
+        
+        // Get the file buffer
+        const arrayBuffer = await response.arrayBuffer();
+        fileBuffer = Buffer.from(arrayBuffer);
+        console.log(`[DOWNLOAD] Successfully downloaded via HTTP, file size: ${fileBuffer.length} bytes`);
+        
+        // Write to temp file for operations that need a file path
+        await writeFileAsync(localPath, fileBuffer);
+        console.log(`[DOWNLOAD] Wrote HTTP file data to temporary path: ${localPath}`);
+      } catch (fetchError) {
+        console.error('[DOWNLOAD] Error fetching from URL:', fetchError);
+        throw new Error(`Failed to download file: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
       }
-      
-      // Get content type from response if not provided
-      if (!mimeType && response.headers.get('content-type')) {
-        mimeType = response.headers.get('content-type') || undefined;
-      }
-      
-      // Get the file buffer
-      fileBuffer = Buffer.from(await response.arrayBuffer());
-      
-      // Write to temp file for operations that need a file path
-      await writeFileAsync(localPath, fileBuffer);
     }
     
     // Return file buffer and local path
@@ -353,6 +369,15 @@ export async function processFileForMultimodal(
   fileName: string, 
   mimeType: string
 ): Promise<ProcessedFile> {
+  console.log(`[MULTIMODAL] Processing file for multimodal analysis:`, {
+    fileName,
+    mimeType,
+    filePathLength: filePath.length,
+    // For debugging purposes, show part of the path without exposing the full URL
+    filePathStart: filePath.substring(0, 30) + '...',
+    isRemote: isRemoteUrl(filePath)
+  });
+  
   let temporaryFilePath: string | null = null;
   let cleanup: (() => Promise<void>) | null = null;
 
@@ -362,21 +387,41 @@ export async function processFileForMultimodal(
     let actualFilePath = filePath;
 
     if (isRemoteUrl(filePath)) {
-      // Download from remote URL (S3, HTTP/HTTPS)
-      console.log(`[INFO] File path is a remote URL: ${filePath}`);
-      const result = await downloadFromUrl(filePath, mimeType);
-      fileContent = result.buffer;
-      actualFilePath = result.localPath;
-      temporaryFilePath = result.localPath;
-      cleanup = result.cleanup;
+      // Download from remote URL (S3, HTTP/HTTPS, GCS)
+      console.log(`[MULTIMODAL] File path is a remote URL, attempting to download`);
+      try {
+        const result = await downloadFromUrl(filePath, mimeType);
+        fileContent = result.buffer;
+        actualFilePath = result.localPath;
+        temporaryFilePath = result.localPath;
+        cleanup = result.cleanup;
+        console.log(`[MULTIMODAL] Successfully downloaded file from remote URL, size: ${fileContent.length} bytes`);
+      } catch (downloadError) {
+        console.error(`[MULTIMODAL] Error downloading from URL:`, downloadError);
+        throw new Error(`Failed to download file from URL: ${downloadError instanceof Error ? downloadError.message : String(downloadError)}`);
+      }
     } else {
       // Read from local file path
-      console.log(`[INFO] File path is a local path: ${filePath}`);
-      fileContent = await fs.promises.readFile(filePath);
+      console.log(`[MULTIMODAL] File path is a local path, reading from filesystem`);
+      try {
+        // Check if the file exists first
+        const exists = await existsAsync(filePath);
+        if (!exists) {
+          console.error(`[MULTIMODAL] File does not exist at path: ${filePath}`);
+          throw new Error(`File does not exist at path: ${filePath}`);
+        }
+        
+        fileContent = await fs.promises.readFile(filePath);
+        console.log(`[MULTIMODAL] Successfully read local file, size: ${fileContent.length} bytes`);
+      } catch (readError) {
+        console.error(`[MULTIMODAL] Error reading local file:`, readError);
+        throw new Error(`Failed to read local file: ${readError instanceof Error ? readError.message : String(readError)}`);
+      }
     }
     
     // Determine content type from the mime type and filename
     const contentType = getContentTypeFromMimeType(mimeType);
+    console.log(`[MULTIMODAL] Determined content type: ${contentType} from MIME type: ${mimeType}`);
     
     // For text and document types, attempt to extract text content
     let textContent: string | undefined;
@@ -384,14 +429,17 @@ export async function processFileForMultimodal(
       try {
         // The filename extension might be needed for some document types
         const extension = path.extname(fileName).toLowerCase();
+        console.log(`[MULTIMODAL] Attempting to extract text content from ${contentType} file with extension: ${extension}`);
         textContent = await extractTextContent(actualFilePath, mimeType, extension);
+        console.log(`[MULTIMODAL] Successfully extracted text content, length: ${textContent?.length || 0} characters`);
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.warn(`Failed to extract text from ${fileName}: ${errorMessage}`);
+        console.warn(`[MULTIMODAL] Failed to extract text from ${fileName}: ${errorMessage}`);
         // Continue with the process even if text extraction fails
       }
     }
     
+    console.log(`[MULTIMODAL] Successfully processed file for analysis, returning result`);
     // Return the processed file
     return {
       content: fileContent,
