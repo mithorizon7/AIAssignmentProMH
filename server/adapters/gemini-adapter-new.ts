@@ -2,7 +2,14 @@
  * Gemini AI adapter for the AI Grader platform
  * Using @google/genai SDK with the latest API patterns for version 0.14.0+
  */
-import { GoogleGenAI, GenerateContentResponse, Part } from '@google/genai';
+// Import the correct types from @google/genai
+import { 
+  GoogleGenAI, 
+  GenerateContentResponse,
+  Part 
+} from '@google/genai';
+
+// The newest Gemini model is "gemini-2.5-flash-preview-04-17" which was released April 17, 2025
 import { ContentType } from '../utils/file-type-settings';
 import { AIAdapter, MultimodalPromptPart } from './ai-adapter';
 import { CriteriaScore } from '@shared/schema';
