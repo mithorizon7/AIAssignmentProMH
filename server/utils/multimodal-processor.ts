@@ -227,32 +227,57 @@ export function isRemoteUrl(path: string): boolean {
   
   console.log(`[MULTIMODAL] Checking if path is remote URL: ${path.substring(0, 30)}${path.length > 30 ? '...' : ''}`);
   
-  // First, check for standard URL protocols
-  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('gs://')) {
-    console.log('[MULTIMODAL] Path is definitely a remote URL (has protocol)');
+  try {
+    // Check if it's a valid URL first
+    try {
+      // This will throw if the URL is invalid
+      new URL(path);
+      console.log('[MULTIMODAL] Path is a valid URL with protocol');
+      return true;
+    } catch (e) {
+      // Not a valid URL with protocol - continue checks
+    }
+    
+    // First, check for standard URL protocols
+    if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('gs://')) {
+      console.log('[MULTIMODAL] Path is definitely a remote URL (has protocol)');
+      return true;
+    }
+    
+    // Check for GCS storage.googleapis.com URLs
+    if (path.includes('storage.googleapis.com') || path.includes('googleusercontent.com')) {
+      console.log('[MULTIMODAL] Path is a GCS URL (storage.googleapis.com or googleusercontent.com)');
+      return true;
+    }
+    
+    // Check for potential GCS object paths that should be converted to signed URLs
+    const isPotentialGcsPath = 
+      path.startsWith('/') === false && // Not an absolute local path
+      path.includes('/') && // Has at least one folder separator
+      !path.includes('\\') && // Not a Windows-style path
+      path.startsWith('submissions/') || path.startsWith('anonymous-submissions/'); // Specific GCS path patterns
+    
+    if (isPotentialGcsPath) {
+      console.log('[MULTIMODAL] Path is a GCS object path (matches submission pattern)');
+      return true;
+    }
+    
+    // If the file doesn't exist locally but has path separators, it's likely a remote path
+    const hasPathSeparators = path.includes('/');
+    const fileExistsLocally = fs.existsSync(path);
+    
+    if (hasPathSeparators && !fileExistsLocally) {
+      console.log('[MULTIMODAL] Path contains separators but file not found locally - treating as remote');
+      return true;
+    }
+    
+    console.log('[MULTIMODAL] Path appears to be a local file path');
+    return false;
+  } catch (error) {
+    console.error('[MULTIMODAL] Error in isRemoteUrl check:', error);
+    // Default to treating it as remote if we can't determine
     return true;
   }
-  
-  // Check for GCS storage.googleapis.com URLs
-  if (path.includes('storage.googleapis.com') || path.includes('googleusercontent.com')) {
-    console.log('[MULTIMODAL] Path is a GCS URL (storage.googleapis.com or googleusercontent.com)');
-    return true;
-  }
-  
-  // Check for potential GCS object paths that should be converted to signed URLs
-  const isPotentialGcsPath = 
-    path.startsWith('/') === false && // Not an absolute local path
-    path.includes('/') && // Has at least one folder separator
-    !path.includes('\\') && // Not a Windows-style path
-    !fs.existsSync(path); // Not an existing local file
-  
-  if (isPotentialGcsPath) {
-    console.log('[MULTIMODAL] Path is potentially a GCS object path');
-    return true;
-  }
-  
-  console.log('[MULTIMODAL] Path appears to be a local file path');
-  return false;
 }
 
 /**
