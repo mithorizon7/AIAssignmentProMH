@@ -512,6 +512,33 @@ export const queueApi = {
               console.log(`[DEVELOPMENT] Processing multimodal submission ${submissionId} of type ${submission.mimeType} with final filePath: ${filePath.substring(0, 100)}...`);
               
               try {
+                console.log(`[MULTIMODAL] Attempting to analyze submission ${submissionId} with these parameters:`, {
+                  fileName: submission.fileName || 'unknown',
+                  fileType: submission.mimeType || 'application/octet-stream',
+                  filePathLength: filePath.length,
+                  filePathStart: filePath.substring(0, 30) + '...',
+                  hasTextContent: !!submission.content
+                });
+                
+                // Examine file path to ensure it's valid
+                if (!filePath || filePath.trim() === '') {
+                  throw new Error('File path is empty - cannot process image submission without a valid file URL');
+                }
+                
+                // Check mime type to ensure it's supported for Gemini
+                if (submission.mimeType && submission.mimeType.startsWith('image/')) {
+                  console.log(`[MULTIMODAL] Processing image submission with MIME type: ${submission.mimeType}`);
+                  
+                  // Additional validation for image submissions
+                  if (filePath.indexOf('storage.googleapis.com') > -1 || 
+                      filePath.indexOf('googleusercontent.com') > -1) {
+                    console.log(`[MULTIMODAL] File appears to be a valid GCS URL`);
+                  } else if (!filePath.startsWith('http')) {
+                    console.log(`[MULTIMODAL] File path is not an HTTP URL, assuming GCS object path: ${filePath}`);
+                  }
+                }
+                
+                // Attempt to process the file with AI
                 feedbackResult = await aiService.analyzeMultimodalSubmission({
                   filePath: filePath,
                   fileName: submission.fileName || 'unknown',
@@ -522,10 +549,45 @@ export const queueApi = {
                   instructorContext: assignment.instructorContext || undefined, // Instructor-only guidance
                   rubric: rubric
                 });
-                console.log(`[DEVELOPMENT] Successfully got AI feedback result for ${submissionId}`);
+                
+                console.log(`[MULTIMODAL] Successfully received AI feedback for ${submissionId}`);
+                console.log(`[MULTIMODAL] Feedback processing time: ${feedbackResult.processingTime}ms`);
+                
+                // Check if we have actual feedback content
+                if (feedbackResult.strengths && feedbackResult.strengths.length > 0) {
+                  console.log(`[MULTIMODAL] Feedback contains ${feedbackResult.strengths.length} strengths points`);
+                }
+                
+                if (feedbackResult.improvements && feedbackResult.improvements.length > 0) {
+                  console.log(`[MULTIMODAL] Feedback contains ${feedbackResult.improvements.length} improvement points`);
+                }
               } catch (multimodalError) {
-                console.error(`[DEVELOPMENT] Error during multimodal analysis:`, multimodalError);
-                throw new Error(`Failed to analyze multimodal submission: ${multimodalError instanceof Error ? multimodalError.message : String(multimodalError)}`);
+                console.error(`[MULTIMODAL] Error during analysis of submission ${submissionId}:`, multimodalError);
+                
+                // First, attempt to get detailed error information
+                const errorMessage = multimodalError instanceof Error 
+                  ? multimodalError.message 
+                  : String(multimodalError);
+                
+                // Log additional context for debugging
+                console.error(`[MULTIMODAL] Error context:`, {
+                  submissionId,
+                  fileName: submission.fileName,
+                  mimeType: submission.mimeType,
+                  errorMessage
+                });
+                
+                // For image-specific errors, add more context
+                if (submission.mimeType?.startsWith('image/')) {
+                  console.error(`[MULTIMODAL] Image processing error details:`, {
+                    imageType: submission.mimeType,
+                    filePathStart: filePath.substring(0, 30) + '...',
+                    isGcsPath: !filePath.startsWith('http') && !filePath.startsWith('/'),
+                    isSignedUrl: filePath.includes('storage.googleapis.com') && filePath.includes('Signature=')
+                  });
+                }
+                
+                throw new Error(`Failed to analyze multimodal submission: ${errorMessage}`);
               }
             } else {
               // Process as standard text submission
