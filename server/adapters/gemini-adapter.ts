@@ -14,7 +14,8 @@ import { ContentType } from '../utils/file-type-settings';
 import { AIAdapter, MultimodalPromptPart } from './ai-adapter';
 import { CriteriaScore } from '@shared/schema';
 import { parseStrict, shouldRetry } from '../utils/json-parser';
-import { GradingFeedback } from '../schemas/gradingSchema';
+import { GradingFeedback, SCHEMA_VERSION } from '../schemas/gradingSchema';
+import { sanitizeText, detectInjectionAttempt } from '../utils/text-sanitizer';
 
 // These are the MIME types supported by Google Gemini API
 // Based on https://ai.google.dev/gemini-api/docs/
@@ -135,6 +136,20 @@ export class GeminiAdapter implements AIAdapter {
       // Reset processing timer
       this.processingStart = Date.now();
       
+      // Sanitize input text to prevent prompt injection and other issues
+      const sanitizedPrompt = sanitizeText(prompt, 8000);
+      
+      // Check for potential injection attempts
+      const potentialInjection = detectInjectionAttempt(prompt);
+      if (potentialInjection) {
+        console.warn(`[GEMINI] Potential prompt injection detected in input`);
+      }
+      
+      // Log if text was truncated
+      if (sanitizedPrompt.length < prompt.length) {
+        console.log(`[GEMINI] Input text truncated from ${prompt.length} to ${sanitizedPrompt.length} characters`);
+      }
+      
       // Generation config parameters
       const temperature = 0.2;
       const topP = 0.8;
@@ -144,7 +159,7 @@ export class GeminiAdapter implements AIAdapter {
       // Prepare the request with proper placement of systemInstruction as a top-level field
       const requestParams: any = {
         model: this.modelName,
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        contents: [{ role: 'user', parts: [{ text: sanitizedPrompt }] }],
         // systemInstruction is now a top-level field, not inside config
         systemInstruction: systemPrompt, 
         config: {
@@ -179,12 +194,67 @@ export class GeminiAdapter implements AIAdapter {
         }
       };
       
-      // Make the API call with a single retry if needed
-      const result = await gradeWithRetry();
+      // Determine if we should use streaming based on expected output size
+      const useStreaming = maxOutputTokens > 1000;
+      let result;
       
-      // Log usage information for monitoring
+      if (useStreaming) {
+        console.log(`[GEMINI] Using streaming for large output (maxOutputTokens: ${maxOutputTokens})`);
+        // Use streaming API for large outputs to avoid truncation
+        try {
+          const stream = await this.genAI.models.generateContentStream(requestParams);
+          let streamedText = '';
+          
+          // Process the stream chunks
+          for await (const chunk of stream) {
+            if (chunk.candidates && 
+                chunk.candidates.length > 0 && 
+                chunk.candidates[0]?.content?.parts) {
+              const part = chunk.candidates[0].content.parts[0];
+              if (part.text) {
+                streamedText += part.text;
+              }
+            }
+          }
+          
+          // Create a response object similar to non-streaming API
+          result = {
+            candidates: [{
+              content: {
+                parts: [{ text: streamedText }]
+              }
+            }]
+          };
+          
+          console.log(`[GEMINI] Streaming complete, received ${streamedText.length} characters`);
+        } catch (error) {
+          console.error(`[GEMINI] Streaming error: ${error instanceof Error ? error.message : String(error)}`);
+          // Fall back to non-streaming if streaming fails
+          console.log(`[GEMINI] Falling back to non-streaming API`);
+          result = await gradeWithRetry();
+        }
+      } else {
+        // Standard API call for normal outputs
+        result = await gradeWithRetry();
+      }
+      
+      // Log comprehensive usage information for monitoring
       if (result.usageMetadata) {
-        console.log(`[GEMINI] Response usage metadata:`, result.usageMetadata);
+        const retryInfo = useStreaming ? '(streaming)' : '';
+        const metrics = {
+          modelName: this.modelName,
+          promptTokens: result.usageMetadata.promptTokenCount || 0,
+          candidatesTokens: result.usageMetadata.candidatesTokenCount || 0,
+          totalTokens: result.usageMetadata.totalTokenCount || 0,
+          streamingUsed: useStreaming,
+          processingTimeMs: Date.now() - this.processingStart
+        };
+        
+        console.log(`[GEMINI] Response usage metrics ${retryInfo}:`, metrics);
+      } else {
+        // Fallback metrics if API doesn't return usage data
+        const estimatedTokens = Math.ceil(prompt.length / 4);
+        console.log(`[GEMINI] Estimated prompt tokens: ${estimatedTokens} (no official metrics available)`);
       }
       
       // Extract text from the response
@@ -262,9 +332,23 @@ export class GeminiAdapter implements AIAdapter {
       // Process each part based on its type
       for (const part of parts) {
         if (part.type === 'text') {
-          // Text parts are straightforward - extract content as string
+          // Text parts need sanitization
+          const originalText = part.content as string;
+          const sanitizedText = sanitizeText(originalText, 8000);
+          
+          // Check for potential injection attempts
+          const potentialInjection = detectInjectionAttempt(originalText);
+          if (potentialInjection) {
+            console.warn(`[GEMINI] Potential prompt injection detected in multimodal text input`);
+          }
+          
+          // Log if text was truncated
+          if (sanitizedText.length < originalText.length) {
+            console.log(`[GEMINI] Multimodal text truncated from ${originalText.length} to ${sanitizedText.length} characters`);
+          }
+          
           apiParts.push({ 
-            text: part.content as string 
+            text: sanitizedText 
           });
         } 
         else if (part.type === 'image') {
@@ -346,8 +430,49 @@ export class GeminiAdapter implements AIAdapter {
         }
       };
       
-      // Generate content with the model, with retry
-      const result = await gradeWithRetry();
+      // Determine if we should use streaming based on expected output size
+      const useStreaming = maxOutputTokens > 1000;
+      let result;
+      
+      if (useStreaming) {
+        console.log(`[GEMINI] Using streaming for large multimodal output (maxOutputTokens: ${maxOutputTokens})`);
+        // Use streaming API for large outputs to avoid truncation
+        try {
+          const stream = await this.genAI.models.generateContentStream(requestParams);
+          let streamedText = '';
+          
+          // Process the stream chunks
+          for await (const chunk of stream) {
+            if (chunk.candidates && 
+                chunk.candidates.length > 0 && 
+                chunk.candidates[0]?.content?.parts) {
+              const part = chunk.candidates[0].content.parts[0];
+              if (part.text) {
+                streamedText += part.text;
+              }
+            }
+          }
+          
+          // Create a response object similar to non-streaming API
+          result = {
+            candidates: [{
+              content: {
+                parts: [{ text: streamedText }]
+              }
+            }]
+          };
+          
+          console.log(`[GEMINI] Multimodal streaming complete, received ${streamedText.length} characters`);
+        } catch (error) {
+          console.error(`[GEMINI] Multimodal streaming error: ${error instanceof Error ? error.message : String(error)}`);
+          // Fall back to non-streaming if streaming fails
+          console.log(`[GEMINI] Falling back to non-streaming API for multimodal content`);
+          result = await gradeWithRetry();
+        }
+      } else {
+        // Standard API call for normal outputs
+        result = await gradeWithRetry();
+      }
       
       // Extract text from the response
       let text = '';
@@ -387,25 +512,50 @@ export class GeminiAdapter implements AIAdapter {
       // Track performance
       const processingEnd = Date.now();
       
-      // Calculate estimated token count (simple approximation)
-      // Estimate multimodal tokens - images are more expensive
-      let inputTokens = 0;
-      for (const part of parts) {
-        if (part.type === 'text') {
-          // Text token estimation
-          const content = part.content as string;
-          inputTokens += Math.ceil(content.length / 4);
-        } else if (part.type === 'image') {
-          // Images are much more token-intensive
-          inputTokens += 3000; // Conservative estimate for image tokens
-        } else {
-          // Other file types
-          inputTokens += 1000; // Rough estimate for documents, audio, etc.
-        }
-      }
+      // Use actual usage data if available, otherwise estimate
+      let tokenCount = 0;
       
-      const outputTokens = Math.ceil(text.length / 4);
-      const tokenCount = inputTokens + outputTokens;
+      if (result.usageMetadata && result.usageMetadata.totalTokenCount) {
+        // Use actual token count from API if available
+        tokenCount = result.usageMetadata.totalTokenCount;
+        
+        // Log comprehensive usage information
+        const retryInfo = useStreaming ? '(streaming)' : '';
+        const metrics = {
+          modelName: this.modelName,
+          promptTokens: result.usageMetadata.promptTokenCount || 0,
+          candidatesTokens: result.usageMetadata.candidatesTokenCount || 0,
+          totalTokens: result.usageMetadata.totalTokenCount || 0,
+          streamingUsed: useStreaming,
+          multimodalParts: apiParts.length,
+          processingTimeMs: Date.now() - this.processingStart
+        };
+        
+        console.log(`[GEMINI] Multimodal response usage metrics ${retryInfo}:`, metrics);
+      } else {
+        // Fall back to estimation if API doesn't provide token counts
+        // Calculate estimated token count (simple approximation)
+        // Estimate multimodal tokens - images are more expensive
+        let inputTokens = 0;
+        for (const part of parts) {
+          if (part.type === 'text') {
+            // Text token estimation
+            const content = part.content as string;
+            inputTokens += Math.ceil(content.length / 4);
+          } else if (part.type === 'image') {
+            // Images are much more token-intensive
+            inputTokens += 3000; // Conservative estimate for image tokens
+          } else {
+            // Other file types
+            inputTokens += 1000; // Rough estimate for documents, audio, etc.
+          }
+        }
+        
+        const outputTokens = Math.ceil(text.length / 4);
+        tokenCount = inputTokens + outputTokens;
+        
+        console.log(`[GEMINI] Estimated multimodal tokens: ${tokenCount} (no official metrics available)`);
+      }
       
       // Return the parsed content with the interface-required format
       return {

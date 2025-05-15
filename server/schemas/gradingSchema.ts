@@ -4,6 +4,9 @@
  */
 import { z } from "zod";
 
+// Define schema version for tracking/history
+export const SCHEMA_VERSION = "1.0.0";
+
 // Define a schema for criteria scores
 const CriteriaScoreSchema = z.object({
   criteriaId: z.string(), // Must be string to match shared schema
@@ -18,10 +21,12 @@ export const GradingSchema = z.object({
   suggestions: z.array(z.string()),
   summary: z.string(),
   score: z.number().min(0).max(100),
-  criteriaScores: z.array(CriteriaScoreSchema).optional()
+  criteriaScores: z.array(CriteriaScoreSchema).optional(),
+  schemaVersion: z.string().default(SCHEMA_VERSION)
 });
 
-// Freeze to prevent modification
+// Freeze all schemas to prevent modification
+Object.freeze(CriteriaScoreSchema);
 Object.freeze(GradingSchema);
 
 // Export the types
