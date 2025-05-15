@@ -1122,13 +1122,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         feedbackItems = feedbackItems.filter((f: any) => submissionIds.includes(f.submissionId));
       }
       
-      const scores = feedbackItems
-        .map((f: { score: number | null | undefined }) => f.score)
-        .filter((score: number | null | undefined) => score !== null && score !== undefined) as number[];
+      // Extract and validate scores with extensive error handling
+      const scores: number[] = [];
+      for (const item of feedbackItems) {
+        // Check if score exists and is a number or can be converted to one
+        if (item.score !== null && item.score !== undefined) {
+          const numericScore = Number(item.score);
+          // Only add valid scores (not NaN) that are within reasonable range (0-100)
+          if (!isNaN(numericScore) && numericScore >= 0 && numericScore <= 100) {
+            scores.push(numericScore);
+          } else {
+            console.warn(`Invalid score found in feedback: ${item.score}, converted to: ${numericScore}`);
+          }
+        }
+      }
       
-      const averageScore = scores.length > 0
-        ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-        : 0;
+      // Safely calculate average score with bounds checking
+      let averageScore = 0;
+      if (scores.length > 0) {
+        try {
+          const sum = scores.reduce((a, b) => {
+            // Additional safety check in reducer
+            if (typeof a !== 'number' || typeof b !== 'number' || isNaN(a) || isNaN(b)) {
+              console.warn(`Invalid values in score reduction: a=${a}, b=${b}`);
+              return 0; // Reset to avoid NaN propagation
+            }
+            return a + b;
+          }, 0);
+          
+          averageScore = Math.round(sum / scores.length);
+          
+          // Final sanity check
+          if (isNaN(averageScore) || averageScore < 0 || averageScore > 100) {
+            console.warn(`Calculated average score out of bounds: ${averageScore}, resetting to 0`);
+            averageScore = 0;
+          }
+        } catch (error) {
+          console.error("Error calculating average score:", error);
+          averageScore = 0;
+        }
+      }
       
       // Calculate feedback generation and viewed stats
       const feedbackGenerated = feedbackItems.length;
