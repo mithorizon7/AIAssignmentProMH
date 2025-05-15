@@ -44,7 +44,7 @@ interface GcsDownloadResult {
   buffer: Buffer;
   metadata?: {
     contentType?: string;
-    size?: number;
+    size?: any; // Could be string or number based on GCS SDK behavior
     [key: string]: any;
   };
 }
@@ -119,7 +119,7 @@ async function downloadFromGCS(url: string, mimeType?: string): Promise<GcsDownl
     
     try {
       // Get the bucket and file objects for direct download
-      const bucket = gcsClient.getBucket();
+      const bucket = gcsClient.getBucket(); // Uses default bucket
       const file = bucket.file(objectPath);
       
       // Download the file directly
@@ -134,7 +134,7 @@ async function downloadFromGCS(url: string, mimeType?: string): Promise<GcsDownl
         buffer: fileData,
         metadata: {
           contentType: metadata.contentType || mimeType,
-          size: typeof metadata.size === 'string' ? Number(metadata.size) : (metadata.size || fileData.length),
+          size: fileData.length, // Use the actual buffer length directly
           ...metadata
         }
       };
