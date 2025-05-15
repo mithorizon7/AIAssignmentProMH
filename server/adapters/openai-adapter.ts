@@ -17,11 +17,23 @@ export class OpenAIAdapter implements AIAdapter {
     this.model = "gpt-4.1-mini-2025-04-14"; 
   }
 
-  async generateCompletion(prompt: string) {
+  async generateCompletion(prompt: string, systemPrompt?: string) {
     try {
+      // Prepare properly typed messages array with optional system message
+      const messages: Array<OpenAI.ChatCompletionMessageParam> = [];
+      
+      // Add system prompt if provided
+      if (systemPrompt) {
+        console.log(`[OPENAI] Using system prompt (${systemPrompt.length} chars)`);
+        messages.push({ role: "system", content: systemPrompt });
+      }
+      
+      // Add user prompt
+      messages.push({ role: "user", content: prompt });
+      
       const response = await this.openai.chat.completions.create({
         model: this.model,
-        messages: [{ role: "user", content: prompt }],
+        messages: messages,
         temperature: 0.5,
         response_format: { type: "json_object" },
       });

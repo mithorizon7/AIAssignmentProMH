@@ -177,8 +177,24 @@ ${params.studentSubmissionContent}
       // Combine all sections into the final prompt
       const finalPrompt = promptSegments.join("\n");
 
-      // Send to AI adapter
-      const response = await this.adapter.generateCompletion(finalPrompt);
+      // Create a system prompt for text submissions
+      const systemPrompt = `You are an expert AI Teaching Assistant analyzing a text-based submission.
+Your task is to provide precise, detailed, and constructive feedback on the student's work.
+
+Your feedback should be:
+- Specific and reference exact elements in the submission
+- Constructive and actionable
+- Balanced, noting both strengths and areas for improvement
+- Free of personal opinions or bias
+- Focused on helping the student improve
+
+Respond ONLY with valid, complete JSON matching the requested structure.
+Do not include explanatory text, comments, or markdown outside the JSON object.`;
+
+      console.log(`[AIService] Using system prompt for text submission (${systemPrompt.length} chars)`);
+      
+      // Send to AI adapter with system prompt
+      const response = await this.adapter.generateCompletion(finalPrompt, systemPrompt);
       
       const processingTime = Date.now() - startTime;
       
