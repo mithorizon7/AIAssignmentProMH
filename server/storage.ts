@@ -210,9 +210,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Assignment operations
-  async getAssignment(id: number): Promise<Assignment | undefined> {
-    const [assignment] = await db.select().from(assignments).where(eq(assignments.id, id));
-    return assignment;
+  async getAssignment(id: number | undefined): Promise<Assignment | undefined> {
+    // Guard against NaN or invalid values
+    if (id === undefined || isNaN(id)) {
+      console.warn(`getAssignment called with invalid id: ${id}`);
+      return undefined;
+    }
+    
+    try {
+      const [assignment] = await db.select().from(assignments).where(eq(assignments.id, id));
+      return assignment;
+    } catch (error) {
+      console.error(`Error retrieving assignment with id ${id}:`, error);
+      return undefined;
+    }
   }
 
   async createAssignment(insertAssignment: InsertAssignment): Promise<Assignment> {

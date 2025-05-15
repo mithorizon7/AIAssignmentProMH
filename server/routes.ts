@@ -10,7 +10,7 @@ import { AIService } from "./services/ai-service";
 import { GeminiAdapter, SUPPORTED_MIME_TYPES } from "./adapters/gemini-adapter";
 import { OpenAIAdapter } from "./adapters/openai-adapter";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 import { db } from "./db";
 import { submissions, feedback, users, type User } from "@shared/schema";
 import { v4 as uuidv4 } from "uuid";
@@ -929,6 +929,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
   }));
 
+  // Import count from drizzle-orm if it's not available in the current scope
+  const { count: countFn } = await import('drizzle-orm');
+
   // Assignment statistics for instructors
   app.get('/api/assignments/stats', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
       // Extract and validate course/assignment IDs from query params
@@ -985,7 +988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalStudents = students.length;
       } else {
         // Count all students
-        const studentCount = await db.select({ count: count() })
+        const studentCount = await db.select({ count: countFn() })
           .from(users)
           .where(eq(users.role, 'student'));
         totalStudents = studentCount[0]?.count || 0;
