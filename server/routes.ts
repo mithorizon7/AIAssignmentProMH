@@ -27,8 +27,10 @@ function generateShareableCode(length = 8): string {
   const uuid = uuidv4();
   
   // Convert to alphanumeric characters by removing dashes and taking first 'length' characters
+  // Always use uppercase for consistency in storage
   const code = uuid.replace(/-/g, '').substring(0, length).toUpperCase();
   
+  console.log(`Generated shareable code: ${code}`);
   return code;
 }
 
@@ -330,7 +332,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .map(a => ({ id: a.id, code: a.shareableCode }));
     console.log(`Available shareable codes:`, JSON.stringify(allCodes));
     
-    const assignment = assignments.find(a => a.shareableCode === code);
+    // Use case-insensitive comparison to find the assignment
+    // This fixes issues where the code might be in a different case than stored
+    const assignment = assignments.find(a => 
+      a.shareableCode && a.shareableCode.toLowerCase() === code.toLowerCase());
     
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment not found with this code' });
