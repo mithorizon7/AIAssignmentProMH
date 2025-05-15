@@ -1,0 +1,43 @@
+Critical - Correct API Request Structure (Align with Official Documentation)
+
+Correctly Structure GenerateContentRequest:
+Why: The current requestParams in gemini-adapter-new-2.ts places generation tuning fields (like temperature, responseMimeType, responseSchema) at the top level. The official API and SDK expect these within a nested generationConfig object. systemInstruction is also a top-level field, separate from generationConfig. Incorrect structure will lead to errors or ignored parameters.
+Reference: https://ai.google.dev/api/generate-content#request-body (shows the JSON request structure). The @google/genai SDK's GenerateContentRequest type will mirror this.
+What to do:
+Import necessary types: GenerateContentRequest, GenerationConfig, Part, Content, SystemInstruction from @google/genai.
+
+In both generateCompletion and generateMultimodalCompletion, modify requestParams as follows:
+
+TypeScript
+// Example for generateMultimodalCompletion:
+const generationConfig: GenerationConfig = {
+    temperature: 0.2, // Your values
+    topP: 0.8,
+    topK: 40,
+    maxOutputTokens: 1024,
+    responseMimeType: "application/json",
+    responseSchema: this.responseSchema // Assuming this.responseSchema aligns with the expected type for responseSchema
+};
+
+let systemInstructionContent: SystemInstruction | undefined = undefined;
+if (systemPrompt) {
+    // The API spec shows systemInstruction can be { role: "system", parts: [{text: "..."}] }
+    // or sometimes just { parts: [{text: "..."}] } or even simpler depending on SDK sugar.
+    // Check the 'SystemInstruction' type from '@google/genai'.
+    // A common pattern is:
+    systemInstructionContent = { parts: [{ text: systemPrompt }] };
+    // Or, if 'role' is expected by the SDK's SystemInstruction type:
+    // systemInstructionContent = { role: 'system', parts: [{ text: systemPrompt }] };
+}
+
+const requestParams: GenerateContentRequest = {
+    model: this.modelName, // This is correct here
+    contents: [{ role: 'user', parts: apiParts }], // apiParts should be Part[]
+    generationConfig: generationConfig, // Correctly nested
+    // Conditionally add systemInstruction if it exists
+    ...(systemInstructionContent && { systemInstruction: systemInstructionContent })
+    // safetySettings: [] // Optional: Add safetySettings here if needed
+};
+ **Delete the manual apiParts.unshift({ text: \${systemPrompt}` });** if you implementsystemInstruction` as a dedicated field.
+
+Ensure apiParts in generateMultimodalCompletion and the parts in generateCompletion are correctly typed as Part[] and that contents is Content[]. The structure [{ role: 'user', parts: apiParts }] is generally correct for the contents array when providing a single turn of user input.
