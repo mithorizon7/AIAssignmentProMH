@@ -120,8 +120,8 @@ export class GeminiAdapter implements AIAdapter {
     // Initialize the Google Generative AI client
     this.genAI = new GoogleGenAI(apiKey);
     
-    // Using a supported model from Google's documentation
-    this.modelName = "gemini-2.5-flash-preview-04-17";
+    // Use a generally available model that supports multimodal
+    this.modelName = "gemini-pro-vision";
     
     console.log(`[GEMINI] Initializing with model: ${this.modelName}`);
   }
@@ -214,8 +214,16 @@ export class GeminiAdapter implements AIAdapter {
       // Use models.generateContent directly
       const result = await this.genAI.models.generateContent(params);
       
-      const response = result;
-      const text = response.response.text();
+      // Extract text from the response - modern @google/genai SDK format
+      let text = '';
+      if (result.candidates && result.candidates[0]?.content?.parts?.[0]?.text) {
+        text = result.candidates[0].content.parts[0].text;
+      } else {
+        console.warn('[GEMINI] Could not extract text response from standard structure');
+        // Try backup method if available
+        text = typeof result.text === 'function' ? result.text() :
+              (typeof result.text === 'string' ? result.text : JSON.stringify(result));
+      }
       
       console.log(`[GEMINI] Response received, length: ${text.length} characters`);
       console.log(`[GEMINI] Response preview: ${text.substring(0, Math.min(100, text.length))}...`);
@@ -223,20 +231,14 @@ export class GeminiAdapter implements AIAdapter {
       // Use responseSchema parsed property if available, with fallbacks
       let parsedContent: ParsedContent = {};
       
-      // First, check if the SDK parsed the response according to our schema
-      if (response.response.candidates && 
-          response.response.candidates[0] && 
-          response.response.candidates[0].parsed) {
-        // With responseSchema, we should have a parsed property
-        try {
-          parsedContent = response.response.candidates[0].parsed as ParsedContent;
-          console.log(`[GEMINI] Successfully used SDK-parsed response`);
-        } catch (error) {
-          console.warn(`[GEMINI] Error accessing parsed response: ${error instanceof Error ? error.message : String(error)}`);
-          // Continue to fallbacks
-        }
-      } else {
-        console.log(`[GEMINI] No parsed response available from SDK, falling back to manual parsing`);
+      // First, check if we can parse the response as JSON directly
+      try {
+        // Try to parse the text as JSON first (most reliable method)
+        parsedContent = JSON.parse(text);
+        console.log(`[GEMINI] Successfully parsed direct JSON response`);
+      } catch (error) {
+        console.warn(`[GEMINI] Direct JSON parsing failed: ${error instanceof Error ? error.message : String(error)}`);
+        console.log(`[GEMINI] Falling back to manual parsing methods`);
       }
       
       // If parsed content is empty or missing required fields, fall back to manual parsing
@@ -530,8 +532,16 @@ Please analyze the above submission and provide feedback in the following JSON f
       
       console.log(`[GEMINI] Successfully received response from Gemini API`);
       
-      const response = result.response;
-      const text = response.text();
+      // Extract text from the response - modern @google/genai SDK format
+      let text = '';
+      if (result.candidates && result.candidates[0]?.content?.parts?.[0]?.text) {
+        text = result.candidates[0].content.parts[0].text;
+      } else {
+        console.warn('[GEMINI] Could not extract text response from standard structure');
+        // Try backup method if available
+        text = typeof result.text === 'function' ? result.text() :
+              (typeof result.text === 'string' ? result.text : JSON.stringify(result));
+      }
       
       console.log(`[GEMINI] Response length: ${text.length} characters`);
       console.log(`[GEMINI] Response preview: ${text.substring(0, Math.min(100, text.length))}...`);
@@ -539,20 +549,13 @@ Please analyze the above submission and provide feedback in the following JSON f
       // Parse the response as JSON with fallbacks
       let parsedContent: ParsedContent = {};
       
-      // First, check if we have a parsed response from the SDK using our responseSchema
-      if (response.candidates && 
-          response.candidates[0] && 
-          response.candidates[0].parsed) {
-        // With responseSchema, we should have a parsed property
-        try {
-          parsedContent = response.candidates[0].parsed as ParsedContent;
-          console.log(`[GEMINI] Successfully used SDK-parsed response for multimodal content`);
-        } catch (error) {
-          console.warn(`[GEMINI] Error accessing parsed response for multimodal: ${error instanceof Error ? error.message : String(error)}`);
-          // Continue to fallbacks
-        }
-      } else {
-        console.log(`[GEMINI] No parsed response available from SDK for multimodal, falling back to manual parsing`);
+      // First try direct JSON parsing (most reliable with responseMimeType: "application/json")
+      try {
+        parsedContent = JSON.parse(text);
+        console.log(`[GEMINI] Successfully parsed direct JSON response for multimodal content`);
+      } catch (parseError) {
+        console.warn(`[GEMINI] Failed to parse direct response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+        console.log(`[GEMINI] Falling back to manual parsing for multimodal content`);
       }
       
       // If parsed content is empty or missing required fields, fall back to manual parsing
@@ -651,8 +654,8 @@ Please analyze the above submission and provide feedback in the following JSON f
       
       // Try to get token usage from response metadata, fall back to estimation
       let tokenCount = 0;
-      if (response.usageMetadata?.totalTokens) {
-        tokenCount = response.usageMetadata.totalTokens;
+      if (result.usageMetadata?.totalTokens) {
+        tokenCount = result.usageMetadata.totalTokens;
       } else {
         // Estimate token count based on response length (~4 chars per token)
         tokenCount = Math.ceil(text.length / 4);
