@@ -1334,22 +1334,49 @@ Please analyze the above submission and provide feedback in the following JSON f
       // Parse the content as JSON
       let parsedContent: ParsedContent = {};
       try {
-        // Note: responseFormat is not supported in the current version, but gemini-2.5 models
-        // might still return properly formatted JSON that we can parse directly
-        if (this.modelName.includes('gemini-2.5')) {
-          console.log('[GEMINI] Attempting to parse structured response from gemini-2.5 model');
-          parsedContent = JSON.parse(text);
-        } else {
-          // For older models, we may need to extract JSON from text
-          console.log('[GEMINI] Attempting to extract JSON from text response');
-          // Extract JSON from the response if it's embedded in text
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            console.log('[GEMINI] Found JSON block in response');
-            parsedContent = JSON.parse(jsonMatch[0]);
+        // First check for markdown code blocks (```json), which Gemini-2.5 loves to use
+        const markdownMatch = text.match(/```(?:json)?\s*\n([\s\S]*?)\n\s*```/);
+        if (markdownMatch) {
+          console.log('[GEMINI] Found markdown code block in response');
+          const jsonContent = markdownMatch[1].trim();
+          try {
+            parsedContent = JSON.parse(jsonContent);
+            console.log('[GEMINI] Successfully parsed JSON from markdown code block');
+          } catch (markdownError) {
+            console.log('[GEMINI] Failed to parse markdown block as JSON:', markdownError.message);
+            // We'll continue to other methods if this fails
+          }
+        }
+        
+        // If no valid content from markdown block, try direct JSON parsing
+        if (Object.keys(parsedContent).length === 0) {
+          if (this.modelName.includes('gemini-2.5')) {
+            console.log('[GEMINI] Attempting to parse direct structured response');
+            try {
+              parsedContent = JSON.parse(text);
+            } catch (directError) {
+              console.log('[GEMINI] Failed to parse direct response:', directError.message);
+            }
           } else {
-            console.log('[GEMINI] No JSON block found, trying to parse entire response as JSON');
-            parsedContent = JSON.parse(text);
+            // For older models, we extract JSON from text
+            console.log('[GEMINI] Attempting to extract JSON from text response');
+            // Extract JSON object from the response if it's embedded in text
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              console.log('[GEMINI] Found JSON block in response');
+              try {
+                parsedContent = JSON.parse(jsonMatch[0]);
+              } catch (jsonError) {
+                console.log('[GEMINI] Failed to parse extracted JSON:', jsonError.message);
+              }
+            } else {
+              console.log('[GEMINI] No JSON block found, trying direct parse as fallback');
+              try {
+                parsedContent = JSON.parse(text);
+              } catch (fallbackError) {
+                console.log('[GEMINI] Failed fallback parse:', fallbackError.message);
+              }
+            }
           }
         }
         
