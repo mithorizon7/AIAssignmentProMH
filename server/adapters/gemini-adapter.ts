@@ -650,41 +650,85 @@ export class GeminiAdapter implements AIAdapter {
             // Follow Gemini API image handling guidelines
             // https://ai.google.dev/gemini-api/docs/image-understanding
             if (Buffer.isBuffer(part.content)) {
+              // Log detailed information about the image being processed
+              console.log(`[GEMINI] Processing image with size: ${part.content.length} bytes, MIME type: ${mimeType}`);
+              
               // Check if MIME type is supported
               if (!this.isMimeTypeSupported(mimeType, 'image')) {
+                console.warn(`[GEMINI] Unsupported image format: ${mimeType}`);
                 contentParts.push({
                   text: `[IMAGE: Unsupported format ${mimeType}. Supported formats are: ${SUPPORTED_MIME_TYPES.image.join(', ')}]`
                 });
                 break;
               }
               
-              if (isLargeFile) {
-                try {
-                  // For large images (>2MB), use Gemini File API
-                  const fileData = await this.createFileData(part.content, mimeType);
-                  fileObjects.push(fileData);
+              try {
+                // Validate image data before processing
+                this.validateImageBuffer(part.content, mimeType);
+                
+                // Approach depends on model version and file size
+                // For gemini-2.5-* models, the File API is recommended for all image sizes
+                if (this.modelName.includes('gemini-2.5') || isLargeFile) {
+                  console.log(`[GEMINI] Using File API for image (${isLargeFile ? 'large file' : 'gemini-2.5 model'})`);
                   
-                  // Add the file part with fileData
-                  contentParts.push({
-                    fileData: {
-                      fileUri: this.getFileUri(fileData),
-                      mimeType: mimeType
-                    }
-                  });
-                } catch (error) {
-                  console.warn('Failed to use Gemini File API for large image:', error);
-                  // Use our specialized handler for file upload failures
-                  contentParts.push(
-                    this.handleFileUploadFailure(part.content, mimeType, textContent)
-                  );
+                  // For large images or gemini-2.5 models, use Gemini File API
+                  const fileData = await this.createFileData(part.content, mimeType);
+                  
+                  // Check if the createFileData method returned a special flag for inline data
+                  if (fileData && (fileData as any).useInlineData === true) {
+                    console.log(`[GEMINI] File API returned useInlineData flag, falling back to inline data`);
+                    this.addInlineImagePart(contentParts, part.content, mimeType);
+                  } else {
+                    fileObjects.push(fileData);
+                    
+                    // Get the file URI
+                    const fileUri = this.getFileUri(fileData);
+                    console.log(`[GEMINI] Successfully created file, URI: ${fileUri.substring(0, 30)}...`);
+                    
+                    // Add the file part with fileData
+                    contentParts.push({
+                      fileData: {
+                        fileUri: fileUri,
+                        mimeType: mimeType
+                      }
+                    });
+                  }
+                } else {
+                  // For smaller images with older models, use inline data (more efficient)
+                  console.log(`[GEMINI] Using inline data for small image (${part.content.length} bytes)`);
+                  this.addInlineImagePart(contentParts, part.content, mimeType);
                 }
-              } else {
-                // For smaller images, use inline data (more efficient)
-                this.addInlineImagePart(contentParts, part.content, mimeType);
+              } catch (error) {
+                console.error('[GEMINI] Error processing image:', error);
+                
+                // For any error, try to fall back to inline data if the image is small enough
+                if (part.content.length < 4 * 1024 * 1024) { // 4MB limit
+                  console.warn('[GEMINI] Falling back to inline data after error');
+                  try {
+                    this.addInlineImagePart(contentParts, part.content, mimeType);
+                  } catch (inlineError) {
+                    console.error('[GEMINI] Inline data fallback also failed:', inlineError);
+                    contentParts.push({
+                      text: `[IMAGE: The image could not be processed. Error: ${error instanceof Error ? error.message : String(error)}]`
+                    });
+                  }
+                } else {
+                  contentParts.push({
+                    text: `[IMAGE: The image is too large (${Math.round(part.content.length/1024)}KB) and could not be processed]`
+                  });
+                }
               }
             } else if (typeof part.content === 'string') {
               // Handle base64 or data URI strings for images
-              this.addInlineImagePart(contentParts, part.content, mimeType);
+              console.log(`[GEMINI] Processing string-based image data (length: ${part.content.length})`);
+              try {
+                this.addInlineImagePart(contentParts, part.content, mimeType);
+              } catch (error) {
+                console.error('[GEMINI] Error processing string image data:', error);
+                contentParts.push({
+                  text: `[IMAGE: Could not process the image data. Error: ${error instanceof Error ? error.message : String(error)}]`
+                });
+              }
             }
             break;
             
@@ -849,48 +893,133 @@ Please analyze the above submission and provide feedback in the following JSON f
       // Generate content with the parts
       const generationConfig: GenerationConfig = {
         temperature: 0.7, 
-        maxOutputTokens: 2048
+        maxOutputTokens: 2048,
+        topP: 0.95,
+        topK: 64
       };
       
-      // Add responseFormat if available in this version of the API
+      // Add responseFormat for structured JSON output if available in this version of the API
       // This is added in newer versions of the Gemini API
       if (this.modelName.includes('gemini-2')) {  // For Gemini 2 models
+        console.log(`[GEMINI] Using JSON response format for ${this.modelName}`);
         generationConfig.responseFormat = { type: "json" };
+      } else {
+        console.log(`[GEMINI] Using standard response format for ${this.modelName}`);
       }
       
-      const result = await this.model.generateContent({
-        contents: [{ role: 'user', parts: contentParts }],
-        generationConfig
+      // Log details about the request we're about to make
+      console.log(`[GEMINI] Sending multimodal request to Gemini API with ${contentParts.length} parts`);
+      
+      // For logging and debugging, summarize content parts without logging entire content
+      const contentPartsInfo = contentParts.map(part => {
+        if ('text' in part && part.text) {
+          return { type: 'text', length: part.text.length };
+        } else if ('inlineData' in part && part.inlineData) {
+          return { 
+            type: 'inlineData', 
+            mimeType: part.inlineData.mimeType || 'unknown',
+            dataLength: part.inlineData.data?.length || 0
+          };
+        } else if ('fileData' in part && part.fileData) {
+          const fileUri = part.fileData.fileUri || '';
+          return { 
+            type: 'fileData', 
+            mimeType: part.fileData.mimeType || 'unknown',
+            fileUri: fileUri.substring(0, Math.min(20, fileUri.length)) + (fileUri.length > 20 ? '...' : '')
+          };
+        }
+        return { type: 'unknown' };
       });
+      console.log(`[GEMINI] Content parts summary:`, contentPartsInfo);
+      
+      // Make the API call
+      let result;
+      try {
+        result = await this.model.generateContent({
+          contents: [{ role: 'user', parts: contentParts }],
+          generationConfig
+        });
+        console.log(`[GEMINI] Successfully received response from Gemini API`);
+      } catch (generateError) {
+        console.error(`[GEMINI] Error generating content:`, generateError);
+        
+        // Provide more context in the error message
+        const modelInfo = {
+          modelName: this.modelName,
+          numContentParts: contentParts.length,
+          hasImages: contentParts.some(part => 
+            'inlineData' in part || 
+            ('fileData' in part && part.fileData && part.fileData.mimeType && part.fileData.mimeType.startsWith('image/'))
+          ),
+          hasDocuments: contentParts.some(part => 
+            'fileData' in part && part.fileData && part.fileData.mimeType && part.fileData.mimeType.startsWith('application/')
+          ),
+        };
+        
+        // Always clean up file resources even if generation fails
+        try {
+          for (const fileObject of fileObjects) {
+            if (fileObject && typeof (fileObject as GeminiFileData).delete === 'function') {
+              await (fileObject as GeminiFileData).delete?.();
+              console.log('[GEMINI] Cleaned up file resource after error');
+            }
+          }
+        } catch (cleanupError) {
+          console.warn('[GEMINI] Error cleaning up file resources after generation error:', cleanupError);
+        }
+        
+        throw new Error(`Gemini API error with ${this.modelName}: ${generateError instanceof Error ? generateError.message : String(generateError)}. Context: ${JSON.stringify(modelInfo)}`);
+      }
       
       // Cleanup file resources
       for (const fileObject of fileObjects) {
         try {
           if (fileObject && typeof (fileObject as GeminiFileData).delete === 'function') {
             await (fileObject as GeminiFileData).delete?.();
+            console.log('[GEMINI] Successfully cleaned up file resource');
           }
         } catch (cleanupError) {
-          console.warn('Error cleaning up file resource:', cleanupError);
+          console.warn('[GEMINI] Error cleaning up file resource:', cleanupError);
         }
       }
       
       const response = result.response;
       const text = response.text();
+      console.log(`[GEMINI] Response length: ${text.length} characters`);
+      
+      // Log a snippet of the response for debugging
+      if (text.length > 0) {
+        console.log(`[GEMINI] Response preview: ${text.substring(0, Math.min(100, text.length))}...`);
+      }
       
       // Parse the content as JSON
       let parsedContent: ParsedContent = {};
       try {
-        // Extract JSON from the response if it's embedded in text
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          parsedContent = JSON.parse(jsonMatch[0]);
-        } else {
+        // With gemini-2.5 models, we should get direct JSON when using responseFormat
+        if (this.modelName.includes('gemini-2.5')) {
+          console.log('[GEMINI] Parsing direct JSON response from gemini-2.5 model');
           parsedContent = JSON.parse(text);
+        } else {
+          // For older models, we may need to extract JSON from text
+          console.log('[GEMINI] Attempting to extract JSON from text response');
+          // Extract JSON from the response if it's embedded in text
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            console.log('[GEMINI] Found JSON block in response');
+            parsedContent = JSON.parse(jsonMatch[0]);
+          } else {
+            console.log('[GEMINI] No JSON block found, trying to parse entire response as JSON');
+            parsedContent = JSON.parse(text);
+          }
         }
-      } catch (e) {
-        console.error("Failed to parse JSON from Gemini multimodal response:", e);
-        console.log("Raw response:", text);
+        
+        console.log('[GEMINI] Successfully parsed JSON:', Object.keys(parsedContent));
+      } catch (parseError) {
+        console.error("[GEMINI] Failed to parse JSON from Gemini response:", parseError);
+        console.log("[GEMINI] Raw response:", text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+        
         // Attempt to extract structured data even from non-JSON response
+        console.log('[GEMINI] Attempting to extract structured data using fallback extractors');
         parsedContent = {
           strengths: extractListItems(text, "strengths"),
           improvements: extractListItems(text, "improvements"),
@@ -898,6 +1027,10 @@ Please analyze the above submission and provide feedback in the following JSON f
           summary: extractSummary(text),
           score: extractScore(text)
         };
+        
+        console.log('[GEMINI] Extracted data using fallback methods:', Object.keys(parsedContent).filter(k => 
+          Array.isArray(parsedContent[k]) ? parsedContent[k].length > 0 : parsedContent[k]
+        ));
       }
       
       /**
@@ -926,27 +1059,38 @@ Please analyze the above submission and provide feedback in the following JSON f
                     
         // If we couldn't get token count from API response metadata, estimate from text length
         if (tokenCount === 0) {
-          console.info("Token count not available from Gemini API response, using estimation method");
+          console.info("[GEMINI] Token count not available from Gemini API response, using estimation method");
           tokenCount = Math.ceil(text.length / 4); // Estimation: ~4 characters per token
+          console.log(`[GEMINI] Estimated token count: ${tokenCount}`);
+        } else {
+          console.log(`[GEMINI] Actual token count from API: ${tokenCount}`);
         }
       } catch (e) {
         // If any error occurs while trying to access the response metadata,
         // fall back to text length estimation
-        console.warn("Error accessing Gemini API response metadata for token count:", e);
+        console.warn("[GEMINI] Error accessing Gemini API response metadata for token count:", e);
         tokenCount = Math.ceil(text.length / 4); // Estimation: ~4 characters per token
+        console.log(`[GEMINI] Fallback estimated token count: ${tokenCount}`);
       }
       
-      return {
+      // Create our standardized response object with all fields properly initialized
+      const standardResponse = {
         strengths: parsedContent.strengths || [],
         improvements: parsedContent.improvements || [],
         suggestions: parsedContent.suggestions || [],
         summary: parsedContent.summary || "",
         score: parsedContent.score,
         criteriaScores: parsedContent.criteriaScores || [],
-        rawResponse: parsedContent,
+        rawResponse: parsedContent as Record<string, unknown>,
         modelName: this.modelName,
         tokenCount: tokenCount
       };
+      
+      // Log successful completion of multimodal AI generation
+      console.log(`[GEMINI] Successfully completed multimodal AI generation with ${this.modelName}`);
+      console.log(`[GEMINI] Response contains: ${standardResponse.strengths.length} strengths, ${standardResponse.improvements.length} improvements, score: ${standardResponse.score || 'none'}`);
+      
+      return standardResponse;
     } catch (error: unknown) {
       console.error("Gemini multimodal API error:", error);
       const errorMessage = error instanceof Error ? error.message : String(error);
