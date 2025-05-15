@@ -224,12 +224,17 @@ export class GeminiAdapter implements AIAdapter {
       // Track performance
       const processingEnd = Date.now();
       
-      // Return the parsed and validated content
+      // Calculate estimated token count (simple approximation)
+      const inputTokens = Math.ceil(prompt.length / 4);
+      const outputTokens = Math.ceil(text.length / 4);
+      const tokenCount = inputTokens + outputTokens;
+      
+      // Return the parsed and validated content in the expected interface format
       return {
         ...parsedContent,
         modelName: this.modelName,
-        rawResponse: text,
-        processTime: (processingEnd - this.processingStart)
+        rawResponse: JSON.parse(text), // Convert string to Record<string, unknown>
+        tokenCount: tokenCount
       };
     } catch (error) {
       console.error(`[GEMINI] Error in generateCompletion: ${error instanceof Error ? error.message : String(error)}`);
@@ -256,26 +261,34 @@ export class GeminiAdapter implements AIAdapter {
       // Process each part based on its type
       for (const part of parts) {
         if (part.type === 'text') {
-          // Text parts are straightforward
+          // Text parts are straightforward - extract content as string
           apiParts.push({ 
-            text: part.text 
+            text: part.content as string 
           });
         } 
-        else if (part.type === 'image' && part.base64Data) {
+        else if (part.type === 'image') {
+          // Convert Buffer to base64 string if needed
+          const base64Data = Buffer.isBuffer(part.content) 
+            ? part.content.toString('base64')
+            : part.content as string;
+            
           // Image parts need specific formatting with MIME type and base64
           apiParts.push({
             inlineData: {
-              data: part.base64Data,
+              data: base64Data,
               mimeType: part.mimeType || 'image/jpeg'
             }
           });
         }
-        else if (part.type === 'file' && part.fileData) {
-          // File data also needs specific formatting
+        else if (part.type === 'document' || part.type === 'audio' || part.type === 'video') {
+          // For document/audio/video we expect content to be a fileUri string
+          const fileUri = part.content as string;
+          
+          // File data needs specific formatting
           apiParts.push({
             fileData: {
               mimeType: part.mimeType || 'application/octet-stream',
-              fileUri: part.fileData
+              fileUri: fileUri
             }
           });
         }
@@ -373,12 +386,32 @@ export class GeminiAdapter implements AIAdapter {
       // Track performance
       const processingEnd = Date.now();
       
-      // Return the parsed content
+      // Calculate estimated token count (simple approximation)
+      // Estimate multimodal tokens - images are more expensive
+      let inputTokens = 0;
+      for (const part of parts) {
+        if (part.type === 'text') {
+          // Text token estimation
+          const content = part.content as string;
+          inputTokens += Math.ceil(content.length / 4);
+        } else if (part.type === 'image') {
+          // Images are much more token-intensive
+          inputTokens += 3000; // Conservative estimate for image tokens
+        } else {
+          // Other file types
+          inputTokens += 1000; // Rough estimate for documents, audio, etc.
+        }
+      }
+      
+      const outputTokens = Math.ceil(text.length / 4);
+      const tokenCount = inputTokens + outputTokens;
+      
+      // Return the parsed content with the interface-required format
       return {
         ...parsedContent,
         modelName: this.modelName,
-        rawResponse: text,
-        processTime: (processingEnd - this.processingStart)
+        rawResponse: JSON.parse(text), // Convert string to Record<string, unknown>
+        tokenCount: tokenCount
       };
     } catch (error) {
       console.error(`[GEMINI] Error in generateMultimodalCompletion: ${error instanceof Error ? error.message : String(error)}`);
