@@ -1,0 +1,57 @@
+1 · Switch to responseMimeType for native JSON (‼ High priority)
+
+Problem
+We still ask the model in plain English to “return JSON,” then strip markdown and clean the text. Works, but it’s brittle.
+
+What to do
+
+Update SDK
+pnpm add @google/genai@latest      # replaces @google/generative-ai
+@google/genai ≥ 0.4.0 already types responseMimeType and responseSchema in GenerationConfig.
+Remove the deprecated field
+// Delete anywhere it appears:
+responseFormat?: { type: string };
+Pass the new flag everywhere we build generationConfig
+const generationConfig = {
+  temperature: 0.4,
+  maxOutputTokens: 8192,
+  topP: 0.95,
+  topK: 64,
+  responseMimeType: "application/json",   // ✅ camel-case, not snake-case
+} satisfies GenerationConfig;
+Important: response_mime_type (snake-case) is ignored in the JS SDK.
+(Optional but recommended) – add a schema for bullet-proof parsing:
+responseSchema: {
+  type: "object",
+  properties: {
+    answer: { type: "string" },
+    citations: { type: "array", items: { type: "string" } },
+  },
+  required: ["answer"],
+}
+When a schema is present the SDK exposes response[0].candidates[0].parsed – no JSON.parse required.
+Delete the console.warn about responseFormat – it’s now obsolete.
+2 · Strengthen JSON-parse error handling
+
+try {
+  const data = JSON.parse(jsonString);
+  …
+} catch (err) {
+  aiLogger.error("Gemini JSON parse failed", {
+    message: err instanceof Error ? err.message : err,
+    raw: jsonString,            // ← log the exact text we tried to parse
+  });
+  …
+}
+Logging the raw string is critical for tracing occasional schema/format drift during the 2.5 preview period.
+
+3 · Make modelName configurable (low priority)
+
+Replace the hard-coded "gemini-2.5-flash-preview-04-17" with
+const modelName = process.env.GEMINI_MODEL_NAME ?? "gemini-2.5-flash-preview-04-17";
+Document the env var in server/docs/AI_MODELS.md so DevOps can roll forward without code edits.
+4 · Keep defensive cleaners in place
+
+Even with responseMimeType, 2.5 Flash occasionally leaks markdown fences when the prompt is ill-formed. Retain stripMarkdown and cleanJsonString as last-chance sanitizers.
+
+Done = all generation calls use responseMimeType, tests pass with raw response.text() parsing removed, error logs include the failed JSON, and model name is environment-driven.
