@@ -313,7 +313,7 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
       try {
         // Import the GCS client only when needed
         const gcsClient = require('./gcs-client');
-        const { getBucket, bucketName, getSignedUrl } = gcsClient;
+        const { getBucket, bucketName, generateSignedUrl } = gcsClient;
         
         // Parse the GCS URL (format: gs://bucket-name/path/to/file)
         const gcsPath = url.replace('gs://', '');
@@ -329,11 +329,7 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
         // 2. If that fails, fall back to direct download
         try {
           console.log(`[DOWNLOAD] Attempting to get signed URL for GCS object`);
-          const signedUrl = await getSignedUrl(objectPath, { 
-            action: 'read',
-            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-            version: 'v4'
-          });
+          const signedUrl = await generateSignedUrl(objectPath, 60); // 60 minutes expiration
           
           console.log(`[DOWNLOAD] Successfully got signed URL, downloading via HTTP`);
           const response = await fetch(signedUrl);
@@ -345,7 +341,8 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
           const arrayBuffer = await response.arrayBuffer();
           fileBuffer = Buffer.from(arrayBuffer);
           console.log(`[DOWNLOAD] Successfully downloaded from GCS signed URL, file size: ${fileBuffer.length} bytes`);
-        } catch (signedUrlError) {
+        } catch (error) { 
+          const signedUrlError = error as Error;
           console.warn(`[DOWNLOAD] Failed to use signed URL approach: ${signedUrlError.message}, falling back to direct download`);
           
           // Get the bucket and file objects for direct download
@@ -441,25 +438,64 @@ export async function processFileForMultimodal(
   fileName: string, 
   mimeType: string
 ): Promise<ProcessedFile> {
+  // Validate input
+  if (!filePath || filePath.trim() === '') {
+    throw new Error('Invalid file path: Path is empty or undefined');
+  }
+  
   console.log(`[MULTIMODAL] Processing file for multimodal analysis:`, {
     fileName,
     mimeType,
     filePathLength: filePath.length,
     // For debugging purposes, show part of the path without exposing the full URL
     filePathStart: filePath.substring(0, 30) + '...',
-    isRemote: isRemoteUrl(filePath)
+    isGcsPath: filePath.startsWith('submissions/') || filePath.startsWith('anonymous-submissions/'),
+    isSignedUrl: filePath.includes('storage.googleapis.com') && filePath.includes('Signature='),
+    imageType: mimeType.startsWith('image/') ? mimeType : 'not-image'
   });
   
   let temporaryFilePath: string | null = null;
   let cleanup: (() => Promise<void>) | null = null;
 
   try {
-    // Check if the file path is a remote URL or a local path
+    // Check if the file path is a remote URL, GCS path, or a local path
     let fileContent: Buffer;
     let actualFilePath = filePath;
+    
+    // Handle GCS path that's not yet converted to a URL
+    if ((filePath.startsWith('submissions/') || filePath.startsWith('anonymous-submissions/')) && 
+        !filePath.startsWith('http')) {
+      
+      console.log(`[MULTIMODAL] File path is a GCS object path, attempting to generate signed URL first`);
+      
+      try {
+        // Import GCS client
+        const { generateSignedUrl, isGcsConfigured } = require('./gcs-client');
+        
+        if (isGcsConfigured()) {
+          // Generate a signed URL with 60-minute expiration
+          const signedUrl = await generateSignedUrl(filePath, 60);
+          
+          if (signedUrl && signedUrl.startsWith('http')) {
+            console.log(`[MULTIMODAL] Successfully generated signed URL for GCS path (${signedUrl.length} chars)`);
+            // Update the file path to use the signed URL
+            filePath = signedUrl;
+          } else {
+            console.error(`[MULTIMODAL] Failed to generate valid signed URL for GCS path: ${filePath}`);
+            throw new Error('Invalid signed URL generated for GCS path');
+          }
+        } else {
+          console.warn(`[MULTIMODAL] GCS not configured, cannot generate signed URL`);
+          // Continue with the original path and let downloadFromUrl handle it
+        }
+      } catch (gcsError: any) {
+        console.error(`[MULTIMODAL] Error generating signed URL for GCS path:`, gcsError);
+        // Don't fail here, try to continue with the original path
+      }
+    }
 
     if (isRemoteUrl(filePath)) {
-      // Download from remote URL (S3, HTTP/HTTPS, GCS)
+      // Download from remote URL (HTTP/HTTPS, GCS)
       console.log(`[MULTIMODAL] File path is a remote URL, attempting to download`);
       try {
         const result = await downloadFromUrl(filePath, mimeType);
@@ -468,7 +504,7 @@ export async function processFileForMultimodal(
         temporaryFilePath = result.localPath;
         cleanup = result.cleanup;
         console.log(`[MULTIMODAL] Successfully downloaded file from remote URL, size: ${fileContent.length} bytes`);
-      } catch (downloadError) {
+      } catch (downloadError: any) {
         console.error(`[MULTIMODAL] Error downloading from URL:`, downloadError);
         throw new Error(`Failed to download file from URL: ${downloadError instanceof Error ? downloadError.message : String(downloadError)}`);
       }
