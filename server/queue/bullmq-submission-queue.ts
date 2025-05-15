@@ -461,12 +461,16 @@ export const queueApi = {
                                  submission.mimeType !== 'text/plain' && 
                                  submission.fileUrl;
             
+            console.log(`[DEVELOPMENT] Submission analysis - isMultimodal: ${isMultimodal}, mimeType: ${submission.mimeType}, fileUrl exists: ${!!submission.fileUrl}`);
+            
             // Analyze the submission with AI based on file type
             let feedbackResult;
             if (isMultimodal) {
               // The fileUrl is now a path in GCS storage
               // The multimodal processor will handle retrieving from GCS as needed
               let filePath = submission.fileUrl || '';
+              
+              console.log(`[DEVELOPMENT] Processing multimodal submission ${submissionId} with original filePath: ${filePath}`);
               
               // Check if this is a GCS path without a signed URL
               // If so, we need to generate a signed URL for access
@@ -475,18 +479,28 @@ export const queueApi = {
                   // Import only when needed to avoid circular dependencies
                   const { generateSignedUrl, isGcsConfigured } = require('../utils/gcs-client');
                   
+                  // Check if GCS is configured
+                  const gcsConfigStatus = isGcsConfigured();
+                  console.log(`[DEVELOPMENT] GCS configured status: ${gcsConfigStatus}`);
+                  
                   // Generate a signed URL for temporary access if GCS is configured
-                  if (isGcsConfigured()) {
+                  if (gcsConfigStatus) {
+                    console.log(`[DEVELOPMENT] Generating signed URL for path: ${filePath}`);
                     const signedUrl = await generateSignedUrl(filePath, 60); // 60 minute expiration
                     logger.info(`Generated signed URL for GCS file access`, {
                       submissionId,
-                      objectPath: filePath
+                      objectPath: filePath,
+                      signedUrlLength: signedUrl.length
                     });
                     
                     // Use the signed URL for file processing
                     filePath = signedUrl;
+                    console.log(`[DEVELOPMENT] Successfully generated signed URL with length: ${signedUrl.length}`);
+                  } else {
+                    console.warn(`[DEVELOPMENT] GCS not configured, cannot generate signed URL`);
                   }
                 } catch (urlError) {
+                  console.error(`[DEVELOPMENT] Error generating signed URL:`, urlError);
                   logger.warn(`Failed to generate signed URL for GCS file, using path directly`, {
                     submissionId,
                     error: (urlError instanceof Error) ? urlError.message : String(urlError)
@@ -495,18 +509,24 @@ export const queueApi = {
                 }
               }
               
-              console.log(`[DEVELOPMENT] Processing multimodal submission ${submissionId} of type ${submission.mimeType}`);
+              console.log(`[DEVELOPMENT] Processing multimodal submission ${submissionId} of type ${submission.mimeType} with final filePath: ${filePath.substring(0, 100)}...`);
               
-              feedbackResult = await aiService.analyzeMultimodalSubmission({
-                filePath: filePath,
-                fileName: submission.fileName || 'unknown',
-                mimeType: submission.mimeType || 'application/octet-stream',
-                textContent: submission.content || undefined, // Optional extracted text
-                assignmentTitle: assignment.title,
-                assignmentDescription: assignment.description || undefined,
-                instructorContext: assignment.instructorContext || undefined, // Instructor-only guidance
-                rubric: rubric
-              });
+              try {
+                feedbackResult = await aiService.analyzeMultimodalSubmission({
+                  filePath: filePath,
+                  fileName: submission.fileName || 'unknown',
+                  mimeType: submission.mimeType || 'application/octet-stream',
+                  textContent: submission.content || undefined, // Optional extracted text
+                  assignmentTitle: assignment.title,
+                  assignmentDescription: assignment.description || undefined,
+                  instructorContext: assignment.instructorContext || undefined, // Instructor-only guidance
+                  rubric: rubric
+                });
+                console.log(`[DEVELOPMENT] Successfully got AI feedback result for ${submissionId}`);
+              } catch (multimodalError) {
+                console.error(`[DEVELOPMENT] Error during multimodal analysis:`, multimodalError);
+                throw new Error(`Failed to analyze multimodal submission: ${multimodalError instanceof Error ? multimodalError.message : String(multimodalError)}`);
+              }
             } else {
               // Process as standard text submission
               const content = submission.content || '';
