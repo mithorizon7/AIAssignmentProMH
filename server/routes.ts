@@ -1163,6 +1163,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Calculate score distribution
+      let scoreDistribution = { high: 0, medium: 0, low: 0 };
+      try {
+        if (scores.length > 0) {
+          // Count scores in each category
+          for (const score of scores) {
+            if (score >= 80) {
+              scoreDistribution.high++;
+            } else if (score >= 50) {
+              scoreDistribution.medium++;
+            } else {
+              scoreDistribution.low++;
+            }
+          }
+          console.log("Score distribution calculated:", scoreDistribution);
+        }
+      } catch (error) {
+        console.error("Error calculating score distribution:", error);
+        scoreDistribution = { high: 0, medium: 0, low: 0 };
+      }
+      
       // Calculate feedback generation and viewed stats
       const feedbackGenerated = feedbackItems.length;
       const feedbackViewed = feedbackItems.filter((f: any) => f.viewed).length;
@@ -1200,6 +1221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         feedbackViewed,
         feedbackViewRate,
         submissionsIncrease,
+        scoreDistribution, // Add the score distribution object
         // Include submission percentages for dashboard display
         submittedPercentage: submissionRate,
         notStartedPercentage: totalStudents > 0 ? Math.round((notStartedCount / totalStudents) * 100) : 0,
