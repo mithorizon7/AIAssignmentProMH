@@ -803,8 +803,10 @@ export class GeminiAdapter implements AIAdapter {
         try {
           parsedContent = JSON.parse(text);
           console.log(`[GEMINI] Successfully parsed direct JSON response`);
-        } catch (jsonError) {
-          console.warn(`[GEMINI] Direct JSON parsing failed, trying to extract from markdown code block`);
+        } catch (error: unknown) {
+          const jsonError = error instanceof Error ? error.message : String(error);
+          console.warn(`[GEMINI] Direct JSON parsing failed: ${jsonError}`);
+          console.warn(`[GEMINI] Trying to extract from markdown code block`);
           
           // Try to extract JSON from markdown code block (```json ... ```)
           const markdownJsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
@@ -839,7 +841,8 @@ export class GeminiAdapter implements AIAdapter {
           }
         }
       } catch (e: unknown) {
-        console.error("[GEMINI] All JSON parsing methods failed:", e);
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        console.error("[GEMINI] All JSON parsing methods failed:", errorMessage);
         console.log("[GEMINI] Raw response:", text);
         
         // Final fallback: extract structured data manually from text
