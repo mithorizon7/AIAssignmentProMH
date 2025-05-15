@@ -1,5 +1,5 @@
 import { 
-  GoogleGenAI, 
+  GoogleGenAI as GoogleGenerativeAI,  // Important: The class is now exported as GoogleGenAI
   HarmCategory,
   HarmBlockThreshold,
   FileState,
