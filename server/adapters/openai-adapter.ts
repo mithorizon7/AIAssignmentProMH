@@ -19,17 +19,23 @@ export class OpenAIAdapter implements AIAdapter {
 
   async generateCompletion(prompt: string, systemPrompt?: string) {
     try {
-      // Prepare properly typed messages array with optional system message
-      const messages: Array<OpenAI.ChatCompletionMessageParam> = [];
+      // Create properly typed message arrays for OpenAI
+      const messages = [];
       
       // Add system prompt if provided
       if (systemPrompt) {
         console.log(`[OPENAI] Using system prompt (${systemPrompt.length} chars)`);
-        messages.push({ role: "system", content: systemPrompt });
+        messages.push({ 
+          role: "system" as const, 
+          content: systemPrompt 
+        });
       }
       
       // Add user prompt
-      messages.push({ role: "user", content: prompt });
+      messages.push({ 
+        role: "user" as const, 
+        content: prompt 
+      });
       
       const response = await this.openai.chat.completions.create({
         model: this.model,
