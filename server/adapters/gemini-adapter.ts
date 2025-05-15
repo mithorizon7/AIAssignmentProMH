@@ -168,14 +168,8 @@ export class GeminiAdapter implements AIAdapter {
         topK: 64
         
         // Note: responseFormat removed as it's not supported in the current Gemini API version
-      },
-      // Add safety settings appropriate for educational content with proper enum values
-      safetySettings: [
-        { category: "HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-        { category: "HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-        { category: "SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-        { category: "DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }
-      ]
+      }
+      // Safety settings removed temporarily to debug API issues
     });
   }
   
