@@ -9,8 +9,9 @@ import { errorHandler, notFoundHandler, logger } from "./lib/error-handler";
 import { runMigrations } from "./migrations/add-missing-columns";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Increase JSON payload limit to 10MB for handling large content like AI prompts
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // Configure helmet security headers based on environment
 const isProduction = app.get("env") === "production";

@@ -313,12 +313,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/assignments/code/:code', defaultRateLimiter, asyncHandler(async (req: Request, res: Response) => {
     const code = req.params.code;
     
+    console.log(`Looking up assignment with code: ${code}`);
+    
     if (!code || code.length < 6) {
+      console.log(`Invalid shareable code: ${code}`);
       return res.status(400).json({ message: 'Invalid shareable code' });
     }
     
     // Query assignments to find one with matching shareable code
     const assignments = await storage.listAssignments();
+    console.log(`Found ${assignments.length} assignments total`);
+    
+    // Print all available shareable codes for debugging
+    const allCodes = assignments
+      .filter(a => a.shareableCode)
+      .map(a => ({ id: a.id, code: a.shareableCode }));
+    console.log(`Available shareable codes:`, JSON.stringify(allCodes));
+    
     const assignment = assignments.find(a => a.shareableCode === code);
     
     if (!assignment) {
