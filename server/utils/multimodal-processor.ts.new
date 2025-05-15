@@ -112,14 +112,13 @@ async function downloadFromGCS(url: string, mimeType?: string): Promise<GcsDownl
         size: contentLength ? parseInt(contentLength, 10) : buffer.length
       }
     };
-  } catch (signedUrlError) {
+  } catch (error) {
     // If signed URL fails, try direct download
-    const errorMsg = signedUrlError instanceof Error ? signedUrlError.message : String(signedUrlError);
-    console.warn(`[GCS] Failed to use signed URL approach: ${errorMsg}, falling back to direct download`);
+    console.warn(`[GCS] Failed to use signed URL approach: ${error instanceof Error ? error.message : String(error)}, falling back to direct download`);
     
     try {
       // Get the bucket and file objects for direct download
-      const bucket = gcsClient.getBucket();
+      const bucket = gcsClient.getBucket(targetBucket);
       const file = bucket.file(objectPath);
       
       // Download the file directly
@@ -134,14 +133,13 @@ async function downloadFromGCS(url: string, mimeType?: string): Promise<GcsDownl
         buffer: fileData,
         metadata: {
           contentType: metadata.contentType || mimeType,
-          size: typeof metadata.size === 'string' ? Number(metadata.size) : (metadata.size || fileData.length),
+          size: metadata.size ? Number(metadata.size) : fileData.length,
           ...metadata
         }
       };
     } catch (directError) {
-      const directErrorMsg = directError instanceof Error ? directError.message : String(directError);
-      console.error(`[GCS] Failed direct download from GCS: ${directErrorMsg}`);
-      throw new Error(`Failed to download file from GCS: ${directErrorMsg}`);
+      console.error(`[GCS] Failed direct download from GCS: ${directError instanceof Error ? directError.message : String(directError)}`);
+      throw new Error(`Failed to download file from GCS: ${directError instanceof Error ? directError.message : String(directError)}`);
     }
   }
 }

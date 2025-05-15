@@ -1,0 +1,94 @@
+1. Correct the Import Syntax in server/utils/multimodal-processor.ts
+
+Action: Replace the CommonJS require() call with an ES Module import statement.
+
+Guidance for server/utils/multimodal-processor.ts:
+
+Change this:
+
+TypeScript
+// ... other code ...
+// Line 545 in your screenshot
+const gcsClient = require('../utils/gcs-client');
+// const { bucketName, isGcsConfigured } = gcsClient; // This line would also change
+// ...
+// Example usage later:
+// if (gcsClient.isGcsConfigured()) { ... }
+// const [fileContents] = await gcsClient.storage.bucket(bucketName).file(objectName).download();
+ To this:
+
+TypeScript
+// server/utils/multimodal-processor.ts
+import { storage, bucketName as defaultGcsBucketName, isGcsConfigured } from '../utils/gcs-client'; // Adjust based on actual exports from gcs-client.ts
+
+// ...
+
+async function downloadFromGCS(gcsPath: string): Promise<Buffer> {
+  try {
+    // Ensure isGcsConfigured is called if it's a necessary check before proceeding
+    if (!isGcsConfigured()) {
+      throw new Error("GCS client is not configured. Check environment variables.");
+    }
+
+    const [parsedBucketName, ...objectPathParts] = gcsPath.replace('gs://', '').split('/');
+    const objectName = objectPathParts.join('/');
+
+    // Use the imported storage instance directly
+    // Use the imported defaultGcsBucketName or parsedBucketName as appropriate
+    const targetBucket = parsedBucketName || defaultGcsBucketName; 
+    if (!targetBucket) {
+        throw new Error(`Invalid GCS path or bucket name not configured: ${gcsPath}`);
+    }
+
+    // logger.info(`Attempting to download from GCS: gs://<span class="math-inline">\{targetBucket\}/</span>{objectName}`);
+    const [fileContents] = await storage.bucket(targetBucket).file(objectName).download();
+    // logger.info(`Successfully downloaded from GCS: ${gcsPath}`);
+    return fileContents;
+  } catch (error: any) {
+    // logger.error(`Failed to download from GCS path ${gcsPath}: ${error.message}`, { error });
+    throw new Error(`Failed to download file from GCS (${gcsPath}): ${error.message}`);
+  }
+}
+// ... rest of the file, ensure all references to gcsClient are updated
+ Note: The exact import (e.g., bucketName as defaultGcsBucketName) depends on how gcs-client.ts exports its members. Your gcs-client.ts exports storage, Bucket, and File. It also defines a bucketName constant internally. You'll need to ensure bucketName and isGcsConfigured are also properly exported from gcs-client.ts if they are to be used as shown in the problematic diff.
+
+Currently gcs-client.ts exports: export { storage, Bucket, File };
+You would need to modify gcs-client.ts to also export isGcsConfigured and potentially the bucketName if it's intended to be the default bucket name used by multimodal-processor.ts.
+
+Example modification to server/utils/gcs-client.ts:
+
+TypeScript
+// ... existing code ...
+// const bucketName = process.env.GCS_BUCKET_NAME || 'aigrader-uploads'; // This is already there
+
+// export { storage, Bucket, File }; // Original export
+export { storage, Bucket, File, bucketName, isGcsConfigured }; // Modified export
+2. Verify and Enforce ES Module Configuration (Reiteration)
+
+This remains crucial. The presence of require suggests a potential misunderstanding or misconfiguration somewhere, even if the top-level settings appear correct.
+
+package.json:
+
+Confirm: "type": "module" is present. (This is correct in your package.json).
+tsconfig.json (and tsconfig.server.json):
+
+Action: Double-check tsconfig.server.json (used by your server:build script: tsc -p tsconfig.server.json).
+Guidance: This file must align with ESM:
+"module": "ESNext" (or ES2020, ES2022, etc.)
+"moduleResolution": "NodeNext" or "Bundler" (Your root tsconfig.json uses "Bundler" and "module": "ESNext", which is good. Ensure tsconfig.server.json doesn't override this to CommonJS).
+If tsconfig.server.json forces CommonJS output, then the built files in dist/server will use require(), which will conflict with Node.js running in ESM mode due to "type": "module".
+3. Check for Other require() Calls
+
+Action: Search your server directory for any other instances of require().
+Guidance: Any such calls in .ts files need to be refactored to ESM import statements. This includes conditional or dynamic require calls as well, which would need to become dynamic import().
+4. Clean Build
+
+Action: Delete the dist folder (if it exists from a previous server:build) and then rebuild and re-run.
+Guidance: This ensures you are not running stale, potentially CommonJS-compiled code.
+Bash
+rm -rf dist # or your OS equivalent
+npm run server:build
+npm run server:start
+# Or for development:
+# npm run server:dev
+ By directly addressing the require() call in server/utils/multimodal-processor.ts and ensuring the TypeScript build configuration (tsconfig.server.json) correctly outputs ES Modules, this "require is not defined" error will be resolved. The primary fix is changing that one line of code from require to import.
