@@ -220,18 +220,39 @@ export function fileToDataURI(content: Buffer, mimeType: string): string {
  * @returns Boolean indicating if the path is a remote URL or GCS path
  */
 export function isRemoteUrl(path: string): boolean {
-  if (!path) return false;
+  if (!path) {
+    console.log('[MULTIMODAL] Empty path provided to isRemoteUrl');
+    return false;
+  }
   
-  // Handle various URL formats
-  return path.startsWith('http://') || 
-         path.startsWith('https://') || 
-         path.startsWith('gs://') ||
-         path.includes('storage.googleapis.com') ||
-         // Detect GCS object paths that we should convert to signed URLs
-         (path.startsWith('/') === false && // Not an absolute local path
-          path.includes('/') && // Has at least one folder separator
-          !path.includes('\\') && // Not a Windows-style path
-          !fs.existsSync(path)); // Not an existing local file
+  console.log(`[MULTIMODAL] Checking if path is remote URL: ${path.substring(0, 30)}${path.length > 30 ? '...' : ''}`);
+  
+  // First, check for standard URL protocols
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('gs://')) {
+    console.log('[MULTIMODAL] Path is definitely a remote URL (has protocol)');
+    return true;
+  }
+  
+  // Check for GCS storage.googleapis.com URLs
+  if (path.includes('storage.googleapis.com') || path.includes('googleusercontent.com')) {
+    console.log('[MULTIMODAL] Path is a GCS URL (storage.googleapis.com or googleusercontent.com)');
+    return true;
+  }
+  
+  // Check for potential GCS object paths that should be converted to signed URLs
+  const isPotentialGcsPath = 
+    path.startsWith('/') === false && // Not an absolute local path
+    path.includes('/') && // Has at least one folder separator
+    !path.includes('\\') && // Not a Windows-style path
+    !fs.existsSync(path); // Not an existing local file
+  
+  if (isPotentialGcsPath) {
+    console.log('[MULTIMODAL] Path is potentially a GCS object path');
+    return true;
+  }
+  
+  console.log('[MULTIMODAL] Path appears to be a local file path');
+  return false;
 }
 
 /**
@@ -266,7 +287,8 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
       console.log(`[DOWNLOAD] Detected GCS URL (gs:// protocol), using GCS SDK`);
       try {
         // Import the GCS client only when needed
-        const { getBucket, bucketName } = require('./gcs-client');
+        const gcsClient = require('./gcs-client');
+        const { getBucket, bucketName, getSignedUrl } = gcsClient;
         
         // Parse the GCS URL (format: gs://bucket-name/path/to/file)
         const gcsPath = url.replace('gs://', '');
@@ -277,15 +299,40 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
         const targetBucket = bucketFromUrl || bucketName;
         console.log(`[DOWNLOAD] GCS bucket: ${targetBucket}, object path: ${objectPath}`);
         
-        // Get the bucket and file objects
-        const bucket = getBucket(targetBucket);
-        const file = bucket.file(objectPath);
-        
-        // Download the file to a buffer
-        console.log(`[DOWNLOAD] Downloading from GCS bucket: ${targetBucket}, object: ${objectPath}`);
-        const [fileData] = await file.download();
-        fileBuffer = fileData;
-        console.log(`[DOWNLOAD] Successfully downloaded from GCS, file size: ${fileBuffer.length} bytes`);
+        // Try two approaches:
+        // 1. First, attempt to get a signed URL and use HTTP fetch (more reliable for large files)
+        // 2. If that fails, fall back to direct download
+        try {
+          console.log(`[DOWNLOAD] Attempting to get signed URL for GCS object`);
+          const signedUrl = await getSignedUrl(objectPath, { 
+            action: 'read',
+            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+            version: 'v4'
+          });
+          
+          console.log(`[DOWNLOAD] Successfully got signed URL, downloading via HTTP`);
+          const response = await fetch(signedUrl);
+          
+          if (!response.ok) {
+            throw new Error(`Failed to download from signed URL: ${response.status} ${response.statusText}`);
+          }
+          
+          const arrayBuffer = await response.arrayBuffer();
+          fileBuffer = Buffer.from(arrayBuffer);
+          console.log(`[DOWNLOAD] Successfully downloaded from GCS signed URL, file size: ${fileBuffer.length} bytes`);
+        } catch (signedUrlError) {
+          console.warn(`[DOWNLOAD] Failed to use signed URL approach: ${signedUrlError.message}, falling back to direct download`);
+          
+          // Get the bucket and file objects for direct download
+          const bucket = getBucket(targetBucket);
+          const file = bucket.file(objectPath);
+          
+          // Download the file to a buffer
+          console.log(`[DOWNLOAD] Downloading directly from GCS bucket: ${targetBucket}, object: ${objectPath}`);
+          const [fileData] = await file.download();
+          fileBuffer = fileData;
+          console.log(`[DOWNLOAD] Successfully downloaded directly from GCS, file size: ${fileBuffer.length} bytes`);
+        }
         
         // Write to temp file for operations that need a file path
         await writeFileAsync(localPath, fileBuffer);
@@ -436,6 +483,67 @@ export async function processFileForMultimodal(
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.warn(`[MULTIMODAL] Failed to extract text from ${fileName}: ${errorMessage}`);
         // Continue with the process even if text extraction fails
+      }
+    }
+    
+    // Special handling for images - validate they're actually valid images
+    if (contentType === 'image') {
+      try {
+        console.log(`[MULTIMODAL] Validating image data, size: ${fileContent.length} bytes, MIME type: ${mimeType}`);
+        
+        // Check if the file has the proper image header bytes based on format
+        const isValidImage = ((): boolean => {
+          if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+            // JPEG starts with bytes FF D8
+            return fileContent.length >= 2 && 
+                  fileContent[0] === 0xFF && 
+                  fileContent[1] === 0xD8;
+          } else if (mimeType === 'image/png') {
+            // PNG starts with the bytes 89 50 4E 47 0D 0A 1A 0A
+            return fileContent.length >= 8 && 
+                  fileContent[0] === 0x89 && 
+                  fileContent[1] === 0x50 &&
+                  fileContent[2] === 0x4E &&
+                  fileContent[3] === 0x47 &&
+                  fileContent[4] === 0x0D &&
+                  fileContent[5] === 0x0A &&
+                  fileContent[6] === 0x1A &&
+                  fileContent[7] === 0x0A;
+          } else if (mimeType === 'image/gif') {
+            // GIF starts with "GIF87a" or "GIF89a"
+            return fileContent.length >= 6 && 
+                  fileContent[0] === 0x47 && // G
+                  fileContent[1] === 0x49 && // I
+                  fileContent[2] === 0x46;   // F
+          } else if (mimeType === 'image/webp') {
+            // WebP starts with "RIFF" followed by file size and "WEBP"
+            return fileContent.length >= 12 && 
+                  fileContent[0] === 0x52 && // R
+                  fileContent[1] === 0x49 && // I
+                  fileContent[2] === 0x46 && // F
+                  fileContent[3] === 0x46 && // F
+                  // Skip 4 bytes for file size
+                  fileContent[8] === 0x57 && // W
+                  fileContent[9] === 0x45 && // E
+                  fileContent[10] === 0x42 && // B
+                  fileContent[11] === 0x50;  // P
+          }
+          // For other image types, just check if there's actual data
+          return fileContent.length > 100; // Arbitrary minimum size
+        })();
+        
+        if (!isValidImage) {
+          console.warn('[MULTIMODAL] Warning: Image data appears to be invalid or corrupted');
+        } else {
+          console.log('[MULTIMODAL] Image validation successful');
+        }
+        
+        // If the image content is too large for inline data, log a warning
+        if (fileContent.length > 4 * 1024 * 1024) { // 4MB 
+          console.warn(`[MULTIMODAL] Image file is large (${Math.round(fileContent.length / 1024 / 1024)}MB), which may cause issues with AI processing`);
+        }
+      } catch (imageValidationError) {
+        console.warn('[MULTIMODAL] Error validating image:', imageValidationError);
       }
     }
     
