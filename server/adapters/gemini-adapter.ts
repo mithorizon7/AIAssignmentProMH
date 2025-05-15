@@ -1241,14 +1241,10 @@ Please analyze the above submission and provide feedback in the following JSON f
         topK: 64
       };
       
-      // Add responseFormat for structured JSON output if available in this version of the API
-      // This is added in newer versions of the Gemini API
-      if (this.modelName.includes('gemini-2')) {  // For Gemini 2 models
-        console.log(`[GEMINI] Using JSON response format for ${this.modelName}`);
-        generationConfig.responseFormat = { type: "json" };
-      } else {
-        console.log(`[GEMINI] Using standard response format for ${this.modelName}`);
-      }
+      // We found that responseFormat is not supported in the current API version
+      // Removed responseFormat configuration to avoid 400 Bad Request errors
+      console.log(`[GEMINI] Using standard response format for ${this.modelName} without responseFormat option`);
+      // Note: When the API is updated to support responseFormat, we can add it back
       
       // Log details about the request we're about to make
       console.log(`[GEMINI] Sending multimodal request to Gemini API with ${contentParts.length} parts`);
@@ -1338,9 +1334,10 @@ Please analyze the above submission and provide feedback in the following JSON f
       // Parse the content as JSON
       let parsedContent: ParsedContent = {};
       try {
-        // With gemini-2.5 models, we should get direct JSON when using responseFormat
+        // Note: responseFormat is not supported in the current version, but gemini-2.5 models
+        // might still return properly formatted JSON that we can parse directly
         if (this.modelName.includes('gemini-2.5')) {
-          console.log('[GEMINI] Parsing direct JSON response from gemini-2.5 model');
+          console.log('[GEMINI] Attempting to parse structured response from gemini-2.5 model');
           parsedContent = JSON.parse(text);
         } else {
           // For older models, we may need to extract JSON from text
