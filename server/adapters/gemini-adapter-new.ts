@@ -2,7 +2,7 @@
  * Gemini AI adapter for the AI Grader platform
  * Using @google/genai SDK with the latest API patterns for version 0.14.0+
  */
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import { ContentType } from '../utils/file-type-settings';
 import { AIAdapter, MultimodalPromptPart } from './ai-adapter';
 import { CriteriaScore } from '@shared/schema';

@@ -19,17 +19,18 @@ dotenv.config();
 const MODEL_NAME = "gemini-2.5-flash-preview-04-17";
 const TEST_PROMPT = "Analyze this image and provide feedback on its design.";
 
-// Create a test SVG for the test
-function createTestSvg() {
-  const svgContent = `
-<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-  <rect width="100%" height="100%" fill="#f0f0f0" />
-  <circle cx="100" cy="100" r="80" fill="#3498db" />
-  <text x="100" y="115" font-family="Arial" font-size="24" fill="white" text-anchor="middle">Test</text>
-</svg>`;
-
-  const filePath = path.join(__dirname, 'test_image.svg');
-  fs.writeFileSync(filePath, svgContent);
+// Use an existing PNG image for the test
+function getTestImagePath() {
+  // Using an existing PNG from the assets
+  const filePath = path.join(__dirname, 'attached_assets/android-chrome-192x192.png');
+  
+  // Verify the file exists
+  if (!fs.existsSync(filePath)) {
+    console.error(`Test image not found at: ${filePath}`);
+    throw new Error('Test image not found');
+  }
+  
+  console.log(`Using test image: ${filePath}`);
   return filePath;
 }
 
@@ -46,12 +47,11 @@ async function testMultimodalGemini() {
   console.log(`Using API key: ${process.env.GEMINI_API_KEY.substring(0, 3)}...`);
   
   try {
-    // Create test file
-    const svgPath = createTestSvg();
-    console.log(`Created test SVG file at: ${svgPath}`);
+    // Get test image path
+    const imagePath = getTestImagePath();
     
     // Read the file
-    const imageData = fs.readFileSync(svgPath);
+    const imageData = fs.readFileSync(imagePath);
     const base64Image = imageData.toString('base64');
     console.log(`Image loaded, size: ${Math.round(base64Image.length / 1024)}KB`);
     
@@ -68,7 +68,7 @@ async function testMultimodalGemini() {
       { 
         inlineData: {
           data: base64Image,
-          mimeType: "image/svg+xml"
+          mimeType: "image/png"
         }
       }
     ];
@@ -107,8 +107,6 @@ async function testMultimodalGemini() {
       console.log(result.usageMetadata);
     }
     
-    // Clean up test file
-    fs.unlinkSync(svgPath);
     console.log("\nTest completed successfully");
     return true;
   } catch (error) {
