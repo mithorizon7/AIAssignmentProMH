@@ -769,24 +769,81 @@ export class GeminiAdapter implements AIAdapter {
 
   async generateCompletion(prompt: string) {
     try {
-      const result = await this.model.generateContent(prompt);
+      // Add JSON prompt instruction and responseMimeType for consistent JSON formatting
+      const generationConfig = {
+        temperature: 0.7,
+        maxOutputTokens: 2048,
+        topP: 0.95,
+        topK: 64,
+        responseMimeType: "application/json"
+      };
+      
+      // Structure request to ensure JSON response
+      const result = await this.model.generateContent({
+        contents: [{ 
+          role: 'user', 
+          parts: [{ 
+            text: prompt + "\n\nPlease provide your response in JSON format."
+          }] 
+        }],
+        generationConfig
+      });
+      
       const response = result.response;
       const text = response.text();
       
-      // Parse the content as JSON
+      // Log successful API call with response format info
+      console.log(`[GEMINI] Text completion API call successful with responseMimeType: application/json`);
+      console.log(`[GEMINI] Response text beginning: ${text.substring(0, Math.min(100, text.length))}...`);
+      
+      // Parse the content as JSON using multiple fallback methods
       let parsedContent: ParsedContent = {};
       try {
-        // Extract JSON from the response if it's embedded in text
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          parsedContent = JSON.parse(jsonMatch[0]);
-        } else {
+        // First try direct JSON parsing with the responseMimeType: application/json
+        try {
           parsedContent = JSON.parse(text);
+          console.log(`[GEMINI] Successfully parsed direct JSON response`);
+        } catch (jsonError) {
+          console.warn(`[GEMINI] Direct JSON parsing failed, trying to extract from markdown code block`);
+          
+          // Try to extract JSON from markdown code block (```json ... ```)
+          const markdownJsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+          if (markdownJsonMatch && markdownJsonMatch[1]) {
+            try {
+              const cleanedJson = cleanJsonString(markdownJsonMatch[1]);
+              parsedContent = JSON.parse(cleanedJson);
+              console.log(`[GEMINI] Successfully extracted JSON from markdown code block`);
+            } catch (error: unknown) {
+              const markdownError = error instanceof Error ? error.message : String(error);
+              console.warn(`[GEMINI] Failed to parse JSON from markdown block: ${markdownError}`);
+              console.warn(`[GEMINI] Trying generic JSON extraction`);
+              throw error; // Pass to next handler
+            }
+          } else {
+            // Try to find anything that looks like a JSON object
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              try {
+                const cleanedJson = cleanJsonString(jsonMatch[0]);
+                parsedContent = JSON.parse(cleanedJson);
+                console.log(`[GEMINI] Successfully extracted JSON using regex pattern`);
+              } catch (error: unknown) {
+                const extractError = error instanceof Error ? error.message : String(error);
+                console.warn(`[GEMINI] Failed to parse extracted JSON pattern: ${extractError}`);
+                console.warn(`[GEMINI] Falling back to manual extraction`);
+                throw error; // Pass to next handler
+              }
+            } else {
+              throw new Error("No JSON-like content found in response");
+            }
+          }
         }
       } catch (e: unknown) {
-        console.error("Failed to parse JSON from Gemini response:", e);
-        console.log("Raw response:", text);
-        // Attempt to extract structured data even from non-JSON response
+        console.error("[GEMINI] All JSON parsing methods failed:", e);
+        console.log("[GEMINI] Raw response:", text);
+        
+        // Final fallback: extract structured data manually from text
+        console.log("[GEMINI] Attempting manual extraction of structured data");
         parsedContent = {
           strengths: extractListItems(text, "strengths"),
           improvements: extractListItems(text, "improvements"),
