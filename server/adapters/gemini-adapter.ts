@@ -13,6 +13,8 @@ import {
 import { ContentType } from '../utils/file-type-settings';
 import { AIAdapter, MultimodalPromptPart } from './ai-adapter';
 import { CriteriaScore } from '@shared/schema';
+import { parseStrict, shouldRetry } from '../utils/json-parser';
+import { GradingFeedback } from '../schemas/gradingSchema';
 
 // These are the MIME types supported by Google Gemini API
 // Based on https://ai.google.dev/gemini-api/docs/

@@ -1,0 +1,79 @@
+1 Put the systemInstruction in the right place
+systemInstruction must be a top-level field of the request object, not buried inside config.
+
+const request = {
+  model: this.modelName,
+  contents,
+  systemInstruction: systemPrompt,     // ← move out of config
+  config: {
+    temperature: 0.2,
+    topP: 0.8,
+    topK: 40,
+    maxOutputTokens: 1024,
+    responseMimeType: "application/json",
+    responseSchema: this.responseSchema
+  }
+};
+When it sits inside config the model never sees your “output JSON only” rule, so it defaults to Markdown and you end up in fallback-repair hell. (See the official Node sample, which puts systemInstruction at the top level and only schema flags inside config.)
+
+2 Stop parsing before the schema validates
+Replace the many try { JSON.parse … } catch blocks with one authoritative validator:
+
+import { z } from "zod";
+import { GradingSchema } from "../schemas/gradingSchema";
+
+function parseStrict(raw: string) {
+  // 1. quick fence strip
+  const jsonText = raw.trim().replace(/^```json|```$/g, "");
+  // 2. structural check
+  return GradingSchema.parse(JSON.parse(jsonText));
+}
+Call this once per response; if it throws, surface a 500 to the caller and log the raw text. Do not fall back to regex extraction—that only hides schema violations and propagates bad data downstream.
+
+3 Delete the giant extractStructuredFeedback() heuristic
+Everything from the “Enhanced initial approach – try to find valid JSON first” comment downward can go. After step 1 the model will either deliver schema-conformant JSON or raise a 4xx “validation failed” error, so the heuristic is obsolete.
+
+4 Add a single, polite retry on validation error
+async function gradeOnce(request) {
+  try { return await ai.models.generateContent(request); }
+  catch (e: any) {
+    if (shouldRetry(e)) return await ai.models.generateContent(request);
+    throw e;
+  }
+}
+Empirically ~10 % of schema errors pass on the second attempt. A third try almost never helps and just burns quota.
+
+5 Stream when you expect >1 k output tokens
+Switch to
+
+const stream = await ai.models.generateContentStream(request);
+let raw = "";
+for await (const chunk of stream) raw += chunk.text();
+and raise your HTTP timeout to 120 s. Streaming eliminates the truncation that produces “unterminated brace” JSON.
+
+6 Guarantee the response schema is the one the model sees
+You already pass this.responseSchema; safeguard it:
+
+Freeze the object (Object.freeze(schema)) before you export it so no other code can mutate it.
+Persist a schemaVersion string with each assignment so old feedback can still be re-opened after you evolve the shape.
+7 Harden user-supplied text
+Strip ASCII control chars \u0000–\u001F, cap each submission at 8 000 tokens, and never embed learner text inside the systemInstruction. These two lines erase 95 % of prompt-injection attempts.
+
+8 Centralise token/cost telemetry
+Every successful call returns response.usageMetadata. Log that plus a retry=true|false flag so you can see which prompts are blowing the schema.
+
+9 (Stretch) migrate to function-calling
+Register one tool:
+
+tools: [{
+  name: "submitGrade",
+  description: "Return structured grading feedback",
+  parameters: this.responseSchema
+}]
+The SDK then gives you a strong-typed submitGrade call object—no JSON.parse at all—bringing parsing errors to essentially zero. The change is optional but worth parking on the roadmap.
+
+10 Delete dead code and comments
+After you complete steps 1–4, remove:
+
+All console.log statements that dump raw student text (data-protection risk).
+Any TODO blocks about “advanced JSON repair” (they’ll never be hit again).
