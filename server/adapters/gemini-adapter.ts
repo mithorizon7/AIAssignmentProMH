@@ -75,7 +75,6 @@ export const SUPPORTED_MIME_TYPES = {
 
 export class GeminiAdapter implements AIAdapter {
   private genAI: GoogleGenAI;
-  private model: any; // Using any temporarily since types differ 
   private modelName: string;
 
   // Define response schema structure once for reuse
@@ -118,25 +117,13 @@ export class GeminiAdapter implements AIAdapter {
       throw new Error("Gemini API key is required");
     }
     
+    // Initialize the Google Generative AI client
     this.genAI = new GoogleGenAI(apiKey);
     
     // Using a supported model from Google's documentation
     this.modelName = "gemini-2.5-flash-preview-04-17";
     
     console.log(`[GEMINI] Initializing with model: ${this.modelName}`);
-    
-    // Get the model with our default configuration including responseSchema
-    this.model = this.genAI.getGenerativeModel({ 
-      model: this.modelName,
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 8192,
-        topP: 0.95,
-        topK: 64,
-        responseMimeType: "application/json",
-        responseSchema: this.responseSchema
-      }
-    });
   }
   
   /**
@@ -156,7 +143,8 @@ export class GeminiAdapter implements AIAdapter {
       image: 'image/jpeg',
       video: 'video/mp4',
       audio: 'audio/mpeg',
-      document: 'application/pdf'
+      document: 'application/pdf',
+      text: 'text/plain' // Added text type
     };
     return typeMap[contentType] || 'application/octet-stream';
   }
@@ -211,8 +199,9 @@ export class GeminiAdapter implements AIAdapter {
       
       console.log(`[GEMINI] Sending text completion request with responseMimeType: application/json`);
       
-      // Create the content with instructions for JSON format
-      const result = await this.model.generateContent({
+      // Create the params object for models.generateContent
+      const params = {
+        model: this.modelName,
         contents: [{ 
           role: 'user', 
           parts: [{ 
@@ -220,10 +209,13 @@ export class GeminiAdapter implements AIAdapter {
           }] 
         }],
         generationConfig: genConfig
-      });
+      };
       
-      const response = result.response;
-      const text = response.text();
+      // Use models.generateContent directly
+      const result = await this.genAI.models.generateContent(params);
+      
+      const response = result;
+      const text = response.response.text();
       
       console.log(`[GEMINI] Response received, length: ${text.length} characters`);
       console.log(`[GEMINI] Response preview: ${text.substring(0, Math.min(100, text.length))}...`);
@@ -232,12 +224,12 @@ export class GeminiAdapter implements AIAdapter {
       let parsedContent: ParsedContent = {};
       
       // First, check if the SDK parsed the response according to our schema
-      if (response.candidates && 
-          response.candidates[0] && 
-          response.candidates[0].parsed) {
+      if (response.response.candidates && 
+          response.response.candidates[0] && 
+          response.response.candidates[0].parsed) {
         // With responseSchema, we should have a parsed property
         try {
-          parsedContent = response.candidates[0].parsed as ParsedContent;
+          parsedContent = response.response.candidates[0].parsed as ParsedContent;
           console.log(`[GEMINI] Successfully used SDK-parsed response`);
         } catch (error) {
           console.warn(`[GEMINI] Error accessing parsed response: ${error instanceof Error ? error.message : String(error)}`);
@@ -373,7 +365,7 @@ export class GeminiAdapter implements AIAdapter {
     }
     
     try {
-      // Prepare the model parts array
+      // Prepare the parts array for the API
       const contentParts: any[] = [];
       
       // Add system prompt if provided
@@ -527,11 +519,14 @@ Please analyze the above submission and provide feedback in the following JSON f
       
       console.log(`[GEMINI] Content parts summary:`, contentSummary);
       
-      // Make the API call
-      const result = await this.model.generateContent({
+      // Make the API call using models.generateContent with the correct parameters
+      const params = {
+        model: this.modelName,
         contents: [{ role: 'user', parts: contentParts }],
         generationConfig: genConfig
-      });
+      };
+      
+      const result = await this.genAI.models.generateContent(params);
       
       console.log(`[GEMINI] Successfully received response from Gemini API`);
       
