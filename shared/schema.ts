@@ -2,6 +2,13 @@ import { pgTable, text, serial, integer, timestamp, json, pgEnum, smallint, bool
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Utility functions for validating IDs
+export function isValidId(id: any): boolean {
+  if (id === undefined || id === null) return false;
+  const numberId = Number(id);
+  return !isNaN(numberId) && numberId > 0 && Number.isInteger(numberId);
+}
+
 import { RubricCriteriaTypeValue } from './enums';
 
 // Rubric type definitions

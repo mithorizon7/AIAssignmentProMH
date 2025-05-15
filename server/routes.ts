@@ -934,6 +934,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Assignment statistics for instructors
   app.get('/api/assignments/stats', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+      // Wrap everything in a try-catch for better error handling
+      try {
       // Extract and validate course/assignment IDs from query params
       let courseId: number | undefined = undefined;
       let assignmentId: number | undefined = undefined;
@@ -1132,6 +1134,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notStartedPercentage: totalStudents > 0 ? Math.round((notStartedCount / totalStudents) * 100) : 0,
         feedbackViewPercentage: feedbackViewRate
       });
+      } catch (error) {
+        console.error("Error in /api/assignments/stats:", error);
+        // Return default values if there's an error
+        return res.json({
+          totalStudents: 0,
+          submittedCount: 0,
+          notStartedCount: 0,
+          submissionRate: 0,
+          totalSubmissions: 0,
+          pendingReviews: 0,
+          averageScore: 0,
+          feedbackGenerated: 0,
+          feedbackViewed: 0,
+          feedbackViewRate: 0,
+          submissionsIncrease: 0,
+          scoreDistribution: { high: 0, medium: 0, low: 0 },
+          feedbackViewLast30Days: Array(30).fill(0),
+          submissionsLast30Days: Array(30).fill(0),
+          notStartedPercentage: 0,
+          submittedPercentage: 0,
+          feedbackViewPercentage: 0
+        });
+      }
   }));
 
   // Assignment analytics for instructors
