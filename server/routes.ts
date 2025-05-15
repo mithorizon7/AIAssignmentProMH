@@ -803,11 +803,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Student progress data for instructors
   app.get('/api/students/progress/:assignmentId?', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
-      const page = parseInt(req.query.page as string || '1');
+      // Set default values
+      let page = 1;
       const pageSize = 10;
       const searchQuery = req.query.search as string || '';
       const statusFilter = req.query.status as string || 'all';
-      const assignmentId = req.params.assignmentId ? parseInt(req.params.assignmentId) : undefined;
+      
+      // Safely parse page parameter
+      if (req.query.page) {
+        const parsedPage = parseInt(req.query.page as string, 10);
+        if (!isNaN(parsedPage) && parsedPage > 0) {
+          page = parsedPage;
+        }
+      }
+      
+      // Safely parse assignmentId parameter
+      let assignmentId: number | undefined = undefined;
+      if (req.params.assignmentId) {
+        const parsedId = parseInt(req.params.assignmentId, 10);
+        if (!isNaN(parsedId) && parsedId > 0) {
+          assignmentId = parsedId;
+        } else {
+          console.warn(`Invalid assignmentId format: ${req.params.assignmentId}`);
+        }
+      }
       
       let students;
       let totalCount;
@@ -1039,17 +1058,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalStudents = students.length;
         console.log(`Students enrolled in course ${courseId}: ${totalStudents}`);
       } else {
-        // Count all students
-        const studentCount = await db.select({ count: countFn() })
-          .from(users)
-          .where(eq(users.role, 'student'));
-        
-        // Make sure count is a number
-        totalStudents = typeof studentCount[0]?.count === 'number' 
-          ? studentCount[0].count 
-          : Number(studentCount[0]?.count) || 0;
+        try {
+          // Count all students
+          const studentCount = await db.select({ count: countFn() })
+            .from(users)
+            .where(eq(users.role, 'student'));
           
-        console.log(`Total students in system: ${totalStudents}`);
+          console.log("Raw student count result:", studentCount);
+          
+          // Handle various formats that countFn might return
+          if (studentCount && studentCount.length > 0) {
+            if (typeof studentCount[0].count === 'number') {
+              totalStudents = studentCount[0].count;
+            } else if (typeof studentCount[0].count === 'string') {
+              // If count comes back as string, parse it safely
+              const parsedCount = parseInt(studentCount[0].count, 10);
+              totalStudents = !isNaN(parsedCount) ? parsedCount : 0;
+            } else if (studentCount[0].count !== null && studentCount[0].count !== undefined) {
+              // Handle other non-null cases
+              totalStudents = Number(studentCount[0].count) || 0;
+            }
+          }
+          
+          // Ensure we always have a valid number
+          if (isNaN(totalStudents)) totalStudents = 0;
+          
+          console.log(`Total students in system: ${totalStudents}`);
+        } catch (error) {
+          console.error("Error counting students:", error);
+          totalStudents = 0;
+        }
       }
       
       // Calculate submission metrics with detailed logging
@@ -1161,7 +1199,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Assignment analytics for instructors
   app.get('/api/assignments/:id?/analytics', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
-      const assignmentId = req.params.id ? parseInt(req.params.id) : undefined;
+      // Safely parse the assignment ID
+      let assignmentId: number | undefined = undefined;
+      if (req.params.id) {
+        const parsed = parseInt(req.params.id, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          assignmentId = parsed;
+        } else {
+          console.warn("Invalid assignment ID format:", req.params.id);
+        }
+      }
       
       let targetAssignmentId = assignmentId;
       

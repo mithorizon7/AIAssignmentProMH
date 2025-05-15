@@ -199,14 +199,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async listCourseEnrollments(courseId: number): Promise<User[]> {
-    const result = await db.select({
-      user: users
-    })
-    .from(enrollments)
-    .innerJoin(users, eq(enrollments.userId, users.id))
-    .where(eq(enrollments.courseId, courseId));
+    // Validate courseId to prevent NaN errors in SQL
+    if (typeof courseId !== 'number' || isNaN(courseId) || courseId <= 0) {
+      console.warn(`listCourseEnrollments called with invalid courseId: ${courseId}, type: ${typeof courseId}`);
+      return [];
+    }
     
-    return result.map((r: { user: User }) => r.user);
+    try {
+      const result = await db.select({
+        user: users
+      })
+      .from(enrollments)
+      .innerJoin(users, eq(enrollments.userId, users.id))
+      .where(eq(enrollments.courseId, courseId));
+      
+      return result.map((r: { user: User }) => r.user);
+    } catch (error) {
+      console.error(`Error retrieving enrollments for course ${courseId}:`, error);
+      return [];
+    }
   }
 
   // Assignment operations
@@ -283,10 +294,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async listAssignments(courseId?: number): Promise<Assignment[]> {
-    if (courseId) {
-      return db.select().from(assignments).where(eq(assignments.courseId, courseId));
+    try {
+      // If courseId is provided, validate it's a valid number
+      if (courseId !== undefined) {
+        if (typeof courseId !== 'number' || isNaN(courseId) || courseId <= 0) {
+          console.warn(`listAssignments called with invalid courseId: ${courseId}, type: ${typeof courseId}`);
+          return [];
+        }
+        return db.select().from(assignments).where(eq(assignments.courseId, courseId));
+      }
+      return db.select().from(assignments);
+    } catch (error) {
+      console.error("Error in listAssignments:", error);
+      return [];
     }
-    return db.select().from(assignments);
   }
 
   async listAssignmentsForUser(userId: number): Promise<Assignment[]> {
@@ -409,13 +430,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async listSubmissionsForAssignment(assignmentId: number): Promise<Submission[]> {
+    // Validate assignmentId to prevent NaN errors
+    if (typeof assignmentId !== 'number' || isNaN(assignmentId) || assignmentId <= 0) {
+      console.warn(`listSubmissionsForAssignment called with invalid assignmentId: ${assignmentId}, type: ${typeof assignmentId}`);
+      return [];
+    }
+    
     try {
       return db.select()
         .from(submissions)
         .where(eq(submissions.assignmentId, assignmentId))
         .orderBy(desc(submissions.createdAt));
     } catch (error) {
-      console.error("Error listing submissions for assignment:", error);
+      console.error(`Error listing submissions for assignment ${assignmentId}:`, error);
       
       // Fallback approach with parameterized SQL if there's a schema issue
       try {
