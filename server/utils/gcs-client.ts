@@ -29,6 +29,11 @@ const isGcsConfigured = (): boolean => {
   return hasCredentials;
 };
 
+// Get the storage bucket
+const getBucket = () => {
+  return storage.bucket(bucketName);
+};
+
 /**
  * Upload a file to Google Cloud Storage
  * @param filePath Local path to file
@@ -49,7 +54,7 @@ const uploadFile = async (
     }
 
     // Upload the file to GCS
-    const bucket = storage.bucket(bucketName);
+    const bucket = getBucket();
     const [file] = await bucket.upload(filePath, {
       destination: destinationPath,
       metadata: {
@@ -88,7 +93,7 @@ const uploadBuffer = async (
     }
     
     // Upload the buffer to GCS
-    const bucket = storage.bucket(bucketName);
+    const bucket = getBucket();
     const file = bucket.file(destinationPath);
     
     await file.save(buffer, {
@@ -125,7 +130,7 @@ const generateSignedUrl = async (
     }
     
     // Generate a signed URL
-    const bucket = storage.bucket(bucketName);
+    const bucket = getBucket();
     const file = bucket.file(objectPath);
     
     const options: GetSignedUrlConfig = {

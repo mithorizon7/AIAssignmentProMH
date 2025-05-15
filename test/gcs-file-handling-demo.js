@@ -2,8 +2,8 @@ import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { isRemoteUrl, processFileForMultimodal } from '../server/utils/multimodal-processor.js';
-import { isGcsConfigured, uploadFile, generateSignedUrl } from '../server/utils/gcs-client.js';
+import { isRemoteUrl, processFileForMultimodal } from '../server/utils/multimodal-processor.ts';
+import { isGcsConfigured, uploadFile, generateSignedUrl } from '../server/utils/gcs-client.ts';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
