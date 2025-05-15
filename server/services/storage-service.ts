@@ -1,6 +1,6 @@
 import { storage } from '../storage';
 import { InsertSubmission, InsertFeedback, Submission, Feedback } from '@shared/schema';
-import { isS3Configured, uploadFile } from '../utils/s3-client';
+import { isGcsConfigured, uploadFile, uploadBuffer, generateSignedUrl } from '../utils/gcs-client';
 import path from 'path';
 import crypto from 'crypto';
 
@@ -30,11 +30,11 @@ export class StorageService {
   }
 
   /**
-   * Store submission file in S3 or generate a mock URL if S3 not configured
+   * Store submission file in Google Cloud Storage or generate a mock URL if GCS not configured
    * @param file The uploaded file from multer
    * @param userId User ID of the submitter
    * @param assignmentId Assignment ID
-   * @returns URL to the stored file
+   * @returns Object path in GCS (to be used with generateSignedUrl when needed)
    */
   async storeSubmissionFile(file: Express.Multer.File, userId: number, assignmentId: number): Promise<string> {
     try {
@@ -44,17 +44,23 @@ export class StorageService {
       const originalExtension = path.extname(file.originalname);
       const safeFileName = `${path.basename(file.originalname, originalExtension)}-${randomString}${originalExtension}`;
       
-      // Construct S3 key (path in bucket)
-      const s3Key = `submissions/${userId}/${assignmentId}/${timestamp}/${safeFileName}`;
+      // Construct GCS object path
+      const gcsPath = `submissions/${userId}/${assignmentId}/${timestamp}/${safeFileName}`;
       
-      // Upload to S3 if configured
-      if (isS3Configured()) {
-        console.log(`[StorageService] Uploading submission file to S3: ${s3Key}`);
-        return await uploadFile(file.path, s3Key, file.mimetype);
+      // Upload to GCS if configured
+      if (isGcsConfigured()) {
+        console.log(`[StorageService] Uploading submission file to GCS: ${gcsPath}`);
+        // If using multer's memoryStorage, use file.buffer
+        if (file.buffer) {
+          return await uploadBuffer(file.buffer, gcsPath, file.mimetype);
+        } else {
+          // If using multer's diskStorage, use file.path
+          return await uploadFile(file.path, gcsPath, file.mimetype);
+        }
       } else {
-        console.warn('[StorageService] S3 not configured, using mock URL');
-        // Return a mock URL for development environments
-        return `https://storage.example.com/${s3Key}`;
+        console.warn('[StorageService] GCS not configured, using mock path');
+        // Return the GCS path (for database storage) - actual URL will be generated when needed
+        return gcsPath;
       }
     } catch (error) {
       console.error('Error storing file:', error);
@@ -63,12 +69,12 @@ export class StorageService {
   }
   
   /**
-   * Store anonymous submission file in S3 or generate a mock URL if S3 not configured
+   * Store anonymous submission file in Google Cloud Storage or generate a mock path if GCS not configured
    * @param file The uploaded file from multer
    * @param assignmentId Assignment ID
    * @param name Submitter's name
    * @param email Submitter's email (used to create a unique path)
-   * @returns URL to the stored file
+   * @returns Object path in GCS (to be used with generateSignedUrl when needed)
    */
   async storeAnonymousSubmissionFile(file: Express.Multer.File, assignmentId: number, name: string, email: string): Promise<string> {
     try {
@@ -81,21 +87,47 @@ export class StorageService {
       // Create a safe email-derived path component
       const safeEmail = email.replace('@', '-at-').replace(/[^\w-]/g, '_');
       
-      // Construct S3 key (path in bucket)
-      const s3Key = `anonymous-submissions/${assignmentId}/${safeEmail}/${timestamp}/${safeFileName}`;
+      // Construct GCS object path
+      const gcsPath = `anonymous-submissions/${assignmentId}/${safeEmail}/${timestamp}/${safeFileName}`;
       
-      // Upload to S3 if configured
-      if (isS3Configured()) {
-        console.log(`[StorageService] Uploading anonymous submission file to S3: ${s3Key}`);
-        return await uploadFile(file.path, s3Key, file.mimetype);
+      // Upload to GCS if configured
+      if (isGcsConfigured()) {
+        console.log(`[StorageService] Uploading anonymous submission file to GCS: ${gcsPath}`);
+        // If using multer's memoryStorage, use file.buffer
+        if (file.buffer) {
+          return await uploadBuffer(file.buffer, gcsPath, file.mimetype);
+        } else {
+          // If using multer's diskStorage, use file.path
+          return await uploadFile(file.path, gcsPath, file.mimetype);
+        }
       } else {
-        console.warn('[StorageService] S3 not configured, using mock URL');
-        // Return a mock URL for development environments
-        return `https://storage.example.com/${s3Key}`;
+        console.warn('[StorageService] GCS not configured, using mock path');
+        // Return the GCS path (for database storage) - actual URL will be generated when needed
+        return gcsPath;
       }
     } catch (error) {
       console.error('Error storing anonymous file:', error);
       throw new Error(`Failed to store submission file: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  /**
+   * Generate a signed URL for accessing a file stored in Google Cloud Storage
+   * @param objectPath The path to the object in GCS (as returned by storeSubmissionFile)
+   * @param expirationMinutes How long the URL should be valid for, in minutes (default: 60)
+   * @returns A signed URL that provides temporary access to the file
+   */
+  async getFileUrl(objectPath: string, expirationMinutes = 60): Promise<string> {
+    try {
+      if (isGcsConfigured()) {
+        return await generateSignedUrl(objectPath, expirationMinutes);
+      } else {
+        // Return a mock URL for development environments
+        return `https://storage.googleapis.com/mock-bucket/${objectPath}`;
+      }
+    } catch (error) {
+      console.error('Error generating file URL:', error);
+      throw new Error(`Failed to generate file URL: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

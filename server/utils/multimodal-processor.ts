@@ -215,20 +215,21 @@ export function fileToDataURI(content: Buffer, mimeType: string): string {
 }
 
 /**
- * Check if a path is a remote URL (S3 or HTTP)
+ * Check if a path is a remote URL (GCS, HTTP, or HTTPS)
  * @param path Path to check
  * @returns Boolean indicating if the path is a remote URL
  */
 export function isRemoteUrl(path: string): boolean {
   return path.startsWith('http://') || 
          path.startsWith('https://') || 
-         path.startsWith('s3://');
+         path.startsWith('gs://') ||
+         path.includes('storage.googleapis.com');
 }
 
 /**
- * Download a file from a remote URL (S3, HTTP, HTTPS) 
+ * Download a file from a remote URL (GCS, HTTP, HTTPS) 
  * @param url The URL to download from
- * @param mimeType Optional MIME type of the file (useful for S3 URLs that might not provide Content-Type)
+ * @param mimeType Optional MIME type of the file (useful for GCS URLs that might not provide Content-Type)
  * @returns An object containing the file buffer and temporary local path
  */
 export async function downloadFromUrl(url: string, mimeType?: string): Promise<{ 
@@ -251,13 +252,12 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
     // Handle different URL types
     let fileBuffer: Buffer;
     
-    if (url.startsWith('s3://')) {
-      // For future S3 integration
-      // This would use AWS S3 SDK for direct access
-      // For now, we'll throw an error
-      throw new Error('Direct S3 URL downloads not yet implemented. Use HTTP/HTTPS URLs from S3 instead.');
+    if (url.startsWith('gs://')) {
+      // If using direct GCS integration, we would use the Google Cloud Storage SDK
+      // For now, we'll throw an error suggesting to use signed URLs instead
+      throw new Error('Direct GCS URL downloads not implemented. Use HTTP/HTTPS signed URLs from GCS instead.');
     } else {
-      // Standard HTTP/HTTPS URLs
+      // Standard HTTP/HTTPS URLs (including GCS signed URLs)
       const response = await fetch(url);
       
       if (!response.ok) {
