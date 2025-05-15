@@ -1016,8 +1016,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Attempting to fetch assignment with ID: ${assignmentId} (type: ${typeof assignmentId})`);
             targetAssignment = await storage.getAssignment(assignmentId);
             console.log("Target assignment found:", targetAssignment ? "Yes" : "No");
+            
+            // If assignmentId was provided but no assignment was found, return appropriate response
+            if (!targetAssignment) {
+              console.warn(`Assignment with ID ${assignmentId} not found - returning default stats`);
+              return res.json({
+                totalStudents: 0,
+                submittedCount: 0,
+                notStartedCount: 0,
+                submissionRate: 0,
+                totalSubmissions: 0,
+                pendingReviews: 0,
+                averageScore: 0,
+                feedbackGenerated: 0,
+                feedbackViewed: 0,
+                feedbackViewRate: 0,
+                submissionsIncrease: 0,
+                scoreDistribution: { high: 0, medium: 0, low: 0 },
+                feedbackViewLast30Days: Array(30).fill(0),
+                submissionsLast30Days: Array(30).fill(0),
+                notStartedPercentage: 0,
+                submittedPercentage: 0,
+                feedbackViewPercentage: 0
+              });
+            }
           } else {
             console.error(`Invalid assignmentId detected: ${assignmentId}, type: ${typeof assignmentId}`);
+            // Don't return 404 for invalid assignment format, just continue with general stats
           }
         } catch (error) {
           console.error("Error fetching target assignment:", error);

@@ -108,14 +108,22 @@ export default function InstructorDashboard() {
       const params = new URLSearchParams();
       
       // Only append valid numeric values
-      const courseIdNum = parseInt(selectedCourse);
-      if (!isNaN(courseIdNum)) {
-        params.append('courseId', courseIdNum.toString());
+      if (selectedCourse) {
+        const courseIdNum = parseInt(selectedCourse);
+        if (!isNaN(courseIdNum) && courseIdNum > 0) {
+          params.append('courseId', courseIdNum.toString());
+        } else {
+          console.warn('Invalid course ID detected:', selectedCourse);
+        }
       }
       
-      const assignmentIdNum = parseInt(selectedAssignment);
-      if (!isNaN(assignmentIdNum)) {
-        params.append('assignmentId', assignmentIdNum.toString());
+      if (selectedAssignment) {
+        const assignmentIdNum = parseInt(selectedAssignment);
+        if (!isNaN(assignmentIdNum) && assignmentIdNum > 0) {
+          params.append('assignmentId', assignmentIdNum.toString());
+        } else {
+          console.warn('Invalid assignment ID detected:', selectedAssignment);
+        }
       }
       
       // Only add the query string if we have parameters
@@ -125,18 +133,56 @@ export default function InstructorDashboard() {
       
       console.log('Fetching stats with URL:', url);
       
-      const response = await fetch(url);
-      if (!response.ok) {
-        console.error('Stats API error:', await response.text());
-        throw new Error('Failed to fetch stats');
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          console.error('Stats API error:', await response.text());
+          // Instead of throwing, return empty stats object to prevent UI errors
+          return {
+            totalStudents: 0,
+            submittedCount: 0,
+            notStartedCount: 0,
+            submissionRate: 0,
+            totalSubmissions: 0,
+            pendingReviews: 0,
+            averageScore: 0,
+            feedbackGenerated: 0,
+            feedbackViewed: 0,
+            feedbackViewRate: 0,
+            submissionsIncrease: 0,
+            scoreDistribution: { high: 0, medium: 0, low: 0 },
+            submittedPercentage: 0,
+            notStartedPercentage: 0,
+            feedbackViewPercentage: 0
+          } as Stats;
+        }
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+        // Return empty stats object to prevent UI errors
+        return {
+          totalStudents: 0,
+          submittedCount: 0,
+          notStartedCount: 0,
+          submissionRate: 0,
+          totalSubmissions: 0,
+          pendingReviews: 0,
+          averageScore: 0,
+          feedbackGenerated: 0,
+          feedbackViewed: 0,
+          feedbackViewRate: 0,
+          submissionsIncrease: 0,
+          scoreDistribution: { high: 0, medium: 0, low: 0 },
+          submittedPercentage: 0,
+          notStartedPercentage: 0,
+          feedbackViewPercentage: 0
+        } as Stats;
       }
-      return response.json();
     },
-    enabled: activeTab === "overview" && (
-      // Only enable if we have valid numeric IDs
-      (!!selectedCourse && !isNaN(parseInt(selectedCourse))) || 
-      (!!selectedAssignment && !isNaN(parseInt(selectedAssignment)))
-    ),
+    enabled: activeTab === "overview",
+    // Add retry logic for better resilience
+    retry: 2,
+    retryDelay: 1000,
   });
   
   // Define analytics data interface
