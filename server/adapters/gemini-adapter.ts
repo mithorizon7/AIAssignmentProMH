@@ -195,9 +195,29 @@ export class GeminiAdapter implements AIAdapter {
     try {
       console.log(`[GEMINI] Creating file data for file of size ${content.length} bytes with MIME type: ${mimeType}`);
       
-      // Check if the content appears to be valid
-      if (content.length === 0) {
+      // Validate content
+      if (!content || content.length === 0) {
         throw new Error('Empty file content provided to createFileData');
+      }
+      
+      // Validate MIME type
+      if (!mimeType || typeof mimeType !== 'string') {
+        console.warn('[GEMINI] Missing or invalid MIME type, defaulting to application/octet-stream');
+        mimeType = 'application/octet-stream';
+      }
+      
+      // Following Gemini best practices for file handling based on size and type
+      // https://ai.google.dev/gemini-api/docs/files
+      
+      // For images specifically, we can use size-appropriate handling
+      if (mimeType.startsWith('image/')) {
+        // For small images (<4MB), we could use inline data if createFile fails
+        // But for consistency and best results, we'll try the File API first
+        console.log(`[GEMINI] Processing image (${content.length} bytes) using File API for best quality analysis`);
+      } 
+      // For large files (PDFs, videos, audio), always use File API
+      else if (content.length > 10 * 1024 * 1024) {
+        console.log(`[GEMINI] Large file detected (${content.length} bytes), using File API is required`);
       }
       
       // For the latest Gemini API version (2.5 models), the File API method is exposed directly on the model

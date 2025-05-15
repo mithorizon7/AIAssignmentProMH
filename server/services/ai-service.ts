@@ -253,9 +253,30 @@ ${params.studentSubmissionContent}
         textContent: processedFile.textContent // Pass through any extracted text content
       });
       
-      // Build a system prompt for assignment context
-      let systemPrompt = `You are an expert AI Teaching Assistant analyzing a ${processedFile.contentType} submission. `;
-      systemPrompt += `\nAssignment: ${params.assignmentTitle}`;
+      // Build a system prompt for assignment context with enhanced guidance for multimodal content
+      // Following Google's Gemini API best practices from https://ai.google.dev/gemini-api/docs/system-instructions
+      // and https://ai.google.dev/gemini-api/docs/image-understanding
+      let systemPrompt = `You are an expert AI Teaching Assistant analyzing a ${processedFile.contentType} submission.
+Your task is to provide precise, detailed, and constructive feedback on the student's work.
+
+For ${processedFile.contentType === 'image' ? 'image' : processedFile.contentType === 'document' ? 'document' : processedFile.contentType} content:
+${processedFile.contentType === 'image' ? 
+`- Carefully analyze all visual elements, composition, technical execution, and conceptual aspects
+- Pay attention to details such as color, composition, technical execution, and creative choices
+- Provide specific feedback that references exact visual elements in the submission
+- Evaluate both technical skills and creative/conceptual understanding` : 
+processedFile.contentType === 'document' ? 
+`- Analyze the document structure, content organization, clarity, and coherence
+- Evaluate accuracy, thoroughness, and relevance of information
+- Provide specific feedback on writing style, argumentation, and evidence use
+- Look for proper citation and reference use when applicable` :
+`- Carefully examine both technical correctness and creative aspects
+- Consider organization, structure, and presentation quality
+- Provide specific feedback referencing exact elements from the submission`}
+
+Respond with a structured assessment including strengths, areas for improvement, and specific suggestions.
+
+Assignment: ${params.assignmentTitle}`;
       
       if (params.assignmentDescription) {
         systemPrompt += `\nDescription: ${params.assignmentDescription}`;
