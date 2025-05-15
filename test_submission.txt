@@ -1,1 +1,10 @@
-This is a test file for the improved file type validation system
+This is a sample text file for testing multimodal processing.
+
+It contains multiple lines of text that the Gemini AI model will analyze.
+
+function testCode() {
+  // This is a sample code block
+  return "Hello, AI Assistant!";
+}
+
+The model should be able to analyze both the text content and the image together.

@@ -22,9 +22,9 @@ if (!process.env.GEMINI_API_KEY) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Test file paths - use full path
-const TEST_IMAGE_FILE = '/home/runner/workspace/attached_assets/Screenshot 2025-05-15 at 2.00.26 PM.png';
-const TEST_TEXT_FILE = '/home/runner/workspace/test_submission.txt';
+// Test file paths - use path relative to current directory with a known existing file
+const TEST_IMAGE_FILE = './attached_assets/Screenshot 2025-05-08 at 1.00.17 PM.png';
+const TEST_TEXT_FILE = './test_submission.txt';
 
 async function main() {
   try {
@@ -59,8 +59,8 @@ async function main() {
     const __dirname = path.dirname(__filename);
     
     // Test file paths (same as in the parent script)
-    const TEST_IMAGE_FILE = '/home/runner/workspace/attached_assets/Screenshot 2025-05-15 at 2.00.26 PM.png';
-    const TEST_TEXT_FILE = '/home/runner/workspace/test_submission.txt';
+    const TEST_IMAGE_FILE = './attached_assets/Screenshot 2025-05-08 at 1.00.17 PM.png';
+    const TEST_TEXT_FILE = './test_submission.txt';
     
     /**
      * Test multimodal content processing with Gemini
