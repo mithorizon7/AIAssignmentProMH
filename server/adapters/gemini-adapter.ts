@@ -1340,11 +1340,45 @@ Please analyze the above submission and provide feedback in the following JSON f
           console.log('[GEMINI] Found markdown code block in response');
           const jsonContent = markdownMatch[1].trim();
           try {
-            parsedContent = JSON.parse(jsonContent);
+            // Log the content we're trying to parse for debugging
+            console.log('[GEMINI] Attempting to parse markdown JSON content (first 200 chars):', 
+              jsonContent.substring(0, 200) + (jsonContent.length > 200 ? '...' : ''));
+              
+            // First try fixing common JSON errors before parsing
+            const cleanedJson = cleanJsonString(jsonContent);
+            parsedContent = JSON.parse(cleanedJson);
             console.log('[GEMINI] Successfully parsed JSON from markdown code block');
           } catch (markdownError) {
             console.log('[GEMINI] Failed to parse markdown block as JSON:', markdownError.message);
-            // We'll continue to other methods if this fails
+            console.log('[GEMINI] JSON error position:', (markdownError as SyntaxError).message);
+            
+            // Try to extract just the valid parts
+            try {
+              // Sometimes the AI doesn't properly close lists/objects - try to fix that
+              const partialJsonMatch = jsonContent.match(/\{\s*"strengths"\s*:\s*\[(.*?)\]/s);
+              if (partialJsonMatch) {
+                const strengths = extractListItemsManually(partialJsonMatch[1]);
+                parsedContent.strengths = strengths;
+                console.log('[GEMINI] Recovered strengths using regex:', strengths.length);
+              }
+              
+              // Try to extract improvements similarly
+              const improvementsMatch = jsonContent.match(/"improvements"\s*:\s*\[(.*?)\]/s);
+              if (improvementsMatch) {
+                const improvements = this.extractListItemsManually(improvementsMatch[1]);
+                parsedContent.improvements = improvements;
+                console.log('[GEMINI] Recovered improvements using regex:', improvements.length);
+              }
+              
+              // Try to extract score
+              const scoreMatch = jsonContent.match(/"score"\s*:\s*(\d+(?:\.\d+)?)/);
+              if (scoreMatch) {
+                parsedContent.score = parseFloat(scoreMatch[1]);
+                console.log('[GEMINI] Recovered score using regex:', parsedContent.score);
+              }
+            } catch (recoveryError) {
+              console.log('[GEMINI] Failed to recover partial JSON:', recoveryError.message);
+            }
           }
         }
         
@@ -1353,7 +1387,8 @@ Please analyze the above submission and provide feedback in the following JSON f
           if (this.modelName.includes('gemini-2.5')) {
             console.log('[GEMINI] Attempting to parse direct structured response');
             try {
-              parsedContent = JSON.parse(text);
+              const cleanedJson = this.cleanJsonString(text);
+              parsedContent = JSON.parse(cleanedJson);
             } catch (directError) {
               console.log('[GEMINI] Failed to parse direct response:', directError.message);
             }
@@ -1365,14 +1400,16 @@ Please analyze the above submission and provide feedback in the following JSON f
             if (jsonMatch) {
               console.log('[GEMINI] Found JSON block in response');
               try {
-                parsedContent = JSON.parse(jsonMatch[0]);
+                const cleanedJson = this.cleanJsonString(jsonMatch[0]);
+                parsedContent = JSON.parse(cleanedJson);
               } catch (jsonError) {
                 console.log('[GEMINI] Failed to parse extracted JSON:', jsonError.message);
               }
             } else {
               console.log('[GEMINI] No JSON block found, trying direct parse as fallback');
               try {
-                parsedContent = JSON.parse(text);
+                const cleanedJson = this.cleanJsonString(text);
+                parsedContent = JSON.parse(cleanedJson);
               } catch (fallbackError) {
                 console.log('[GEMINI] Failed fallback parse:', fallbackError.message);
               }
@@ -1380,7 +1417,10 @@ Please analyze the above submission and provide feedback in the following JSON f
           }
         }
         
-        console.log('[GEMINI] Successfully parsed JSON:', Object.keys(parsedContent));
+        console.log('[GEMINI] Parsed JSON keys:', Object.keys(parsedContent));
+        if (Object.keys(parsedContent).length > 0) {
+          console.log('[GEMINI] Successfully extracted content from response');
+        }
       } catch (parseError) {
         console.error("[GEMINI] Failed to parse JSON from Gemini response:", parseError);
         console.log("[GEMINI] Raw response:", text.substring(0, 500) + (text.length > 500 ? '...' : ''));
@@ -1488,4 +1528,64 @@ function extractScore(text: string): number | undefined {
   const regex = /score[:\s]*(\d+)/i;
   const match = text.match(regex);
   return match ? parseInt(match[1], 10) : undefined;
+}
+
+/**
+ * Helper function to manually extract list items from a JSON array string that might be malformed
+ * Used by the GeminiAdapter class
+ */
+function extractListItemsManually(jsonArrayContent: string): string[] {
+  // This handles cases where the JSON array is malformed but we can still extract the strings
+  const items: string[] = [];
+  
+  // Match all quoted strings in the array portion
+  const stringMatches = jsonArrayContent.match(/"([^"\\]*(\\.[^"\\]*)*)"/g);
+  
+  if (stringMatches) {
+    stringMatches.forEach(match => {
+      // Remove the quotes and add to our items array
+      const item = match.substring(1, match.length - 1).trim();
+      if (item) {
+        items.push(item);
+      }
+    });
+  }
+  
+  return items;
+}
+
+/**
+ * Helper function to clean a JSON string before attempting to parse it
+ * Handles common errors that the AI might make when generating JSON
+ */
+function cleanJsonString(jsonStr: string): string {
+  let cleaned = jsonStr;
+  
+  // Sometimes the AI adds trailing commas in arrays or objects which is invalid JSON
+  // Replace trailing commas in arrays
+  cleaned = cleaned.replace(/,\s*]/g, ']');
+  
+  // Replace trailing commas in objects
+  cleaned = cleaned.replace(/,\s*}/g, '}');
+  
+  // Sometimes the AI includes comments which are not valid in JSON
+  // Remove single line comments
+  cleaned = cleaned.replace(/\/\/.*$/gm, '');
+  
+  // Remove multi-line comments
+  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
+  
+  // Fix unescaped quotes in strings (this is tricky and might cause issues)
+  // Only attempt if we detect obvious issues
+  if (cleaned.includes('\\"') || cleaned.includes('\\\'')) {
+    try {
+      // Only apply this fix if we detect potential issues
+      cleaned = cleaned.replace(/([^\\])"([^"]*)([^\\])"/g, '$1"$2$3\\"');
+    } catch (e) {
+      // If any error occurs during replacement, just keep the original
+      console.log('[GEMINI] Error while trying to fix unescaped quotes:', e);
+    }
+  }
+  
+  return cleaned;
 }
