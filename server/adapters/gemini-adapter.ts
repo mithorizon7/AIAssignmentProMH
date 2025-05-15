@@ -1,4 +1,12 @@
-import { GoogleGenerativeAI, GenerativeModel, Content, Part, FileData } from '@google/generative-ai';
+import { 
+  GoogleGenerativeAI, 
+  GenerativeModel, 
+  Content, 
+  Part, 
+  FileData,
+  HarmCategory,
+  HarmBlockThreshold
+} from '@google/generative-ai';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
@@ -157,18 +165,16 @@ export class GeminiAdapter implements AIAdapter {
         
         // These settings help with structured assessment output format
         topP: 0.95,
-        topK: 64,
+        topK: 64
         
-        // Encourage structured output but don't force JSON
-        // (we'll parse it later regardless of format)
-        responseFormat: { type: "STRUCTURED" }
+        // Note: responseFormat removed as it's not supported in the current Gemini API version
       },
-      // Add safety settings appropriate for educational content
+      // Add safety settings appropriate for educational content with proper enum values
       safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }
+        { category: "HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+        { category: "HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+        { category: "SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+        { category: "DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }
       ]
     });
   }
