@@ -293,14 +293,38 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
   cleanup: () => Promise<void>
 }> {
   try {
-    console.log(`[DOWNLOAD] Downloading file from URL: ${url.substring(0, 30)}... (url length: ${url.length})`);
+    // Prevent logging full GCS URLs (which might contain sensitive signed URL data)
+    // But provide enough to debug issues
+    const isGcsSignedUrl = url.includes('storage.googleapis.com') && url.includes('Signature=');
+    const urlPreview = isGcsSignedUrl
+      ? `https://storage.googleapis.com/...[signed-url]...`
+      : url.substring(0, Math.min(30, url.length)) + (url.length > 30 ? '...' : '');
+      
+    console.log(`[DOWNLOAD] Downloading file from URL: ${urlPreview} (type: ${isGcsSignedUrl ? 'GCS signed URL' : url.startsWith('gs://') ? 'GCS URI' : 'HTTP URL'})`);
+    
+    // Validate URL
+    if (!url || url.trim() === '') {
+      throw new Error('Empty URL provided to downloadFromUrl');
+    }
     
     // Generate a temporary file path
     const tempDir = os.tmpdir();
     const randomName = crypto.randomBytes(16).toString('hex');
-    const extension = mimeType ? 
-      `.${mimeType.split('/')[1]}` : 
-      path.extname(url) || '.tmp';
+    
+    // Parse extension from URL or MIME type
+    let extension: string;
+    if (mimeType) {
+      const parts = mimeType.split('/');
+      // For application types, use the subtype (e.g., pdf from application/pdf)
+      // For other types, use the second part directly
+      extension = `.${parts[1]}`;
+    } else if (url.includes('.') && !url.startsWith('gs://') && !isGcsSignedUrl) {
+      // Extract extension from URL for regular URLs only (not GCS)
+      const urlPath = new URL(url).pathname;
+      extension = path.extname(urlPath) || '.tmp';
+    } else {
+      extension = '.tmp';
+    }
     
     const localPath = path.join(tempDir, `${randomName}${extension}`);
     console.log(`[DOWNLOAD] Using temp file path: ${localPath}`);

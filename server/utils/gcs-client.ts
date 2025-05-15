@@ -20,12 +20,37 @@ const isGcsConfigured = (): boolean => {
   
   if (!hasCredentials) {
     console.warn('GOOGLE_APPLICATION_CREDENTIALS environment variable is not set. GCS operations will likely fail.');
+    
+    // Provide more detailed diagnostic information
+    try {
+      const credentialPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+      if (credentialPath) {
+        const exists = fs.existsSync(credentialPath);
+        console.warn(`Credentials file ${credentialPath} ${exists ? 'exists' : 'does not exist'}.`);
+        
+        if (exists) {
+          // Check if file is readable
+          try {
+            const stats = fs.statSync(credentialPath);
+            console.warn(`Credentials file is ${stats.size} bytes and was modified at ${stats.mtime}.`);
+          } catch (statError) {
+            console.warn(`Unable to read credentials file stats: ${statError instanceof Error ? statError.message : String(statError)}`);
+          }
+        }
+      } else {
+        console.warn('No credentials path specified.');
+      }
+    } catch (checkError) {
+      console.warn(`Error checking credentials file: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+    }
   }
   
   if (!hasBucket) {
-    console.warn('GCS_BUCKET_NAME environment variable is not set. Using default bucket: aigrader-uploads');
+    console.warn(`GCS_BUCKET_NAME environment variable is not set. Using default bucket: ${bucketName}`);
   }
   
+  // In some cloud environments, explicit credentials might not be needed,
+  // as they can be inferred from the runtime environment (e.g., on GCP)
   return hasCredentials;
 };
 
@@ -126,27 +151,68 @@ const generateSignedUrl = async (
   expirationMinutes = 60
 ): Promise<string> => {
   try {
+    // Validate input
+    if (!objectPath || objectPath.trim() === '') {
+      throw new Error('Empty object path provided to generateSignedUrl');
+    }
+    
+    console.log(`[GCS] Generating signed URL for object: ${objectPath} with expiration: ${expirationMinutes} minutes`);
+    
     // Validate configuration
     if (!isGcsConfigured()) {
-      console.warn('GCS not configured, using mock URL');
-      return `https://storage.googleapis.com/${bucketName}/${objectPath}`;
+      console.warn('[GCS] GCS not properly configured for signed URL generation');
+      console.warn('[GCS] GOOGLE_APPLICATION_CREDENTIALS environment variable is not set or file is invalid');
+      
+      // Check if we're in a production environment
+      const isProduction = process.env.NODE_ENV === 'production';
+      
+      if (isProduction) {
+        throw new Error('GCS not configured in production environment. Check GOOGLE_APPLICATION_CREDENTIALS.');
+      } else {
+        console.warn('[GCS] Using mock URL for development environment');
+        // Only in development, return a mock URL
+        return `https://storage.googleapis.com/${bucketName}/${objectPath}`;
+      }
     }
     
     // Normalize object path (remove leading slash if present)
     const normalizedPath = objectPath.startsWith('/') ? objectPath.substring(1) : objectPath;
+    console.log(`[GCS] Normalized object path: ${normalizedPath}`);
     
-    // Generate a signed URL
-    const bucket = getBucket();
-    const file = bucket.file(normalizedPath);
-    
-    const options: GetSignedUrlConfig = {
-      version: 'v4',
-      action: 'read',
-      expires: Date.now() + expirationMinutes * 60 * 1000, // Convert minutes to milliseconds
-    };
-    
-    const [url] = await file.getSignedUrl(options);
-    return url;
+    // Validate that the file exists before attempting to generate a URL
+    try {
+      const bucket = getBucket();
+      const file = bucket.file(normalizedPath);
+      
+      // Check if the file exists
+      const [exists] = await file.exists();
+      if (!exists) {
+        console.warn(`[GCS] File does not exist in bucket: ${bucketName}, path: ${normalizedPath}`);
+        // We'll still try to generate a URL as the file might be created later
+      } else {
+        console.log(`[GCS] File exists in bucket: ${bucketName}, path: ${normalizedPath}`);
+      }
+      
+      // Generate a signed URL with specified options
+      const options: GetSignedUrlConfig = {
+        version: 'v4',
+        action: 'read',
+        expires: Date.now() + expirationMinutes * 60 * 1000, // Convert minutes to milliseconds
+      };
+      
+      console.log(`[GCS] Requesting signed URL with expiration: ${new Date(options.expires).toISOString()}`);
+      const [url] = await file.getSignedUrl(options);
+      
+      if (!url || !url.startsWith('http')) {
+        throw new Error(`Invalid signed URL generated: ${url ? url.substring(0, 30) + '...' : 'undefined'}`);
+      }
+      
+      console.log(`[GCS] Successfully generated signed URL for ${normalizedPath} (${url.length} chars)`);
+      return url;
+    } catch (gcsOperationError) {
+      console.error('[GCS] Error in GCS operation:', gcsOperationError);
+      throw new Error(`GCS operation failed: ${gcsOperationError instanceof Error ? gcsOperationError.message : String(gcsOperationError)}`);
+    }
   } catch (error) {
     console.error('[GCS] Error generating signed URL:', error);
     throw new Error(`Failed to generate signed URL: ${error instanceof Error ? error.message : String(error)}`);

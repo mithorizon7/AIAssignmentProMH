@@ -906,21 +906,40 @@ export class GeminiAdapter implements AIAdapter {
                     const fileData = await this.createFileData(part.content, mimeType);
                     fileObjects.push(fileData);
                     
-                    // Get the file URI
-                    const fileUri = this.getFileUri(fileData);
-                    if (!fileUri) {
-                      throw new Error('Failed to get valid fileUri from fileData');
-                    }
-                    
-                    console.log(`[GEMINI] Successfully created file using File API, URI: ${fileUri.substring(0, 30)}...`);
-                    
-                    // Add the file part with fileData following recommended format for gemini-2.5 models
-                    contentParts.push({
-                      fileData: {
-                        fileUri: fileUri,
-                        mimeType: mimeType
+                    // Check for our special useInlineData flag that indicates the File API failed
+                    // but we can use inline data instead
+                    if ((fileData as any).useInlineData === true && (fileData as any).data) {
+                      console.log(`[GEMINI] Using inlineData fallback from createFileData result for image`);
+                      // Use the data directly from the fileData
+                      const imageBuffer = (fileData as any).data;
+                      // Convert to base64 if it's a buffer
+                      const base64Data = Buffer.isBuffer(imageBuffer) 
+                        ? imageBuffer.toString('base64') 
+                        : typeof imageBuffer === 'string' ? imageBuffer : '';
+                        
+                      contentParts.push({
+                        inlineData: {
+                          data: base64Data,
+                          mimeType: mimeType
+                        }
+                      });
+                    } else {
+                      // Normal flow - get the file URI and use it
+                      const fileUri = this.getFileUri(fileData);
+                      if (!fileUri) {
+                        throw new Error('Failed to get valid fileUri from fileData');
                       }
-                    });
+                      
+                      console.log(`[GEMINI] Successfully created file using File API, URI: ${fileUri.substring(0, 30)}...`);
+                      
+                      // Add the file part with fileData following recommended format for gemini-2.5 models
+                      contentParts.push({
+                        fileData: {
+                          fileUri: fileUri,
+                          mimeType: mimeType
+                        }
+                      });
+                    }
                   } catch (fileApiError) {
                     console.warn(`[GEMINI] File API failed, falling back to inline data: ${fileApiError instanceof Error ? fileApiError.message : String(fileApiError)}`);
                     
