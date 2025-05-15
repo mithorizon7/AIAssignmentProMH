@@ -38,8 +38,8 @@ export class GeminiAdapter implements AIAdapter {
     // Initialize the Google Generative AI client
     this.genAI = new GoogleGenAI({ apiKey });
     
-    // Using the specified model from Google's documentation
-    this.modelName = "gemini-2.5-flash-preview-04-17";
+    // Make model name configurable with environment variable or use default
+    this.modelName = process.env.GEMINI_MODEL_NAME ?? "gemini-2.5-flash-preview-04-17";
     
     console.log(`[GEMINI] Initializing with model: ${this.modelName}`);
   }
@@ -207,11 +207,11 @@ export class GeminiAdapter implements AIAdapter {
       const topK = 40;
       const maxOutputTokens = 1024;
       
-      // Prepare the request with JSON response format - use proper structure with generationConfig
+      // Prepare the request with JSON response format - use proper structure with config
       const requestParams: any = {
         model: this.modelName,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
+        config: {
           temperature,
           topP, 
           topK,
@@ -382,32 +382,32 @@ export class GeminiAdapter implements AIAdapter {
         }
       }
       
-      // Add system prompt as text part - needs to go after other parts for proper context
-      if (systemPrompt) {
-        // Prepend the system prompt for proper instruction order
-        apiParts.unshift({ text: `${systemPrompt}` });
-        console.log(`[GEMINI] Added system prompt (${systemPrompt.length} chars)`);
-      }
-      
       // Generation config parameters
       const temperature = 0.2;
       const topP = 0.8;
       const topK = 40;
       const maxOutputTokens = 1024;
       
-      // Prepare the request with JSON response format - use proper structure with generationConfig
+      // Prepare the request with JSON response format - use proper structure with config
       const requestParams: any = {
         model: this.modelName,
         contents: [{ role: 'user', parts: apiParts }],
-        generationConfig: {
+        config: {
           temperature,
           topP,
           topK,
           maxOutputTokens,
           responseMimeType: "application/json",
-          responseSchema: this.responseSchema
+          responseSchema: this.responseSchema,
+          // Add system instruction directly in config if provided
+          systemInstruction: systemPrompt ? { text: systemPrompt } : undefined
         }
       };
+      
+      // Log if system prompt was added
+      if (systemPrompt) {
+        console.log(`[GEMINI] Added system prompt as systemInstruction (${systemPrompt.length} chars)`);
+      }
       
       console.log(`[GEMINI] Making API request to model: ${this.modelName}`);
       console.log(`[GEMINI] Request has ${apiParts.length} content parts`);
@@ -439,11 +439,11 @@ export class GeminiAdapter implements AIAdapter {
             text: "Note: An image was included but could not be processed due to format limitations." 
           });
           
-          // Retry with text-only, keeping the generationConfig structure
+          // Retry with text-only, keeping the config structure
           const retryParams = {
             model: this.modelName,
             contents: [{ role: 'user', parts: textOnlyParts }],
-            generationConfig: requestParams.generationConfig
+            config: requestParams.config
           };
           result = await this.genAI.models.generateContent(retryParams);
         } else {
