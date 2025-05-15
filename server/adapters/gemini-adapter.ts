@@ -356,7 +356,7 @@ export class GeminiAdapter implements AIAdapter {
         criteriaScores: parsedContent.criteriaScores || [],
         rawResponse: parsedContent,
         modelName: this.modelName,
-        tokenCount: estimatedTokens
+        tokenCount: tokenCount
       };
     } catch (error) {
       console.error("[GEMINI] API error:", error instanceof Error ? error.message : String(error));
