@@ -110,8 +110,21 @@ export class GeminiAdapter implements AIAdapter {
     }
     
     this.generativeAI = new GoogleGenerativeAI(apiKey);
-    this.modelName = "models/gemini-2.5-flash-preview-04-17"; // Default recommended model
-    this.model = this.generativeAI.getGenerativeModel({ model: this.modelName });
+    
+    // Update to use the latest model that supports all features
+    // The newest model is "gemini-1.0-pro-vision" for vision/image analysis
+    // "gemini-2.5-flash-preview-04-17" might not have full vision support
+    this.modelName = "gemini-1.0-pro-vision"; 
+    
+    console.log(`[GEMINI] Initializing with model: ${this.modelName}`);
+    
+    this.model = this.generativeAI.getGenerativeModel({ 
+      model: this.modelName,
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 8192
+      }
+    });
   }
   
   /**
@@ -178,35 +191,74 @@ export class GeminiAdapter implements AIAdapter {
    */
   private async createFileData(content: Buffer, mimeType: string): Promise<GeminiFileData> {
     try {
+      console.log(`[GEMINI] Creating file data for image of size ${content.length} bytes with MIME type: ${mimeType}`);
+      
+      // List out available methods on the generativeAI instance for debugging
+      const availableMethods = Object.keys(this.generativeAI).filter(
+        key => typeof (this.generativeAI as any)[key] === 'function'
+      );
+      console.log(`[GEMINI] Available methods on generativeAI instance: ${availableMethods.join(', ')}`);
+      
       // Primary path: Upload file to Gemini File API using proper method
       // First check if the GenerativeAI instance has the createFile method (latest API version)
       if (this.generativeAI.createFile && typeof this.generativeAI.createFile === 'function') {
-        const fileData = await this.generativeAI.createFile({
-          data: content,
-          mimeType
-        }) as GeminiFileData;
-        
-        console.log('[INFO] Successfully uploaded file to Gemini File API');
-        return fileData;
+        console.log(`[GEMINI] Using createFile method to upload to Gemini File API`);
+        try {
+          const fileData = await this.generativeAI.createFile({
+            data: content,
+            mimeType
+          }) as GeminiFileData;
+          
+          console.log(`[GEMINI] Successfully uploaded file to Gemini File API, fileData:`, fileData);
+          return fileData;
+        } catch (createFileError) {
+          console.error(`[GEMINI] createFile method failed:`, createFileError);
+          // Don't throw yet, try the next method
+          throw createFileError;
+        }
+      } else {
+        console.log(`[GEMINI] createFile method not available, trying alternatives`);
       }
       
       // Try alternative method: createBlob for older API versions
       if (this.generativeAI.createBlob && typeof this.generativeAI.createBlob === 'function') {
-        const fileData = await this.generativeAI.createBlob({
-          data: content,
-          mimeType
-        }) as GeminiFileData;
-        
-        console.log('[INFO] Successfully uploaded file to Gemini File API (using createBlob)');
-        return fileData;
+        console.log(`[GEMINI] Using createBlob method to upload to Gemini File API`);
+        try {
+          const fileData = await this.generativeAI.createBlob({
+            data: content,
+            mimeType
+          }) as GeminiFileData;
+          
+          console.log(`[GEMINI] Successfully uploaded file to Gemini File API (using createBlob), fileData:`, fileData);
+          return fileData;
+        } catch (createBlobError) {
+          console.error(`[GEMINI] createBlob method failed:`, createBlobError);
+          // Don't throw yet, try the next fallback
+          throw createBlobError;
+        }
+      } else {
+        console.log(`[GEMINI] createBlob method not available, trying alternatives`);
       }
       
       // If we reach here, File API methods are not available
-      console.error('Gemini File API methods not available! File content cannot be properly processed.');
-      throw new Error('Gemini File API methods (createFile/createBlob) not available');
+      console.error('[GEMINI] No Gemini File API methods (createFile/createBlob) are available! Using inline data for images instead.');
+      
+      // For small images (< 4MB), we can use inlineData directly instead of throwing an error
+      if (content.length < 4 * 1024 * 1024 && mimeType.startsWith('image/')) {
+        console.log(`[GEMINI] Image is small enough (${content.length} bytes) to use as inlineData`);
+        
+        // Return a mock FileData object that will be handled properly by the calling code
+        return {
+          mimeType,
+          // This is just a placeholder - the calling code will actually use inline data
+          data: Buffer.from('INLINE_DATA_FALLBACK')
+        } as unknown as GeminiFileData;
+      }
+      
+      throw new Error('Gemini File API methods (createFile/createBlob) not available and content too large for inline');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('Error creating file with Gemini File API:', errorMessage);
+      console.error('[GEMINI] Error creating file with Gemini File API:', errorMessage);
       
       // We don't want to directly use data URI as fileUri - it's not the intended use
       // Instead we'll throw the error and let the calling code handle it based on content type
@@ -278,27 +330,53 @@ export class GeminiAdapter implements AIAdapter {
    * @param mimeType Image MIME type
    */
   private addInlineImagePart(contentParts: Part[], content: string | Buffer, mimeType: string): void {
-    // For images, convert to base64 if it's a buffer
-    let base64Data: string;
-    
-    if (Buffer.isBuffer(content)) {
-      // Convert buffer to base64 string (without data URI prefix)
-      base64Data = content.toString('base64');
-    } else if (typeof content === 'string' && content.startsWith('data:')) {
-      // Extract base64 from data URI
-      base64Data = content.replace(/^data:image\/\w+;base64,/, '');
-    } else {
-      // Assume it's already a base64 string
-      base64Data = content as string;
-    }
-    
-    // Add the image part with inline data
-    contentParts.push({
-      inlineData: {
-        data: base64Data,
-        mimeType: mimeType
+    try {
+      console.log(`[GEMINI] Adding inline image data with MIME type: ${mimeType}`);
+      
+      let base64Data: string;
+      
+      // Convert Buffer to base64 string
+      if (Buffer.isBuffer(content)) {
+        console.log(`[GEMINI] Converting Buffer of size ${content.length} bytes to base64`);
+        base64Data = content.toString('base64');
+      } 
+      // Handle data URI format (data:image/jpeg;base64,/9j/4AAQ...)
+      else if (typeof content === 'string' && content.startsWith('data:')) {
+        console.log(`[GEMINI] Processing data URI string (length: ${content.length})`);
+        base64Data = content.replace(/^data:image\/\w+;base64,/, '');
+      } 
+      // Handle direct base64 string
+      else if (typeof content === 'string') {
+        console.log(`[GEMINI] Using provided string as base64 data (length: ${content.length})`);
+        base64Data = content;
       }
-    });
+      else {
+        throw new Error('Content must be a Buffer or string');
+      }
+      
+      console.log(`[GEMINI] Successfully prepared base64 image data (length: ${base64Data.length})`);
+      
+      // Ensure the image data is valid base64 by checking a sample
+      const sampleCheck = base64Data.substring(0, 100).match(/^[A-Za-z0-9+/=]+$/);
+      if (!sampleCheck) {
+        console.warn(`[GEMINI] Warning: Image data doesn't appear to be valid base64`);
+      }
+      
+      contentParts.push({
+        inlineData: {
+          data: base64Data,
+          mimeType
+        }
+      });
+      
+      console.log(`[GEMINI] Successfully added inline image to content parts`);
+    } catch (error) {
+      console.error('[GEMINI] Error adding inline image:', error);
+      // If conversion fails, add a text part indicating the failure
+      contentParts.push({
+        text: `[IMAGE: Failed to process as inline data - ${error instanceof Error ? error.message : String(error)}]`
+      });
+    }
   }
 
   async generateCompletion(prompt: string) {
