@@ -101,18 +101,21 @@ export default function InstructorDashboard() {
   }
 
   const { data: stats = {} as Stats, isLoading: statsLoading } = useQuery<Stats>({
-    queryKey: [`${API_ROUTES.ASSIGNMENTS}/stats`],
+    queryKey: [`${API_ROUTES.ASSIGNMENTS}/stats`, selectedCourse, selectedAssignment],
     queryFn: async () => {
       // Build URL with query parameters properly
       let url = `${API_ROUTES.ASSIGNMENTS}/stats`;
       const params = new URLSearchParams();
       
-      if (selectedCourse) {
-        params.append('courseId', selectedCourse);
+      // Only append valid numeric values
+      const courseIdNum = parseInt(selectedCourse);
+      if (!isNaN(courseIdNum)) {
+        params.append('courseId', courseIdNum.toString());
       }
       
-      if (selectedAssignment) {
-        params.append('assignmentId', selectedAssignment);
+      const assignmentIdNum = parseInt(selectedAssignment);
+      if (!isNaN(assignmentIdNum)) {
+        params.append('assignmentId', assignmentIdNum.toString());
       }
       
       // Only add the query string if we have parameters
@@ -120,13 +123,20 @@ export default function InstructorDashboard() {
         url += `?${params.toString()}`;
       }
       
+      console.log('Fetching stats with URL:', url);
+      
       const response = await fetch(url);
       if (!response.ok) {
+        console.error('Stats API error:', await response.text());
         throw new Error('Failed to fetch stats');
       }
       return response.json();
     },
-    enabled: activeTab === "overview" && (!!selectedCourse || !!selectedAssignment),
+    enabled: activeTab === "overview" && (
+      // Only enable if we have valid numeric IDs
+      (!!selectedCourse && !isNaN(parseInt(selectedCourse))) || 
+      (!!selectedAssignment && !isNaN(parseInt(selectedAssignment)))
+    ),
   });
   
   // Define analytics data interface

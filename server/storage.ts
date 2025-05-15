@@ -212,19 +212,25 @@ export class DatabaseStorage implements IStorage {
   // Assignment operations
   async getAssignment(id: number | undefined): Promise<Assignment | undefined> {
     // Guard against NaN or invalid values
-    if (id === undefined || isNaN(Number(id))) {
+    if (id === undefined || isNaN(Number(id)) || Number(id) <= 0) {
       console.warn(`getAssignment called with invalid id: ${id}`);
       return undefined;
     }
     
     // Convert id to a valid number to avoid SQL parameter issues
-    const numericId = Number(id);
+    const numericId = Math.floor(Number(id));
+    console.log(`Fetching assignment with validated id: ${numericId}`);
     
     try {
-      const [assignment] = await db.select().from(assignments).where(eq(assignments.id, numericId));
-      return assignment;
+      const result = await db.select().from(assignments).where(eq(assignments.id, numericId));
+      if (result && result.length > 0) {
+        return result[0];
+      } else {
+        console.warn(`No assignment found with id: ${numericId}`);
+        return undefined;
+      }
     } catch (error) {
-      console.error(`Error retrieving assignment with id ${id}:`, error);
+      console.error(`Error retrieving assignment with id ${numericId}:`, error);
       return undefined;
     }
   }

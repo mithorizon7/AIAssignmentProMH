@@ -941,21 +941,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Stats query params:", req.query);
       
       try {
-        // Safely parse courseId
-        if (req.query.courseId && req.query.courseId !== 'undefined') {
-          const parsedCourseId = Number(req.query.courseId);
-          if (!isNaN(parsedCourseId)) {
+        // Safely parse courseId - strict validation and conversion
+        if (req.query.courseId && 
+            typeof req.query.courseId === 'string' && 
+            req.query.courseId !== 'undefined' && 
+            req.query.courseId !== 'null') {
+            
+          // Only proceed if it's a valid positive integer
+          const parsedCourseId = parseInt(req.query.courseId, 10);
+          if (!isNaN(parsedCourseId) && parsedCourseId > 0) {
             courseId = parsedCourseId;
             console.log("Using courseId:", courseId);
+          } else {
+            console.warn("Invalid courseId format:", req.query.courseId);
           }
         }
         
-        // Safely parse assignmentId
-        if (req.query.assignmentId && req.query.assignmentId !== 'undefined') {
-          const parsedAssignmentId = Number(req.query.assignmentId);
-          if (!isNaN(parsedAssignmentId)) {
+        // Safely parse assignmentId - strict validation and conversion
+        if (req.query.assignmentId && 
+            typeof req.query.assignmentId === 'string' && 
+            req.query.assignmentId !== 'undefined' && 
+            req.query.assignmentId !== 'null') {
+            
+          // Only proceed if it's a valid positive integer
+          const parsedAssignmentId = parseInt(req.query.assignmentId, 10);
+          if (!isNaN(parsedAssignmentId) && parsedAssignmentId > 0) {
             assignmentId = parsedAssignmentId;
             console.log("Using assignmentId:", assignmentId);
+          } else {
+            console.warn("Invalid assignmentId format:", req.query.assignmentId);
           }
         }
       } catch (e) {

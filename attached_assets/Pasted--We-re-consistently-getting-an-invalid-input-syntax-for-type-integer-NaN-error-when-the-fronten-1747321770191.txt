@@ -1,0 +1,98 @@
+"We're consistently getting an 'invalid input syntax for type integer: "NaN"' error when the frontend calls the /api/assignments/stats endpoint. This indicates an issue on the backend where a numerical value expected by the database is not being provided correctly. Please investigate and fix this by following these steps:
+
+1. Pinpoint the Exact Database Operation:
+* Examine Server Logs: Check the detailed server-side logs (your AIGrader/server/lib/logger.ts should be helping here) that occur when /api/assignments/stats is called. The logs should ideally show the exact SQL query that failed or the Drizzle ORM operation that triggered the PostgreSQL error. This is the most direct way to see where NaN is being introduced to the database.
+* Full Stack Trace: The error message usually comes with a stack trace. Analyze this trace to see which part of your backend code (likely in AIGrader/server/routes/instructor.ts, AIGrader/server/services/metrics-service.ts, or database interaction logic in AIGrader/server/storage.ts or equivalent) is making the problematic database call.
+
+2. Inspect Input Parameters to the /api/assignments/stats Route Handler:
+* Route Definition: Find the route handler for /api/assignments/stats in AIGrader/server/routes.ts or AIGrader/server/routes/instructor.ts.
+* Expected Parameters: Does this endpoint expect any route parameters (e.g., /api/assignments/:assignmentId/stats), query parameters (e.g., /api/assignments/stats?courseId=123), or body parameters that should be integers?
+* Log Received Parameters: Add temporary logging at the very beginning of the route handler to print out all received parameters (req.params, req.query, req.body) and the req.user object (to check userId or instructorId).
+typescript // Example in your route handler console.log(`[DEBUG /api/assignments/stats] User:`, req.user); console.log(`[DEBUG /api/assignments/stats] Params:`, req.params); console.log(`[DEBUG /api/assignments/stats] Query:`, req.query); console.log(`[DEBUG /api/assignments/stats] Body:`, req.body);
+* Client-Side Call: Also, check the frontend code (likely in an instructor dashboard component) that calls this API endpoint. Is it definitely providing all necessary integer IDs (like courseId or assignmentId)? Are they being correctly parsed or retrieved before the API call?
+
+3. Trace Data Flow to the Service Layer (metrics-service.ts or similar):
+* Follow the parameters logged in step 2 as they are passed from the route handler to any service functions (e.g., in AIGrader/server/services/metrics-service.ts or AIGrader/server/storage.ts).
+* Log Values within Service Functions: Add logging inside these service functions to see the values of any IDs or numbers just before they are used in database queries or calculations.
+* Check Type Conversions: Look for any parseInt(), Number(), or mathematical operations that might be performed on these parameters.
+* If parseInt(someVariable) is used, and someVariable is undefined, null, or a non-numeric string (that isn't caught by validation), parseInt() can return NaN.
+* If an arithmetic operation like variableA / variableB occurs and variableB could be zero, or if either variable is undefined, the result could be NaN or Infinity, which then might be incorrectly passed to a part of a query expecting a simple integer.
+
+4. Examine Database Queries (Drizzle ORM or Raw SQL):
+* Identify the Failing Query: Based on the logs or stack trace from step 1.
+* Check Placeholders/Variables: Look at how integer variables (like assignmentId, courseId, userId, limits, offsets) are being used in the query.
+* Drizzle Example:
+typescript // If assignmentId is NaN here, the query will fail const stats = await db.select(...).from(submissionsTable).where(eq(submissionsTable.assignmentId, assignmentId));
+* Raw SQL Example (less likely with Drizzle but possible in fallbacks):
+typescript // If someId is NaN, this will be '...WHERE id = NaN' which is invalid SQL for integer comparison const result = await db.execute(sql`SELECT * FROM some_table WHERE id = ${someId}`);
+* Calculations in Queries: Are there any calculations happening directly in the SQL query (e.g., AVG(score), COUNT(*))? If these are operating on empty sets or NULL values in a way that produces NaN (though SQL usually handles this with NULL), ensure subsequent code doesn't try to convert that NaN or NULL result into an integer for another query without proper checks.
+
+5. Handle NaN and undefined Values Gracefully:
+* Input Validation (Zod): Ensure your Zod schemas for the API request (if any parameters are expected) correctly validate that numerical inputs are indeed numbers and are required if they are not optional.
+* Default Values/Checks: Before using a variable in a numerical operation or database query where an integer is expected:
+* Check if it's undefined, null, or isNaN().
+* Provide a default value if appropriate (e.g., const page = parseInt(req.query.page) || 1;).
+* Or, if a required ID is missing/invalid, return an appropriate HTTP error (e.g., 400 Bad Request) before attempting the database operation.
+typescript const courseId = parseInt(req.query.courseId as string); if (isNaN(courseId)) { return res.status(400).json({ message: "Invalid or missing courseId" }); } // Proceed with using courseId
+* Division by Zero: If calculating averages or rates, explicitly check for division by zero and handle that case (e.g., return 0, null, or a specific message).
+typescript const submissionRate = totalStudents > 0 ? (actualSubmissions / totalStudents) : 0;
+
+6. Specific Scenarios for /api/assignments/stats:
+* This endpoint likely fetches statistics for one or more assignments.
+* Common Integer Inputs: assignmentId (if for a specific assignment), courseId (to scope assignments), instructorId (implicit from req.user).
+* Calculations Leading to NaN:
+* Calculating an average score when there are no scored submissions (SUM(scores) / COUNT(scores) could be 0/0 or NULL/0 which might lead to NaN in JavaScript if not handled).
+* Calculating submission rates if the number of enrolled students is zero.
+
+Example of Where to Look in Code (Conceptual):
+
+TypeScript
+// In AIGrader/server/routes/instructor.ts (or similar)
+router.get('/assignments/stats', asyncHandler(async (req, res) => {
+  // 1. LOG INCOMING DATA
+  console.log('[DEBUG /api/assignments/stats] User ID:', req.user?.id);
+  console.log('[DEBUG /api/assignments/stats] Query Params:', req.query);
+
+  // 2. VALIDATE AND PARSE PARAMS
+  const courseIdStr = req.query.courseId as string;
+  // const assignmentIdStr = req.query.assignmentId as string; // If applicable
+
+  let courseId: number | undefined = courseIdStr ? parseInt(courseIdStr) : undefined;
+  // let assignmentId: number | undefined = assignmentIdStr ? parseInt(assignmentIdStr) : undefined;
+
+  if (courseIdStr && isNaN(courseId!)) { // Check if parsing failed
+    return res.status(400).json({ message: 'Invalid courseId format' });
+  }
+  // Similarly for assignmentId if used
+
+  // 3. CALL SERVICE
+  // Ensure that what's passed to the service is a valid number or undefined (if optional)
+  // The service itself should also be robust.
+  const stats = await metricsService.getAssignmentStats({
+    instructorId: req.user!.id, // Assuming req.user.id is always a number
+    courseId: courseId,
+    // assignmentId: assignmentId,
+  });
+
+  res.json(stats);
+}));
+
+// In AIGrader/server/services/metrics-service.ts
+async getAssignmentStats(params: { instructorId: number; courseId?: number; /* assignmentId?: number; */ }) {
+  // LOG PARAMS RECEIVED BY SERVICE
+  console.log('[DEBUG metricsService.getAssignmentStats] Params:', params);
+
+  // If params.courseId is undefined and your query requires it to be a number,
+  // or if it's used in a calculation that results in NaN, this is a problem area.
+  // Example:
+  // const someValue = params.courseId / someOtherValue; // If params.courseId is undefined, someValue becomes NaN
+
+  // When making DB calls:
+  // Ensure all IDs passed to Drizzle (or SQL) are actual numbers.
+  // E.g., if doing an average:
+  // const result = await db.select({ avgScore: avg(feedback.score) })...
+  // If no scores, avgScore might be null. If you then do:
+  // const processedScore = parseInt(result[0].avgScore); // This could be parseInt(null) -> NaN
+  // Or:
+  // const someCalculation = result[0].avgScore * 10; // null * 10 -> 0, but undefined * 10 -> NaN
+}
