@@ -1,0 +1,38 @@
+We're observing that the Instructor Dashboard's 'Overview' tab (enrolled students, submission rate, average score, feedback viewed, submission status counts) and the 'Student Lookup' tab (student lists and their summary stats) are incorrectly showing all zeros, even though actual student and submission data exists in the database.
+
+Please investigate and fix this by following these steps:
+
+Phase 1: Backend Verification (API Endpoints for Dashboard Metrics)
+
+Identify Metrics Endpoints:
+
+Review AIGrader/server/routes/instructor.ts (and potentially AIGrader/server/services/metrics-service.ts or similar service files) to identify the API endpoints responsible for providing the data to the Instructor Dashboard.
+Expected Endpoints (Examples):
+/api/instructor/dashboard/overview-stats (for enrolled students, submission rate, avg score, feedback viewed)
+/api/instructor/dashboard/submission-status-summary (for counts of submissions by status: pending, graded, etc.)
+/api/instructor/dashboard/students or /api/instructor/courses/{courseId}/students-with-stats (for the student lookup, potentially with search/filter parameters)
+Verify Backend Logic for Each Metric in metrics-service.ts (or equivalent):
+
+Enrolled Students Count:
+How is this calculated? Does it correctly query the enrollments table, filtering by the instructor's courses and counting distinct active students?
+Submission Rate:
+How is this calculated? It likely involves:
+Total number of expected submissions (e.g., number of enrolled students multiplied by the number of relevant assignments).
+Total number of actual submissions made for those assignments.
+Ensure it's correctly scoped to the instructor's courses and relevant assignments (e.g., active, past due).
+Average Score:
+How is this calculated? Does it query the feedback or submissions table for scores, correctly averaging them for the instructor's courses/assignments? Does it handle submissions without scores?
+Feedback Viewed Rate:
+This requires tracking when feedback is viewed. How is this tracked in the database (e.g., a feedbackViewedAt timestamp on the feedback or a separate tracking table)? How is the rate calculated against total feedback given?
+Submission Status Overview (Counts per status):
+How are these counts derived? Does it query the submissions table, grouping by status (e.g., 'pending_ai_feedback', 'feedback_generated', 'viewed_by_student') for the instructor's assignments?
+Student Lookup Data:
+When searching for students (or listing them), does the backend query correctly join users, enrollments, submissions, and feedback tables to get per-student stats like total assignments, submissions made, average score for that student in the instructor's courses?
+Are search/filter parameters (if any) applied correctly?
+Test Backend Endpoints Directly:
+
+Use a tool like Postman, Insomnia, or curl (or write a simple test script) to call these identified backend API endpoints directly (authenticating as an instructor who should have data).
+Check the JSON response:
+Is the data returned by the API also all zeros, or is it correct?
+If the API returns zeros, the bug is in the backend logic (SQL queries, data aggregation in the service).
+If the API returns correct data, the bug is likely on the frontend (how it fetches, processes, or displays this data).

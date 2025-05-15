@@ -938,20 +938,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let courseId: number | undefined = undefined;
       let assignmentId: number | undefined = undefined;
       
+      console.log("Stats query params:", req.query);
+      
       try {
         // Safely parse courseId
-        if (req.query.courseId) {
-          const parsedCourseId = parseInt(req.query.courseId as string);
+        if (req.query.courseId && req.query.courseId !== 'undefined') {
+          const parsedCourseId = Number(req.query.courseId);
           if (!isNaN(parsedCourseId)) {
             courseId = parsedCourseId;
+            console.log("Using courseId:", courseId);
           }
         }
         
         // Safely parse assignmentId
-        if (req.query.assignmentId) {
-          const parsedAssignmentId = parseInt(req.query.assignmentId as string);
+        if (req.query.assignmentId && req.query.assignmentId !== 'undefined') {
+          const parsedAssignmentId = Number(req.query.assignmentId);
           if (!isNaN(parsedAssignmentId)) {
             assignmentId = parsedAssignmentId;
+            console.log("Using assignmentId:", assignmentId);
           }
         }
       } catch (e) {
@@ -961,14 +965,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get all assignments (filtered by course if specified)
       let allAssignments = await storage.listAssignments();
+      console.log(`Total assignments before filtering: ${allAssignments.length}`);
+      
       if (courseId) {
         allAssignments = allAssignments.filter(a => a.courseId === courseId);
+        console.log(`Assignments after filtering by courseId ${courseId}: ${allAssignments.length}`);
       }
       
       // Get target assignment if specified
       let targetAssignment = undefined;
       if (assignmentId) {
         targetAssignment = await storage.getAssignment(assignmentId);
+        console.log("Target assignment found:", targetAssignment ? "Yes" : "No");
       }
       
       // Get all submissions (filtered by assignment if specified)
@@ -986,23 +994,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (courseId) {
         const students = await storage.listCourseEnrollments(courseId);
         totalStudents = students.length;
+        console.log(`Students enrolled in course ${courseId}: ${totalStudents}`);
       } else {
         // Count all students
         const studentCount = await db.select({ count: countFn() })
           .from(users)
           .where(eq(users.role, 'student'));
-        totalStudents = studentCount[0]?.count || 0;
+        
+        // Make sure count is a number
+        totalStudents = typeof studentCount[0]?.count === 'number' 
+          ? studentCount[0].count 
+          : Number(studentCount[0]?.count) || 0;
+          
+        console.log(`Total students in system: ${totalStudents}`);
       }
       
-      // Calculate submission metrics
+      // Calculate submission metrics with detailed logging
       const totalSubmissions = submissionsQuery.length;
+      console.log(`Total submissions found: ${totalSubmissions}`);
       
       // Count unique students who have submitted
-      const submittedStudentIds = new Set(submissionsQuery.map((s: any) => s.userId));
+      const submittedStudentIds = new Set();
+      submissionsQuery.forEach((s: any) => {
+        if (s && s.userId) submittedStudentIds.add(s.userId);
+      });
       const submittedCount = submittedStudentIds.size;
+      console.log(`Number of unique students who submitted: ${submittedCount}`);
       
       // Calculate students who haven't submitted
       const notStartedCount = Math.max(0, totalStudents - submittedCount);
+      console.log(`Students who haven't started: ${notStartedCount}`);
       
       // Calculate submission rates
       const submissionRate = totalStudents > 0 ? Math.round((submittedCount / totalStudents) * 100) : 0;
