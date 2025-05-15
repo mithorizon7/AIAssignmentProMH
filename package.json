@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.37.0",
     "@bull-board/api": "^6.9.6",
     "@bull-board/express": "^6.9.6",
     "@google-cloud/storage": "^7.16.0",
@@ -89,7 +90,7 @@
     "multer": "^1.4.5-lts.2",
     "next-themes": "^0.4.6",
     "node-fetch": "^3.3.2",
-    "openai": "^4.97.0",
+    "openai": "^4.98.0",
     "passport": "^0.7.0",
     "passport-auth0": "^1.4.4",
     "passport-local": "^1.0.0",
