@@ -124,7 +124,7 @@ export async function createFileData(
       cached = await redis.get(cacheKey);
       if (cached) {
         console.log(`[GEMINI] Using cached file URI for ${mimeType} (${buf.length} bytes)`);
-        return { file_uri: cached, mime_type: mimeType };
+        return { fileUri: cached, mimeType: mimeType };
       }
     } catch (err) {
       console.warn(`[GEMINI] Redis cache lookup failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -176,7 +176,7 @@ export async function createFileData(
       throw new Error("File upload failed: No URI returned from Gemini API");
     }
     
-    return { file_uri: file.uri, mime_type: mimeType };
+    return { fileUri: file.uri, mimeType: mimeType };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`[GEMINI] File upload failed: ${errorMessage}`);
