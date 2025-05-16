@@ -479,13 +479,13 @@ export class GeminiAdapter implements AIAdapter {
                 
                 apiParts.push({
                   inlineData: {
-                    mimeType: part.mimeType,
+                    mimeType: promptPart.mimeType,
                     data: base64Data // Remove the data:mime/type;base64, prefix if present
                   }
                 });
               } else {
                 // SVGs and other file types need to be uploaded even when small
-                const fileData = await createFileData(this.genAI, part.content, part.mimeType);
+                const fileData = await createFileData(this.genAI, promptPart.content, promptPart.mimeType);
                 fileDataList.push(fileData);
                 
                 // Create properly typed part structure directly
