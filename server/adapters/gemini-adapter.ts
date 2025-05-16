@@ -378,7 +378,7 @@ export class GeminiAdapter implements AIAdapter {
             // Create the appropriate file data representation
             if (useFilesAPI) {
               console.log(`[GEMINI] Using Files API for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB)`);
-              const fileData = await createFileData(part.content, part.mimeType);
+              const fileData = await createFileData(this.genAI, part.content, part.mimeType);
               fileDataList.push(fileData);
               
               // Convert to SDK format and add to parts
@@ -412,7 +412,7 @@ export class GeminiAdapter implements AIAdapter {
                 });
               } else {
                 // SVGs and other file types need to be uploaded even when small
-                const fileData = await createFileData(part.content, part.mimeType);
+                const fileData = await createFileData(this.genAI, part.content, part.mimeType);
                 fileDataList.push(fileData);
                 
                 // Convert to SDK format and add to parts
