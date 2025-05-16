@@ -1,0 +1,212 @@
+The Fix:
+
+You need to pass this.genAI as the first argument to createFileData in all places where it's called within gemini-adapter.ts.
+
+Here's how the corrected generateMultimodalCompletion method in gemini-adapter-13.ts (or your current latest version) should look after applying this fix. I'll use the structure of gemini-adapter-13.ts as the base.
+
+Corrected generateMultimodalCompletion in gemini-adapter-13.ts:
+
+TypeScript
+// In class GeminiAdapter (using the structure of gemini-adapter-13.ts)
+
+async generateMultimodalCompletion(
+    multimodalPromptParts: MultimodalPromptPart[],
+    systemPrompt?: string
+) {
+    try {
+        console.log(`[GEMINI] Generating multimodal completion with ${multimodalPromptParts.length} parts`);
+        this.processingStart = Date.now(); // Resetting here, as runImageRubric also resets. Consider if only one reset is needed.
+
+        const apiParts: Part[] = [];
+        const fileDataList: GeminiFileData[] = []; // Assuming GeminiFileData is the correct type
+
+        for (const part of multimodalPromptParts) {
+            if (part.type === 'text') {
+                const sanitizedText = sanitizeText(part.text, 8000);
+                const potentialInjection = detectInjectionAttempt(part.text);
+                if (potentialInjection) {
+                    console.warn(
+                        `[GEMINI] Potential prompt injection detected in text part: ` +
+                        `${part.text.slice(0, 120)}${part.text.length > 120 ? '...' : ''}`
+                    );
+                }
+                if (sanitizedText.length < part.text.length) {
+                    console.log(`[GEMINI] Text part truncated from ${part.text.length} to ${sanitizedText.length} characters`);
+                }
+                apiParts.push({ text: sanitizedText });
+
+            } else if (part.mimeType && typeof part.mimeType === 'string') { // Ensure mimeType is a string
+                let currentMimeType: string = part.mimeType;
+                let contentType: ContentType = 'image';
+
+                if (SUPPORTED_MIME_TYPES.video.includes(currentMimeType)) {
+                    contentType = 'video';
+                } else if (SUPPORTED_MIME_TYPES.audio.includes(currentMimeType)) {
+                    contentType = 'audio';
+                } else if (SUPPORTED_MIME_TYPES.document.includes(currentMimeType)) {
+                    contentType = 'document';
+                }
+
+                const isSVG = currentMimeType === 'image/svg+xml';
+                const contentLength = typeof part.content === 'string' ? part.content.length : (Buffer.isBuffer(part.content) ? part.content.length : 0);
+                const useFilesAPI = shouldUseFilesAPI(contentLength, currentMimeType, contentType);
+
+                try {
+                    if (useFilesAPI) {
+                        console.log(`[GEMINI] Using Files API for ${contentType} content (${(contentLength / 1024).toFixed(1)}KB, MIME: ${currentMimeType})`);
+                        const fileData = await createFileData(
+                            this.genAI, // <--- FIX: Added this.genAI
+                            part.content,
+                            currentMimeType
+                        );
+                        fileDataList.push(fileData);
+                        const apiFileData = toSDKFormat(fileData);
+                        apiParts.push({ fileData: apiFileData });
+                    } else {
+                        // This branch is for small images that can be inlined.
+                        // Other types (documents, audio, video, SVG) are generally expected to use Files API
+                        // via shouldUseFilesAPI or specific logic.
+                        if (contentType === 'image' && !isSVG) {
+                            console.log(`[GEMINI] Using inline data URI for image content (${(contentLength / 1024).toFixed(1)}KB, MIME: ${currentMimeType})`);
+                            let base64data: string;
+                            if (typeof part.content === 'string') {
+                                if (part.content.startsWith(`data:${currentMimeType};base64,`)) {
+                                    base64data = part.content.substring(`data:${currentMimeType};base64,`.length);
+                                } else if (part.content.startsWith('data:')) {
+                                    base64data = part.content.split(',')[1] || '';
+                                } else {
+                                    base64data = part.content; // Assuming already base64
+                                }
+                            } else if (Buffer.isBuffer(part.content)) {
+                                base64data = part.content.toString('base64');
+                            } else {
+                                throw new Error(`Unsupported content type for inline data: ${typeof part.content}`);
+                            }
+                            apiParts.push({
+                                inlineData: {
+                                    mimeType: currentMimeType,
+                                    data: base64data
+                                }
+                            });
+                        } else {
+                            // If it's not an inlineable image (e.g., SVG, or a document/audio/video that somehow
+                            // didn't get flagged by shouldUseFilesAPI but shouldn't be inlined),
+                            // it should still probably go through the Files API.
+                            console.log(`[GEMINI] ${contentType} (${currentMimeType}) type not inlined, forcing Files API upload.`);
+                            const fileData = await createFileData(
+                                this.genAI, // <--- FIX: Added this.genAI
+                                part.content,
+                                currentMimeType
+                            );
+                            fileDataList.push(fileData);
+                            const apiFileData = toSDKFormat(fileData);
+                            apiParts.push({ fileData: apiFileData });
+                        }
+                    }
+                } catch (error) {
+                    console.error(`[GEMINI] Error processing ${contentType} (MIME: ${currentMimeType}) content: ${error instanceof Error ? error.message : String(error)}`);
+                    throw new Error(`Failed to process ${contentType} (MIME: ${currentMimeType}) content: ${error instanceof Error ? error.message : String(error)}`);
+                }
+            } else if (part.type !== 'text' && !part.mimeType) {
+                console.error(`[GEMINI ERROR] Missing mimeType for non-text part. Type: ${part.type}, Part: ${JSON.stringify(part)}`);
+                throw new Error(`Missing mimeType for non-text multimodal part of type: ${part.type}`);
+           } else if (part.type !== 'text' && typeof part.mimeType !== 'string') {
+                console.error(`[GEMINI ERROR] Invalid mimeType. Expected string, got ${typeof part.mimeType}. Part: ${JSON.stringify(part)}`);
+                throw new Error(`Invalid mimeType for multimodal part: Expected string, got ${typeof part.mimeType}`);
+           }
+        }
+
+        if (apiParts.length === 0 && multimodalPromptParts.length > 0) {
+            const hasNonText = multimodalPromptParts.some(p => p.type !== 'text');
+            if (hasNonText) {
+                 throw new Error("[GEMINI] No processable non-text parts found in multimodal request after filtering. Check MIME types and content.");
+            } else {
+                 throw new Error("[GEMINI] No processable parts found in multimodal request. All parts were text but resulted in zero API parts, or only non-text parts were provided and all failed processing.");
+            }
+        }
+         if (apiParts.length === 0 && multimodalPromptParts.length === 0) {
+            // Or handle as an empty request if appropriate
+            throw new Error("[GEMINI] Cannot make request with zero API parts from an empty input.");
+        }
+
+
+        // Use our shared image-rubric helper for the API call
+        // The result from runImageRubric includes 'result.usageMetadata'
+        const { raw, result: apiResultObject, tokenCount } = await this.runImageRubric(apiParts, systemPrompt);
+
+        let parsedContent: GradingFeedback;
+        try {
+            parsedContent = await parseStrict(raw);
+
+            // apiResultObject here refers to the object constructed inside runImageRubric,
+            // which contains usageMetadata from the *initial* requestParams, not the stream.
+            // This needs to be fixed in runImageRubric to get metadata from the stream.
+            // Assuming runImageRubric is fixed to return correct usageMetadata in its 'result' prop.
+            if (apiResultObject.usageMetadata) {
+                 parsedContent._promptTokens = apiResultObject.usageMetadata.promptTokenCount;
+            }
+            parsedContent._totalTokens = tokenCount; // tokenCount from runImageRubric is already usageMetadata?.totalTokenCount
+
+            console.log(`[GEMINI] Successfully parsed response JSON (${raw.length} chars)`);
+            return { // Ensure this matches AIAdapterResponse
+                ...parsedContent,
+                modelName: this.modelName,
+                rawResponse: JSON.parse(raw) // raw is string, rawResponse should be object
+                // tokenCount is already part of parsedContent via _totalTokens if added there,
+                // or should be added here if AIAdapterResponse defines it at top level.
+            };
+        } catch (error) {
+            console.error(`[GEMINI] Failed to parse response JSON: ${error instanceof Error ? error.message : String(error)}`);
+
+            if (raw && (raw.includes('"criteriaScores":') || raw.includes('"overallFeedback":'))) {
+                try {
+                    console.log('[GEMINI] Attempting to repair potentially truncated JSON');
+                    const repairedJson = repairJson(raw);
+                    parsedContent = await parseStrict(repairedJson);
+
+                    if (apiResultObject.usageMetadata) {
+                        parsedContent._promptTokens = apiResultObject.usageMetadata.promptTokenCount;
+                    }
+                    parsedContent._totalTokens = tokenCount;
+
+                    console.log(`[GEMINI] Successfully repaired and parsed JSON response`);
+                    return { // Ensure this matches AIAdapterResponse
+                        ...parsedContent,
+                        modelName: this.modelName,
+                        rawResponse: JSON.parse(repairedJson)
+                    };
+                } catch (repairError) {
+                    console.error(`[GEMINI] Repair attempt failed: ${repairError instanceof Error ? repairError.message : String(repairError)}`);
+                }
+            }
+            throw new Error(`Failed to parse Gemini response: ${error instanceof Error ? error.message : String(error)}\nRaw: ${raw.slice(0, 200)}...`);
+        }
+    } catch (error) {
+        console.error(`[GEMINI] Error generating multimodal completion: ${error instanceof Error ? error.message : String(error)}`);
+        if (error instanceof Error && error.stack) {
+            console.error(`[GEMINI] Stack trace: ${error.stack}`);
+        }
+        throw error;
+    }
+}
+Key changes made in the snippet above:
+
+this.genAI Passed to createFileData: In both identified locations within the useFilesAPI block and the else block (for SVGs or other non-inlineable types), this.genAI is now correctly passed as the first argument to createFileData.
+
+const fileData = await createFileData(this.genAI, part.content, currentMimeType);
+Improved Logging for File Processing: Added MIME: ${currentMimeType} to the console log when using Files API or inline data to make it easier to trace which file types are going through which path.
+
+Clarified Logic for non-inlineable types: The else block after if (contentType === 'image' && !isSVG) now more clearly states that other types (or SVGs) will be routed to use createFileData (which uses the Files API).
+
+More Robust Empty apiParts Check: Added more specific error messages if apiParts ends up empty before calling runImageRubric.
+
+Further Important Consideration (from previous feedback, still relevant):
+
+usageMetadata in runImageRubric: As mentioned before, the runImageRubric method in gemini-adapter-13.ts (the version you're working from) has this line:
+TypeScript
+const result = {
+    // ...
+    usageMetadata: requestParams.usageMetadata // This will be undefined from the initial params
+};
+The usageMetadata needs to be captured from the actual stream response chunks. Your collectStream helper within runImageRubric should be responsible for accumulating this and returning it. Then runImageRubric should use this actual metadata. My gemini-adapter-punchlist version included a usageMetadata field in the return type of collectStream and runImageRubric to handle this. Please ensure this is correctly implemented in your runImageRubric and collectStream for accurate token counting and metrics.
+By passing this.genAI to createFileData, you should resolve the ENOENT error that was caused by createFileData not receiving its expected GoogleGenAI instance and likely misinterpreting subsequent arguments.
