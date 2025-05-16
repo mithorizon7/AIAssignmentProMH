@@ -158,7 +158,7 @@ export class GeminiAdapter implements AIAdapter {
       const temperature = 0.2;
       const topP = 0.8;
       const topK = 40;
-      let maxOutputTokens = BASE_MAX_TOKENS;
+      const maxOutputTokens = 750;
       
       // Prepare the request with proper placement of systemInstruction as a top-level field
       const requestParams: any = {
@@ -183,69 +183,89 @@ export class GeminiAdapter implements AIAdapter {
       
       console.log(`[GEMINI] Sending request to Gemini API with responseMimeType: application/json`);
       
-      // Helper to build request with the specified token cap
-      const buildRequest = (cap: number) => {
-        const req = { ...requestParams };
-        req.config.maxOutputTokens = cap;
-        return req;
+      // Function to handle a single API request with retry capability
+      const gradeWithRetry = async (): Promise<GenerateContentResponse> => {
+        try {
+          return await this.genAI.models.generateContent(requestParams);
+        } catch (e: any) {
+          // If the error is one that might be resolved with a retry, try once more
+          if (isSchemaError(e) && shouldRetry(e)) {
+            console.log(`[GEMINI] API call failed with error that warrants retry: ${e.message}`);
+            console.log(`[GEMINI] Retrying API call once...`);
+            return await this.genAI.models.generateContent(requestParams);
+          }
+          throw e;
+        }
       };
       
-      // Helper to run streaming request and collect all chunks
-      const collectStream = async (req: any): Promise<{raw: string, finishReason: string}> => {
-        console.log(`[GEMINI] Using streaming with token limit: ${req.config.maxOutputTokens}`);
+      // Always use streaming for all requests to avoid truncation issues
+      // Based on recommendation #3 - adopt a single generation path
+      const BASE_MAX = 1200;   // covers 99% of image feedback
+      const RETRY_MAX = 1600;  // bump once on early stop
+      
+      // Function to run the content generation with specified token limit
+      const run = async (cap: number) => {
+        // Update the request with the specified token limit
+        requestParams.config.maxOutputTokens = cap;
+        console.log(`[GEMINI] Using streaming with token limit: ${cap}`);
         
-        const stream = await this.genAI.models.generateContentStream(req);
-        let streamedText = '';
-        let finishReason = 'STOP'; // Default to successful finish
-        
-        // Process the stream chunks
-        for await (const chunk of stream) {
-          if (chunk.candidates && chunk.candidates.length > 0) {
-            // Get finish reason from the last chunk if available
-            if (chunk.candidates[0].finishReason) {
-              finishReason = chunk.candidates[0].finishReason;
-            }
-            
-            if (chunk.candidates[0]?.content?.parts) {
-              const part = chunk.candidates[0].content.parts[0];
-              if (part.text) {
-                streamedText += part.text;
+        try {
+          const stream = await this.genAI.models.generateContentStream(requestParams);
+          let streamedText = '';
+          let finishReason = 'STOP'; // Default to successful finish
+          
+          // Process the stream chunks
+          for await (const chunk of stream) {
+            if (chunk.candidates && 
+                chunk.candidates.length > 0) {
+              // Get finish reason from the last chunk if available
+              if (chunk.candidates[0].finishReason) {
+                finishReason = chunk.candidates[0].finishReason;
+              }
+              
+              if (chunk.candidates[0]?.content?.parts) {
+                const part = chunk.candidates[0].content.parts[0];
+                if (part.text) {
+                  streamedText += part.text;
+                }
               }
             }
           }
+          
+          // Create a response object similar to non-streaming API
+          const result = {
+            candidates: [{
+              content: {
+                parts: [{ text: streamedText }]
+              },
+              finishReason
+            }],
+            // Copy usage metadata structure to maintain compatibility
+            usageMetadata: requestParams.usageMetadata
+          };
+          
+          return { result, finishReason, raw: streamedText };
+        } catch (error) {
+          console.error(`[GEMINI] Streaming error: ${error instanceof Error ? error.message : String(error)}`);
+          throw error;
         }
-        
-        console.log(`[GEMINI] Stream received ${streamedText.length} characters, finish reason: ${finishReason}`);
-        return { raw: streamedText, finishReason };
       };
       
-      // Run the request once with a specific token limit
-      const runOnce = async (cap: number) => collectStream(buildRequest(cap));
-      
-      // First try with base token limit
-      let { raw, finishReason } = await runOnce(BASE_MAX_TOKENS);
+      // First attempt with base token limit
+      let { result, finishReason, raw } = await run(BASE_MAX);
       
       // If the model stopped early, retry with a higher token limit
       if (finishReason !== 'STOP') {
-        console.warn(`[GEMINI] early stop ${finishReason} – retry ↑ tokens`);
-        ({ raw, finishReason } = await runOnce(RETRY_MAX_TOKENS));
+        console.warn(`[GEMINI] early stop ${finishReason} – retry with increased token limit`);
+        ({ result, finishReason, raw } = await run(RETRY_MAX));
+        
+        // If still not successful, throw an error
+        if (finishReason !== 'STOP') {
+          throw new Error(`Gemini failed twice (reason: ${finishReason})`);
+        }
       }
       
-      // If still having issues, throw an error
-      if (finishReason !== 'STOP') {
-        throw new Error(`Gemini failed twice (reason: ${finishReason})`);
-      }
-      
-      // Create a response object similar to the API structure
-      const result = {
-        candidates: [{
-          content: {
-            parts: [{ text: raw }]
-          },
-          finishReason
-        }],
-        usageMetadata: requestParams.usageMetadata
-      };
+      console.log(`[GEMINI] Streaming complete, received ${raw.length} characters, finish reason: ${finishReason}`);
       
       // Log comprehensive usage information for monitoring
       if (result.usageMetadata) {
@@ -256,6 +276,7 @@ export class GeminiAdapter implements AIAdapter {
           candidatesTokens: result.usageMetadata.candidatesTokenCount || 0,
           totalTokens: result.usageMetadata.totalTokenCount || 0,
           streamingUsed: true, // Always using streaming now
+          tokenLimit: finishReason !== 'STOP' ? RETRY_MAX : BASE_MAX,
           processingTimeMs: Date.now() - this.processingStart
         };
         
@@ -388,9 +409,12 @@ export class GeminiAdapter implements AIAdapter {
                 part.mimeType || 'image/jpeg'
               );
               
-              // Add file data using snake_case format for the API
+              // Convert to the SDK's expected camelCase format
+              const sdkFileData = toSDKFormat(fileData);
+              
+              // Add file data using the SDK's expected structure
               apiParts.push({
-                file_data: fileData
+                fileData: sdkFileData
               });
               
               console.log(`[GEMINI] Successfully uploaded large image to Files API`);
@@ -415,39 +439,41 @@ export class GeminiAdapter implements AIAdapter {
             throw new Error(`Failed to process image: ${error instanceof Error ? error.message : String(error)}`);
           }
         }
-        else if (part.type === 'file') {
+        else if (part.type === 'document' || part.type === 'audio' || part.type === 'video') {
           try {
-            // All document files go through the Files API
-            console.log(`[GEMINI] Processing file with MIME type: ${part.mimeType}`);
+            console.log(`[GEMINI] Processing ${part.type} file with mime type ${part.mimeType || 'unknown'}`);
             
-            // Upload the file to Gemini Files API
+            // Upload file to Files API first, returns snake_case properly formatted GeminiFileData
             const fileData = await createFileData(
               this.genAI,
               part.content as Buffer | string,
               part.mimeType || 'application/octet-stream'
             );
             
-            // Add file data using snake_case format for the API
+            // Convert to the SDK's expected camelCase format
+            const sdkFileData = toSDKFormat(fileData);
+            
+            // Add file data using the SDK's expected structure
             apiParts.push({
-              file_data: fileData
+              fileData: sdkFileData
             });
             
-            console.log(`[GEMINI] Successfully uploaded file to Files API with URI: ${fileData.file_uri}`);
+            console.log(`[GEMINI] Successfully added ${part.type} file to request`);
           } catch (error) {
-            console.error(`[GEMINI] Error processing file: ${error instanceof Error ? error.message : String(error)}`);
-            throw new Error(`Failed to process file: ${error instanceof Error ? error.message : String(error)}`);
+            console.error(`[GEMINI] Error processing ${part.type} file: ${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(`Failed to process ${part.type} file: ${error instanceof Error ? error.message : String(error)}`);
           }
         }
-        else {
-          console.warn(`[GEMINI] Unsupported content type: ${part.type}`);
-        }
       }
+      
+      // Log the number of parts being sent
+      console.log(`[GEMINI] Sending ${apiParts.length} parts to the API`);
       
       // Generation config parameters
       const temperature = 0.2;
       const topP = 0.8;
       const topK = 40;
-      let maxOutputTokens = BASE_MAX_TOKENS;
+      const maxOutputTokens = 750;
       
       // Create the request object with responseSchema for JSON output
       const requestParams: any = {
@@ -474,101 +500,163 @@ export class GeminiAdapter implements AIAdapter {
         console.log(`[GEMINI] Added system prompt as top-level systemInstruction (${systemPrompt.length} chars)`);
       }
       
-      // Helper to build request with the specified token cap
-      const buildRequest = (cap: number) => {
-        const req = { ...requestParams };
-        req.config.maxOutputTokens = cap;
-        return req;
+      console.log(`[GEMINI] Sending multimodal request to Gemini API with responseMimeType: application/json`);
+      
+      // Function to handle a single API request with retry capability
+      const gradeWithRetry = async (): Promise<GenerateContentResponse> => {
+        try {
+          return await this.genAI.models.generateContent(requestParams);
+        } catch (e: any) {
+          // If the error is one that might be resolved with a retry, try once more
+          if (isSchemaError(e) && shouldRetry(e)) {
+            console.log(`[GEMINI] API call failed with error that warrants retry: ${e.message}`);
+            console.log(`[GEMINI] Retrying API call once...`);
+            return await this.genAI.models.generateContent(requestParams);
+          }
+          throw e;
+        }
       };
       
-      // Helper to run streaming request and collect all chunks
-      const collectStream = async (req: any): Promise<{raw: string, finishReason: string}> => {
-        console.log(`[GEMINI] Using streaming for multimodal with token limit: ${req.config.maxOutputTokens}`);
+      // Always use streaming for multimodal content to avoid truncation issues
+      // Based on recommendation #3 - adopt a single generation path
+      const BASE_MAX = 1200;   // covers 99% of image feedback
+      const RETRY_MAX = 1600;  // bump once on early stop
+      // Function to run the content generation with specified token limit
+      const run = async (cap: number) => {
+        // Update the request with the specified token limit
+        requestParams.config.maxOutputTokens = cap;
+        console.log(`[GEMINI] Using streaming for multimodal with token limit: ${cap}`);
         
-        const stream = await this.genAI.models.generateContentStream(req);
-        let streamedText = '';
-        let finishReason = 'STOP'; // Default to successful finish
-        
-        // Process the stream chunks
-        for await (const chunk of stream) {
-          if (chunk.candidates && chunk.candidates.length > 0) {
-            // Get finish reason from the last chunk if available
-            if (chunk.candidates[0].finishReason) {
-              finishReason = chunk.candidates[0].finishReason;
+        try {
+          const stream = await this.genAI.models.generateContentStream(requestParams);
+          let streamedText = '';
+          let finishReason = 'STOP'; // Default to successful finish
+          
+          // Process the stream chunks
+          for await (const chunk of stream) {
+            if (chunk.candidates && 
+                chunk.candidates.length > 0) {
+              // Get finish reason from the last chunk if available
+              if (chunk.candidates[0].finishReason) {
+                finishReason = chunk.candidates[0].finishReason;
+              }
+              
+              if (chunk.candidates[0]?.content?.parts) {
+                const part = chunk.candidates[0].content.parts[0];
+                if (part.text) {
+                  streamedText += part.text;
+                }
+              }
             }
-            
-            if (chunk.candidates[0]?.content?.parts) {
+          }
+          
+          // Create a response object similar to non-streaming API
+          const result = {
+            candidates: [{
+              content: {
+                parts: [{ text: streamedText }]
+              },
+              finishReason
+            }],
+            // Include usage metadata with the correct structure
+            usageMetadata: requestParams.usageMetadata
+          };
+          
+          return { result, finishReason, raw: streamedText };
+        } catch (error) {
+          console.error(`[GEMINI] Multimodal streaming error: ${error instanceof Error ? error.message : String(error)}`);
+          throw error;
+        }
+      };
+      
+      // First attempt with base token limit
+      let { result, finishReason, raw } = await run(BASE_MAX);
+        console.log(`[GEMINI] Using streaming for large multimodal output (maxOutputTokens: ${maxOutputTokens})`);
+        // Use streaming API for large outputs to avoid truncation
+        try {
+          const stream = await this.genAI.models.generateContentStream(requestParams);
+          let streamedText = '';
+          
+          // Process the stream chunks
+          for await (const chunk of stream) {
+            if (chunk.candidates && 
+                chunk.candidates.length > 0 && 
+                chunk.candidates[0]?.content?.parts) {
               const part = chunk.candidates[0].content.parts[0];
               if (part.text) {
                 streamedText += part.text;
               }
             }
           }
+          
+          // Create a response object similar to non-streaming API
+          result = {
+            candidates: [{
+              content: {
+                parts: [{ text: streamedText }]
+              }
+            }]
+          };
+          
+          console.log(`[GEMINI] Multimodal streaming complete, received ${streamedText.length} characters`);
+        } catch (error) {
+          console.error(`[GEMINI] Multimodal streaming error: ${error instanceof Error ? error.message : String(error)}`);
+          // Fall back to non-streaming if streaming fails
+          console.log(`[GEMINI] Falling back to non-streaming API for multimodal content`);
+          result = await gradeWithRetry();
         }
-        
-        console.log(`[GEMINI] Multimodal stream received ${streamedText.length} characters, finish reason: ${finishReason}`);
-        return { raw: streamedText, finishReason };
-      };
-      
-      // Run the request once with a specific token limit
-      const runOnce = async (cap: number) => collectStream(buildRequest(cap));
-      
-      // First try with base token limit
-      let { raw, finishReason } = await runOnce(BASE_MAX_TOKENS);
-      
-      // If the model stopped early, retry with a higher token limit
-      if (finishReason !== 'STOP') {
-        console.warn(`[GEMINI] Multimodal early stop ${finishReason} – retry with increased token limit`);
-        ({ raw, finishReason } = await runOnce(RETRY_MAX_TOKENS));
+      } else {
+        // Standard API call for normal outputs
+        result = await gradeWithRetry();
       }
       
-      // If still having issues, throw an error
-      if (finishReason !== 'STOP') {
-        throw new Error(`Gemini failed twice for multimodal content (reason: ${finishReason})`);
+      // Extract text from the response
+      let text = '';
+      
+      if (result.candidates && 
+          result.candidates.length > 0 && 
+          result.candidates[0]?.content?.parts) {
+        const firstPart = result.candidates[0].content.parts[0];
+        if (firstPart.text) {
+          text = firstPart.text;
+        } else {
+          console.warn('[GEMINI] Response text not found in expected location');
+          text = JSON.stringify(result);
+        }
+      } else {
+        console.warn('[GEMINI] Could not extract text response from standard structure');
+        text = JSON.stringify(result);
       }
       
-      // Create a response object similar to the API structure
-      const result = {
-        candidates: [{
-          content: {
-            parts: [{ text: raw }]
-          },
-          finishReason
-        }],
-        usageMetadata: requestParams.usageMetadata
-      };
-      
-      // Log JSON response content for debugging (truncated for privacy/security)
-      console.log(`[GEMINI] Multimodal streaming complete, received ${raw.length} characters, finish reason: ${finishReason}`);
-
-      // Extract and parse the JSON text
-      let text = raw;
-      
-      // Verify the text is valid JSON
-      console.log(`[GEMINI] Multimodal response format check - appears to be valid JSON: ${text.trim().startsWith('{') && text.trim().endsWith('}')}`);
+      console.log(`[GEMINI] Response received, length: ${text.length} characters`);
+      // Only log validity, not actual content for privacy
+      console.log(`[GEMINI] Response format check - appears to be valid JSON: ${text.trim().startsWith('{') && text.trim().endsWith('}')}`);
       
       // Parse and validate the response with our strict parser 
-      console.log(`[GEMINI] Parsing and validating multimodal JSON with schema`);
+      console.log(`[GEMINI] Parsing and validating JSON with schema`);
       
       let parsedContent: GradingFeedback;
       
       try {
         // Use the strict parser that validates against schema
         parsedContent = parseStrict(text);
-        console.log(`[GEMINI] Successfully parsed and validated multimodal JSON response`);
+        console.log(`[GEMINI] Successfully parsed and validated JSON response`);
       } catch (error) {
-        console.error(`[GEMINI] Multimodal JSON parsing or validation failed: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(`[GEMINI] JSON parsing or validation failed: ${error instanceof Error ? error.message : String(error)}`);
         throw new SchemaValidationError(
-          `Gemini returned multimodal JSON that failed schema validation`, 
+          `Gemini returned JSON that failed schema validation`, 
           text, 
           error
         );
       }
       
+      // Track performance
+      const processingEnd = Date.now();
+      
+      // Use actual usage data if available, otherwise estimate
       let tokenCount = 0;
       
-      // Log comprehensive usage information
-      if (result.usageMetadata) {
+      if (result.usageMetadata && result.usageMetadata.totalTokenCount) {
         // Use actual token count from API if available
         tokenCount = result.usageMetadata.totalTokenCount;
         
@@ -604,5 +692,33 @@ export class GeminiAdapter implements AIAdapter {
       console.error(`[GEMINI] Error in generateMultimodalCompletion: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
+  }
+  
+  /**
+   * Check if a file type is supported by the Gemini API
+   */
+  isSupportedMimeType(mimeType: string): boolean {
+    return (
+      SUPPORTED_MIME_TYPES.image.includes(mimeType) ||
+      SUPPORTED_MIME_TYPES.video.includes(mimeType) ||
+      SUPPORTED_MIME_TYPES.audio.includes(mimeType) ||
+      SUPPORTED_MIME_TYPES.document.includes(mimeType)
+    );
+  }
+  
+  /**
+   * Get the content type category for a given MIME type
+   */
+  getContentType(mimeType: string): ContentType | undefined {
+    if (SUPPORTED_MIME_TYPES.image.includes(mimeType)) {
+      return 'image';
+    } else if (SUPPORTED_MIME_TYPES.video.includes(mimeType)) {
+      return 'video';
+    } else if (SUPPORTED_MIME_TYPES.audio.includes(mimeType)) {
+      return 'audio';
+    } else if (SUPPORTED_MIME_TYPES.document.includes(mimeType)) {
+      return 'document';
+    }
+    return undefined;
   }
 }
