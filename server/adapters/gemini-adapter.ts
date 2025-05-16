@@ -298,7 +298,8 @@ export class GeminiAdapter implements AIAdapter {
       }
       
       // Use the actual token count from API if available, or set a reasonable default
-      const tokenCount = result.usageMetadata?.totalTokenCount || 1000;
+      // Don't use fallback values for token count to avoid bogus cost data
+      const tokenCount = result.usageMetadata?.totalTokenCount;
       
       // Return the parsed and validated content in the expected interface format
       return {
