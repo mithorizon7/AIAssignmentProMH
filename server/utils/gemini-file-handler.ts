@@ -62,9 +62,10 @@ async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
         const arrayBuffer = await res.arrayBuffer();
         console.log(`[FETCHBUFFER] Successfully downloaded ${arrayBuffer.byteLength} bytes from URL`);
         return Buffer.from(arrayBuffer);
-      } catch (error) {
-        console.error(`[FETCHBUFFER] Error fetching URL: ${error.message}`);
-        throw error;
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`[FETCHBUFFER] Error fetching URL: ${errorMessage}`);
+        throw new Error(`Failed to download file from URL: ${errorMessage}`);
       }
     }
     
@@ -76,9 +77,10 @@ async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
         const fileBuffer = await fsp.readFile(src); // local path
         console.log(`[FETCHBUFFER] Successfully read ${fileBuffer.length} bytes from file`);
         return fileBuffer;
-      } catch (err) {
-        console.error(`[FETCHBUFFER] File read error: ${err.message}`);
-        throw new Error(`Failed to read file from path: ${err instanceof Error ? err.message : String(err)}`);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.error(`[FETCHBUFFER] File read error: ${errorMessage}`);
+        throw new Error(`Failed to read file from path: ${errorMessage}`);
       }
     }
   }
@@ -136,10 +138,12 @@ export async function createFileData(
     // Add more detailed logging to help debug the issue
     console.log(`[GEMINI] Buffer type: ${typeof buf}, isBuffer: ${Buffer.isBuffer(buf)}, length: ${buf.length}`);
     
-    // Based on SDK v0.14.0, try a different approach with a plain object
+    // Match the expected format from Gemini SDK documentation
     const file = await genAI.files.upload({
-      data: buf.toString('base64'),
-      mimeType: mimeType
+      file: buf, // Passing the buffer directly
+      config: {
+        mimeType: mimeType
+      }
     });
     console.log(`[GEMINI] File uploaded successfully, URI: ${file.uri}`);
     
@@ -155,9 +159,10 @@ export async function createFileData(
     }
     
     return { file_uri: file.uri, mime_type: mimeType };
-  } catch (error) {
-    console.error(`[GEMINI] File upload failed: ${error instanceof Error ? error.message : String(error)}`);
-    throw new Error(`Failed to upload file to Gemini: ${error instanceof Error ? error.message : String(error)}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[GEMINI] File upload failed: ${errorMessage}`);
+    throw new Error(`Failed to upload file to Gemini: ${errorMessage}`);
   }
 }
 
