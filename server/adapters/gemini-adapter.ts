@@ -15,7 +15,7 @@ const RETRY_MAX_TOKENS = 1600;  // if finishReason !== "STOP"
 
 // The newest Gemini model is "gemini-2.5-flash-preview-04-17" which was released April 17, 2025
 import { ContentType } from '../utils/file-type-settings';
-import { AIAdapter, MultimodalPromptPart } from './ai-adapter';
+import { AIAdapter, AIAdapterResponse, MultimodalPromptPart } from './interfaces';
 import { CriteriaScore } from '@shared/schema';
 import { parseStrict } from '../utils/json-parser';
 import { GradingFeedback, SCHEMA_VERSION, gradingJSONSchema } from '../schemas/gradingSchema';
