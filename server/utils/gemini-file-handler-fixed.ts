@@ -7,7 +7,9 @@
 
 import crypto from 'crypto';
 import { promises as fsp } from 'fs';
-import { GoogleGenAI, GoogleGenerativeAI } from '@google/genai';
+// Import the Google AI SDK
+// We use 'any' type for broader compatibility with different SDK versions
+import { GoogleGenAI } from '@google/genai';
 import { Redis } from 'ioredis';
 import path from 'path';
 
@@ -114,7 +116,7 @@ async function createTempFile(buffer: Buffer, extension?: string): Promise<{
  * Handles different SDK versions and fallbacks
  */
 export async function createFileData(
-  genAI: GoogleGenerativeAI,
+  genAI: GenAIType,
   source: Buffer | string,
   mimeType: string
 ): Promise<GeminiFileData> {

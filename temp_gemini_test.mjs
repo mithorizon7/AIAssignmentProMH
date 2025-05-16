@@ -1,151 +1,129 @@
+/**
+ * Test script for the improved Gemini file handler
+ * Tests handling of different file types and SDK versions
+ */
 
-  import pkg from '@google/genai';
-  const { GoogleGenAI } = pkg;
+import pkg from '@google/genai';
+const { GoogleGenerativeAI } = pkg;
+import fs from 'fs/promises';
+import path from 'path';
+import crypto from 'crypto';
 
-  async function testGeminiAdapter() {
-    try {
-      console.log('Testing Gemini adapter with the gemini-2.5-flash-preview-04-17 model...');
-      
-      // Initialize the Google Generative AI client
-      const genAI = new GoogleGenAI({ apiKey: 'AIzaSyDHYFnpsGcrEMw8TAW1qLTMfs0sN7HZS-Q' });
-      
-      // The model name to test
-      const modelName = "gemini-2.5-flash-preview-04-17";
-      console.log(`Using model: ${modelName}`);
-      
-      // Get the model
-      const model = genAI.getGenerativeModel({ model: modelName });
-      
-      // Set up generation config
-      const generationConfig = {
-        temperature: 0.2,
-        topP: 0.8,
-        topK: 40,
-        maxOutputTokens: 1024,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "object",
-          properties: {
-            strengths: {
-              type: "array",
-              items: { type: "string" }
-            },
-            improvements: {
-              type: "array",
-              items: { type: "string" }
-            },
-            summary: { type: "string" },
-            score: { type: "number" }
-          },
-          required: ["strengths", "improvements", "summary", "score"]
-        }
-      };
-      
-      // The test content
-      const testContent = `
-This is a test submission for the Gemini AI model using "gemini-2.5-flash-preview-04-17".
-Please analyze this text and provide feedback with:
-- strengths
-- improvements
-- summary
-- score (0-100)
+// Initialize with API key
+const API_KEY = process.env.GOOGLE_API_KEY;
 
-The square root of 16 is 4. The capital of France is Paris.
-`;
-      
-      // Create the content for generation
-      const content = [
-        {
-          role: "user",
-          parts: [{ text: testContent }]
-        }
-      ];
-      
-      console.log('Sending request to Gemini API...');
-      
-      // Generate content
-      const result = await model.generateContent({
-        contents: content,
-        generationConfig
+if (!API_KEY) {
+  console.error('Error: GOOGLE_API_KEY environment variable is not set');
+  process.exit(1);
+}
+
+const genAI = new GoogleGenerativeAI(API_KEY);
+
+// Create a simple text file for testing
+async function createTextFile() {
+  const content = 'This is a test document for Gemini API file handling.';
+  const filePath = `/tmp/test-document-${Date.now()}.txt`;
+  await fs.writeFile(filePath, content);
+  console.log(`Created test file at ${filePath}`);
+  return filePath;
+}
+
+// Upload file and get file ID
+async function uploadFileToGemini(filePath) {
+  try {
+    console.log(`Uploading file ${filePath} to Gemini Files API...`);
+    
+    // Try files.upload (newer SDK versions)
+    if (genAI.files && typeof genAI.files.upload === 'function') {
+      console.log('Using newer SDK version with files.upload method');
+      const result = await genAI.files.upload({
+        file: filePath,
+        config: { mimeType: 'text/plain' }
       });
       
-      // Print the structure for debugging
-      console.log('\nResponse structure:');
-      console.log(JSON.stringify(Object.keys(result), null, 2));
+      console.log('Upload result:', result);
+      return { fileId: result.fileId || result.uri, method: 'files.upload' };
+    } 
+    // Try uploadFile directly (some SDK versions)
+    else if (typeof genAI.uploadFile === 'function') {
+      console.log('Using older SDK version with uploadFile method');
+      const result = await genAI.uploadFile(filePath, { mimeType: 'text/plain' });
       
-      if (result.response) {
-        console.log('\nResponse.response structure:');
-        console.log(JSON.stringify(Object.keys(result.response), null, 2));
-        
-        if (result.response.candidates && result.response.candidates.length > 0) {
-          console.log('\nFound', result.response.candidates.length, 'candidates');
-          
-          const firstCandidate = result.response.candidates[0];
-          console.log('\nCandidate structure:');
-          console.log(JSON.stringify(Object.keys(firstCandidate), null, 2));
-          
-          if (firstCandidate.content) {
-            console.log('\nContent structure:');
-            console.log(JSON.stringify(Object.keys(firstCandidate.content), null, 2));
-            
-            if (firstCandidate.content.parts && firstCandidate.content.parts.length > 0) {
-              console.log('\nFound', firstCandidate.content.parts.length, 'parts');
-              
-              const firstPart = firstCandidate.content.parts[0];
-              if (firstPart.text) {
-                console.log('\nResponse text preview:');
-                console.log(firstPart.text.substring(0, 200) + '...');
-                
-                try {
-                  // Try to parse as JSON
-                  const parsed = JSON.parse(firstPart.text);
-                  console.log('\nParsed JSON:');
-                  console.log(JSON.stringify(parsed, null, 2));
-                  
-                  return { success: true, message: 'Test completed successfully' };
-                } catch (error) {
-                  console.error('\nError parsing response as JSON:', error.message);
-                  console.log('Raw text response:');
-                  console.log(firstPart.text);
-                }
-              } else {
-                console.error('\nNo text found in part');
-                console.log('Part structure:');
-                console.log(JSON.stringify(firstPart, null, 2));
-              }
-            } else {
-              console.error('\nNo parts found in content');
-            }
-          } else {
-            console.error('\nNo content found in candidate');
-          }
-        } else {
-          console.error('\nNo candidates found in response');
-        }
-      } else {
-        console.error('\nNo response field in result');
-        console.log('Raw result:');
-        console.log(JSON.stringify(result, null, 2));
+      console.log('Upload result:', result);
+      return { fileId: result.uri || result.fileId, method: 'uploadFile' };
+    }
+    // No supported methods found
+    else {
+      throw new Error('No compatible file upload method found in Gemini SDK');
+    }
+  } catch (error) {
+    console.error('Failed to upload file:', error.message);
+    throw error;
+  }
+}
+
+// Test the file upload and model usage
+async function testFileHandler() {
+  let filePath = null;
+  
+  try {
+    // Create a test file
+    filePath = await createTextFile();
+    
+    // Upload the file
+    const { fileId, method } = await uploadFileToGemini(filePath);
+    
+    console.log(`\nSuccessfully uploaded file using '${method}' method`);
+    console.log(`File identifier: ${fileId}`);
+    
+    // Now try to use this file with a model
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-04-17' });
+    
+    // Format the file data for the model
+    const filePart = {
+      fileData: {
+        fileUri: fileId,
+        mimeType: 'text/plain'
       }
-      
-      return { success: false, message: 'Test completed with issues' };
-    } catch (error) {
-      console.error('\nError testing Gemini adapter:', error.message);
-      if (error.stack) {
-        console.error(error.stack);
+    };
+    
+    // Create the prompt
+    const prompt = [
+      { text: 'Please read this file and summarize its contents in one sentence:' },
+      filePart
+    ];
+    
+    console.log('\nSending prompt to Gemini model...');
+    
+    // Get the response
+    const result = await model.generateContent({
+      contents: [{ parts: prompt }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 1000,
       }
-      return { success: false, message: `Test failed: ${error.message}` };
+    });
+    
+    const response = await result.response;
+    console.log('\nGemini response:');
+    console.log(response.text());
+    
+  } catch (error) {
+    console.error('Test failed:', error.message);
+  } finally {
+    // Clean up
+    if (filePath) {
+      try {
+        await fs.unlink(filePath);
+        console.log(`\nCleaned up test file: ${filePath}`);
+      } catch (cleanupErr) {
+        console.error(`Failed to clean up file: ${cleanupErr.message}`);
+      }
     }
   }
+}
 
-  // Run the test
-  testGeminiAdapter().then(result => {
-    console.log('\nTest result:', result);
-    if (!result.success) {
-      process.exit(1);
-    }
-  }).catch(err => {
-    console.error('Unhandled error during test:', err);
-    process.exit(1);
-  });
-  
+console.log('Starting Gemini file handler test...');
+testFileHandler()
+  .then(() => console.log('Test completed'))
+  .catch(err => console.error(`Fatal error: ${err.message}`));
