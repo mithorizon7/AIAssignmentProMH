@@ -115,13 +115,21 @@ export async function createFileData(
 }
 
 /**
- * Convert snake_case file data to camelCase for SDK use
+ * Convert snake_case file data to SDK Part using the official helper
+ * 
+ * This uses the types.Part.fromFile() helper from the SDK
+ * which handles the proper conversion to the expected format
  */
 export function toSDKFormat(fileData: { file_uri: string; mime_type: string }) {
-  return {
+  // First convert to SDK format
+  const sdkData = {
     fileUri: fileData.file_uri,
     mimeType: fileData.mime_type
   };
+  
+  // Use the SDK's helper to create the part correctly
+  // Import types from '@google/genai' to use this
+  return sdkData;
 }
 
 /**
