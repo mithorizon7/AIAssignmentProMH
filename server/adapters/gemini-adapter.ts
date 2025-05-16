@@ -432,8 +432,8 @@ export class GeminiAdapter implements AIAdapter {
               const fileData = await createFileData(this.genAI, part.content, mimeType);
               fileDataList.push(fileData);
               
-              // Create properly typed file_data structure using our GeminiFilePart interface
-              // This is needed because SDK v0.14.0 doesn't have Part.fromFile helper
+              // Create properly typed file_data structure with correct snake_case format
+              // Since we're on SDK v0.14.0 which doesn't have Part.fromFile helper
               const filePart: GeminiFilePart = {
                 file_data: {
                   file_uri: fileData.file_uri,
