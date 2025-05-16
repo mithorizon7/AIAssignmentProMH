@@ -189,7 +189,7 @@ export function shouldUseFilesAPI(mimeType: string, contentSize: number): boolea
     mime.includes('presentation') ||
     mime.includes('openxmlformats') // Covers docx, xlsx, pptx
   ) {
-    console.log(`[GEMINI] Using Files API for document type: ${mime}`);
+    // Document types always use Files API
     return true;
   }
   

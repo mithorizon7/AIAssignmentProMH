@@ -3,8 +3,8 @@
  */
 
 export interface GeminiFileData {
-  file_uri: string;
-  mime_type: string;
+  fileUri: string;
+  mimeType: string;
 }
 
 export interface GradingFeedback {
