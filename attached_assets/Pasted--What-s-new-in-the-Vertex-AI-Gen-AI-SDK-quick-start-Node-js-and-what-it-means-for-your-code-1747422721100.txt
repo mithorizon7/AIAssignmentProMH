@@ -1,0 +1,64 @@
+### What’s new in the Vertex AI **Gen AI SDK** quick-start (Node.js) and what it means for your code
+
+1. **Client creation has two explicit modes**
+
+   * **Gemini Developer API (default)** – `new GoogleGenAI({ apiKey })`
+   * **Vertex AI** – `new GoogleGenAI({ vertexai: true, project, location })`
+     (The doc sample shows the environment switch with `GOOGLE_GENAI_USE_VERTEXAI`.)
+     → Your constructor call (`new GoogleGenAI({ apiKey })`) is still correct, but if you intend to move the workload onto Vertex AI you must pass `vertexai: true` and the project / location instead of the API-key block. ([Google Cloud][1])
+
+2. **`files.upload()` parameter names changed**
+   The SDK now expects
+
+   ```ts
+   await ai.files.upload({
+     file: Buffer | string | File | Blob,      // required
+     config: { mimeType: "application/…" }     // optional but recommended
+   });
+   ```
+
+   *The older `{ data: buf, mimeType }` shape is gone.*
+   Inside the SDK it dereferences `file.size` (for a Blob/File) or `fs.statSync(file).size` (for a path) – when you pass an object that lives in `data`, it’s **undefined**, so the next line bombs out with **“Cannot read properties of undefined (reading 'size')”** – exactly the error you’re seeing.
+
+3. **Valid `file` values in Node**
+
+   * A **string path** (fastest-to-implement fix – just give the SDK the temp file path you already have on disk).
+   * A **Buffer** is also accepted; the SDK internally wraps it in a `Blob`, which **has a `size` property**, so no more undefined errors.
+   * You no longer need – and should delete – the extra `Buffer.from(...)` layer you added earlier.
+
+4. **Schema of the returned object is unchanged** – the snippet in the docs calls `file.uri`; that is still the property the API returns. Your `GeminiFileData` type is therefore correct.
+
+---
+
+### Two-line surgical fix
+
+```ts
+// utils/gemini-file-handler.ts – inside createFileData()
+const file = await genAI.files.upload({
+  file: buf,                            // <-- WAS “data: buf”
+  config: { mimeType }                  // <-- put mimeType into the config sub-object
+});
+```
+
+*(remove the cast to `any`; the shape now matches the SDK type)*
+
+```ts
+// adapters/gemini-adapter.ts – everywhere you build a Part for a document/audio/video
+apiParts.push(toSDKFormat(fileData));  // <-- toSDKFormat remains correct
+```
+
+That is literally all that is required to eliminate the “reading ‘size’” crash for DOCX/PDF/audio/video uploads. The rest of your recent refactor (Buffer → fetchToBuffer, redis cache, strict typing, `shouldUseFilesAPI`, etc.) stays intact.
+
+---
+
+### Why this is enough
+
+* The SDK does the MIME sniffing and *Blob* wrapping for you once it sees a `file` key.
+* `config.mimeType` guarantees Gemini indexes the file under the correct type (important for Word/Excel/PPT).
+* The returned `file.uri` remains identical, so no downstream changes are needed.
+
+---
+
+**Confidence:** high (≈90 %) that changing `data → file` and adding `config` eliminates the remaining DOCX/PDF upload failures; moderate (≈10 %) chance you’ll also need to pass a path string rather than a Buffer if you’re on a very old 0.14.x cut – but try the Buffer first.
+
+[1]: https://cloud.google.com/vertex-ai/generative-ai/docs/sdks/overview "Google Gen AI SDK  |  Generative AI on Vertex AI  |  Google Cloud"

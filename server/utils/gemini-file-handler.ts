@@ -139,12 +139,24 @@ export async function createFileData(
     // Add more detailed logging to help debug the issue
     console.log(`[GEMINI] Buffer type: ${typeof buf}, isBuffer: ${Buffer.isBuffer(buf)}, length: ${buf.length}`);
     
-    // Based on @google/genai SDK v0.14.0 documentation
-    // The correct parameter name is 'buffer', not 'data'
+    // Updated to match the latest SDK format (v0.14.0+)
+    // For Node.js, we need to save the buffer to a temporary file and provide the path
+    // This is the most reliable approach as recommended in the migration guide
+    const tempFilePath = `/tmp/gemini-upload-${crypto.randomBytes(8).toString('hex')}`;
+    await fsp.writeFile(tempFilePath, buf);
+    
     const file = await genAI.files.upload({
-      buffer: buf,
-      mimeType: mimeType
+      file: tempFilePath,
+      config: { mimeType: mimeType }
     });
+    
+    // Clean up the temp file after successful upload
+    try {
+      await fsp.unlink(tempFilePath);
+    } catch (error) {
+      const cleanupError = error as Error;
+      console.warn(`[GEMINI] Could not clean up temp file: ${cleanupError.message}`);
+    }
     console.log(`[GEMINI] File uploaded successfully, URI: ${file.uri}`);
     
     // Cache the file URI for future use (if Redis is available)
