@@ -36,7 +36,7 @@ import { GradingFeedback, SCHEMA_VERSION, gradingJSONSchema } from '../schemas/g
 import { sanitizeText, detectInjectionAttempt } from '../utils/text-sanitizer';
 import { isSchemaError, shouldRetry, SchemaValidationError } from '../utils/schema-errors';
 import { pruneForGemini } from '../utils/schema-pruner';
-import { createFileData, GeminiFileData, toSDKFormat, shouldUseFilesAPI } from '../utils/gemini-file-handler';
+import { createFileData, GeminiFileData, shouldUseFilesAPI } from '../utils/gemini-file-handler';
 import { repairJson } from '../utils/json-repair';
 
 // These are the MIME types supported by Google Gemini API
@@ -438,13 +438,14 @@ export class GeminiAdapter implements AIAdapter {
               
               // Create properly typed fileData structure with correct format for Gemini API
               // Updated to match the required data field format in newer SDK versions
-              const filePart: GeminiFilePart = {
+              // Create properly typed part structure
+              const part: Part = {
                 fileData: {
                   fileUri: fileData.fileUri,
                   mimeType: fileData.mimeType
                 }
               };
-              apiParts.push(filePart as unknown as Part);
+              apiParts.push(part);
             } else {
               // Use inline data for smaller images
               console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB, MIME: ${part.mimeType})`);
@@ -487,15 +488,14 @@ export class GeminiAdapter implements AIAdapter {
                 const fileData = await createFileData(this.genAI, part.content, part.mimeType);
                 fileDataList.push(fileData);
                 
-                // Create properly typed fileData structure using our GeminiFilePart interface
-                // This is needed because SDK v0.14.0 doesn't have Part.fromFile helper
-                const filePart: GeminiFilePart = {
+                // Create properly typed part structure directly
+                const part: Part = {
                   fileData: {
                     fileUri: fileData.fileUri,
                     mimeType: fileData.mimeType
                   }
                 };
-                apiParts.push(filePart as unknown as Part);
+                apiParts.push(part);
               }
             }
           } catch (error) {

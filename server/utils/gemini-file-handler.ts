@@ -40,32 +40,24 @@ const CACHE_TTL = 47 * 60 * 60; // 47 hours (just under Gemini's 48-hour limit)
  * Fetch a file from URL or local path and convert to Buffer
  */
 async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
-  console.log(`[FETCHBUFFER] Processing source type: ${typeof src}, ${Buffer.isBuffer(src) ? 'is Buffer' : 'not Buffer'}`);
-  if (typeof src === 'string') {
-    console.log(`[FETCHBUFFER] String source: ${src.substring(0, 50)}...`);
-  }
-  
   // If already a Buffer, return it directly
   if (Buffer.isBuffer(src)) {
-    console.log(`[FETCHBUFFER] Returning existing buffer of size ${src.length} bytes`);
     return src;
   }
   
   // Handle URL or local file path
   if (typeof src === 'string') {
     if (src.startsWith('gs://') || src.startsWith('http')) {
-      console.log(`[FETCHBUFFER] Fetching from URL: ${src}`);
       try {
         const res = await fetch(src);
         if (!res.ok) {
           throw new Error(`Failed to download file from URL: ${src} (status: ${res.status})`);
         }
         const arrayBuffer = await res.arrayBuffer();
-        console.log(`[FETCHBUFFER] Successfully downloaded ${arrayBuffer.byteLength} bytes from URL`);
         return Buffer.from(arrayBuffer);
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`[FETCHBUFFER] Error fetching URL: ${errorMessage}`);
+        console.error(`Error fetching URL: ${errorMessage}`);
         throw new Error(`Failed to download file from URL: ${errorMessage}`);
       }
     }
@@ -74,20 +66,17 @@ async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
     // This prevents trying to read MIME types as file paths
     if (src.includes('/') || src.includes('\\') || !src.includes('/')) {
       try {
-        console.log(`[FETCHBUFFER] Reading from file system: ${src}`);
         const fileBuffer = await fsp.readFile(src); // local path
-        console.log(`[FETCHBUFFER] Successfully read ${fileBuffer.length} bytes from file`);
         return fileBuffer;
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        console.error(`[FETCHBUFFER] File read error: ${errorMessage}`);
+        console.error(`File read error: ${errorMessage}`);
         throw new Error(`Failed to read file from path: ${errorMessage}`);
       }
     }
   }
   
   // If we reach here, it's not a valid source
-  console.error(`[FETCHBUFFER] Invalid source type or format`);
   throw new Error(`Invalid file source: ${typeof src === 'string' ? src : 'non-string value'}`);
 }
 
@@ -97,20 +86,19 @@ async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
  * This function:
  * 1. Checks the cache to see if we've already uploaded this file
  * 2. Uploads the file to Gemini Files API if not in cache
- * 3. Returns a proper Files API reference format
+ * 3. Returns a properly formatted file reference with camelCase properties
  * 
  * @param genAI Initialized Google GenAI client
  * @param source File content as Buffer or URL string
  * @param mimeType MIME type of the file
- * @returns File reference in snake_case format for API
+ * @returns File reference with camelCase properties
  */
 export async function createFileData(
   genAI: GoogleGenAI,
   source: Buffer | string,
   mimeType: string
 ): Promise<GeminiFileData> {
-  // Use fetchToBuffer to handle the different source types
-  // This function properly converts string paths/URLs to Buffers
+  // Convert source to Buffer if needed
   const buf = await fetchToBuffer(source);
   
   // Generate hash to use as cache key
@@ -118,34 +106,24 @@ export async function createFileData(
   const cacheKey = `gemini:file:${hash}:${mimeType}`;
   
   // Check if we've already uploaded this file (if Redis is available)
-  let cached = null;
   if (redis !== null) {
     try {
-      cached = await redis.get(cacheKey);
+      const cached = await redis.get(cacheKey);
       if (cached) {
-        console.log(`[GEMINI] Using cached file URI for ${mimeType} (${buf.length} bytes)`);
         return { fileUri: cached, mimeType: mimeType };
       }
     } catch (err) {
-      console.warn(`[GEMINI] Redis cache lookup failed: ${err instanceof Error ? err.message : String(err)}`);
       // Continue without caching if Redis fails
     }
-  } else {
-    console.log(`[GEMINI] Redis not available, file caching disabled`);
   }
   
-  // Upload file to Gemini Files API
-  console.log(`[GEMINI] Uploading ${buf.length} bytes (${mimeType}) to Files API`);
   try {
-    // Add more detailed logging to help debug the issue
-    console.log(`[GEMINI] Buffer type: ${typeof buf}, isBuffer: ${Buffer.isBuffer(buf)}, length: ${buf.length}`);
-    
-    // Updated to match the latest SDK format (v0.14.0+)
-    // For Node.js, we need to save the buffer to a temporary file and provide the path
-    // This is the most reliable approach as recommended in the migration guide
+    // For Node.js, save the buffer to a temporary file
+    // This is the recommended approach for reliable file handling
     const tempFilePath = `/tmp/gemini-upload-${crypto.randomBytes(8).toString('hex')}`;
     await fsp.writeFile(tempFilePath, buf);
     
+    // Upload using the 'file' parameter (not 'buffer') as specified in SDK v0.14.0
     const file = await genAI.files.upload({
       file: tempFilePath,
       config: { mimeType: mimeType }
@@ -155,18 +133,14 @@ export async function createFileData(
     try {
       await fsp.unlink(tempFilePath);
     } catch (error) {
-      const cleanupError = error as Error;
-      console.warn(`[GEMINI] Could not clean up temp file: ${cleanupError.message}`);
+      // Silent cleanup failure - this isn't critical
     }
-    console.log(`[GEMINI] File uploaded successfully, URI: ${file.uri}`);
     
     // Cache the file URI for future use (if Redis is available)
     if (redis !== null && file && file.uri) {
       try {
         await redis.setex(cacheKey, CACHE_TTL, file.uri);
-        console.log(`[GEMINI] Cached file URI for future use (TTL: ${CACHE_TTL}s)`);
       } catch (err) {
-        console.warn(`[GEMINI] Failed to cache file URI: ${err instanceof Error ? err.message : String(err)}`);
         // Continue without caching
       }
     }
@@ -179,25 +153,12 @@ export async function createFileData(
     return { fileUri: file.uri, mimeType: mimeType };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[GEMINI] File upload failed: ${errorMessage}`);
     throw new Error(`Failed to upload file to Gemini: ${errorMessage}`);
   }
 }
 
-/**
- * Convert snake_case file data to raw file_data structure for Gemini API
- * 
- * The Gemini API expects data in a specific format with correct casing
- */
-export function toSDKFormat(fileData: { fileUri: string; mimeType: string }) {
-  // Create a properly formatted fileData structure for the API
-  return {
-    fileData: {
-      fileUri: fileData.fileUri,
-      mimeType: fileData.mimeType
-    }
-  };
-}
+// toSDKFormat function has been removed as it's now obsolete
+// We're using proper typing instead of conversion functions
 
 /**
  * Determine if a file should be sent as inline data or uploaded to Files API
