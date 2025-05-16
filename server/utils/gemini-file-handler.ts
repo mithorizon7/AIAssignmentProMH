@@ -38,33 +38,52 @@ const CACHE_TTL = 47 * 60 * 60; // 47 hours (just under Gemini's 48-hour limit)
  * Fetch a file from URL or local path and convert to Buffer
  */
 async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
+  console.log(`[FETCHBUFFER] Processing source type: ${typeof src}, ${Buffer.isBuffer(src) ? 'is Buffer' : 'not Buffer'}`);
+  if (typeof src === 'string') {
+    console.log(`[FETCHBUFFER] String source: ${src.substring(0, 50)}...`);
+  }
+  
   // If already a Buffer, return it directly
   if (Buffer.isBuffer(src)) {
+    console.log(`[FETCHBUFFER] Returning existing buffer of size ${src.length} bytes`);
     return src;
   }
   
   // Handle URL or local file path
   if (typeof src === 'string') {
     if (src.startsWith('gs://') || src.startsWith('http')) {
-      const res = await fetch(src);
-      if (!res.ok) {
-        throw new Error(`Failed to download file from URL: ${src} (status: ${res.status})`);
+      console.log(`[FETCHBUFFER] Fetching from URL: ${src}`);
+      try {
+        const res = await fetch(src);
+        if (!res.ok) {
+          throw new Error(`Failed to download file from URL: ${src} (status: ${res.status})`);
+        }
+        const arrayBuffer = await res.arrayBuffer();
+        console.log(`[FETCHBUFFER] Successfully downloaded ${arrayBuffer.byteLength} bytes from URL`);
+        return Buffer.from(arrayBuffer);
+      } catch (error) {
+        console.error(`[FETCHBUFFER] Error fetching URL: ${error.message}`);
+        throw error;
       }
-      return Buffer.from(await res.arrayBuffer());
     }
     
     // Only try to read from filesystem if it looks like a file path
     // This prevents trying to read MIME types as file paths
     if (src.includes('/') || src.includes('\\') || !src.includes('/')) {
       try {
-        return await fsp.readFile(src); // local path
+        console.log(`[FETCHBUFFER] Reading from file system: ${src}`);
+        const fileBuffer = await fsp.readFile(src); // local path
+        console.log(`[FETCHBUFFER] Successfully read ${fileBuffer.length} bytes from file`);
+        return fileBuffer;
       } catch (err) {
+        console.error(`[FETCHBUFFER] File read error: ${err.message}`);
         throw new Error(`Failed to read file from path: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
   
   // If we reach here, it's not a valid source
+  console.error(`[FETCHBUFFER] Invalid source type or format`);
   throw new Error(`Invalid file source: ${typeof src === 'string' ? src : 'non-string value'}`);
 }
 
@@ -189,4 +208,4 @@ export function shouldUseFilesAPI(mimeType: string, contentSize: number): boolea
   }
   
   return false;
-}
+}console.log('Debugging GCS URL fetching:', JSON.stringify(process.env, null, 2))
