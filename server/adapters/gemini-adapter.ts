@@ -370,7 +370,9 @@ export class GeminiAdapter implements AIAdapter {
           const isSVG = part.mimeType === 'image/svg+xml';
           
           // Determine if we should use the Files API for this content
-          const useFilesAPI = shouldUseFilesAPI(part.content.length, part.mimeType, contentType);
+          // Ensure mimeType is a string before passing it to shouldUseFilesAPI
+          const mimeType = typeof part.mimeType === 'string' ? part.mimeType : 'application/octet-stream';
+          const useFilesAPI = shouldUseFilesAPI(mimeType, part.content.length);
           
           try {
             // Create the appropriate file data representation
