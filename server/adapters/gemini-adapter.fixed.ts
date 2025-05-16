@@ -6,19 +6,16 @@
 import { 
   GoogleGenAI, 
   GenerateContentResponse,
-  Part
+  Part 
 } from '@google/genai';
 
 // The newest Gemini model is "gemini-2.5-flash-preview-04-17" which was released April 17, 2025
 import { ContentType } from '../utils/file-type-settings';
 import { AIAdapter, MultimodalPromptPart } from './ai-adapter';
 import { CriteriaScore } from '@shared/schema';
-import { parseStrict } from '../utils/json-parser';
-import { GradingFeedback, SCHEMA_VERSION, gradingJSONSchema } from '../schemas/gradingSchema';
+import { parseStrict, shouldRetry } from '../utils/json-parser';
+import { GradingFeedback, SCHEMA_VERSION } from '../schemas/gradingSchema';
 import { sanitizeText, detectInjectionAttempt } from '../utils/text-sanitizer';
-import { isSchemaError, shouldRetry, SchemaValidationError } from '../utils/schema-errors';
-import { pruneForGemini } from '../utils/schema-pruner';
-import { createFileData, GeminiFileData, toSDKFormat } from '../utils/gemini-file-handler';
 
 // These are the MIME types supported by Google Gemini API
 // Based on https://ai.google.dev/gemini-api/docs/
@@ -73,12 +70,39 @@ export class GeminiAdapter implements AIAdapter {
   private modelName: string;
   private processingStart: number;
   
-  // Use a pruned version of the JSON schema from gradingSchema.ts
-  // Gemini only supports a subset of JSON Schema fields
-  private readonly responseSchema: any;
-  
-  // File cache cleanup interval
-  private fileCacheCleanupInterval: NodeJS.Timeout | null = null;
+  // Define response schema structure once for reuse
+  private responseSchema = {
+    type: "object",
+    properties: {
+      strengths: {
+        type: "array",
+        items: { type: "string" }
+      },
+      improvements: {
+        type: "array",
+        items: { type: "string" }
+      },
+      suggestions: {
+        type: "array",
+        items: { type: "string" }
+      },
+      summary: { type: "string" },
+      score: { type: "number" },
+      criteriaScores: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            criteriaId: { type: "string" }, // Must be string to match shared schema
+            score: { type: "number" },
+            feedback: { type: "string" }
+          },
+          required: ["criteriaId", "score", "feedback"]
+        }
+      }
+    },
+    required: ["strengths", "improvements", "suggestions", "summary", "score"]
+  };
   
   /**
    * Create a new GeminiAdapter instance
@@ -101,23 +125,8 @@ export class GeminiAdapter implements AIAdapter {
     // Initialize processing timer
     this.processingStart = Date.now();
     
-    // Prune the schema to remove fields not supported by Gemini API
-    // This prevents the "Unknown name" errors for standard JSON Schema fields
-    this.responseSchema = Object.freeze(pruneForGemini(gradingJSONSchema));
-    
-    console.log(`[GEMINI] Schema pruned for Gemini API compatibility`);
-    
-    // Start file cache cleanup
-    const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
-    this.fileCacheCleanupInterval = setInterval(() => {
-      try {
-        const now = Date.now();
-        console.log(`[GEMINI] Running scheduled file cache cleanup at ${new Date(now).toISOString()}`);
-        // The actual cleanup runs in gemini-file-handler.ts
-      } catch (error) {
-        console.error(`[GEMINI] File cache cleanup error: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }, CLEANUP_INTERVAL);
+    // Freeze schema to prevent modification
+    Object.freeze(this.responseSchema);
   }
   
   /**
@@ -126,8 +135,6 @@ export class GeminiAdapter implements AIAdapter {
   async generateCompletion(prompt: string, systemPrompt?: string) {
     try {
       console.log(`[GEMINI] Generating completion with prompt length: ${prompt.length} chars`);
-      // Log preview of the prompt, truncated for privacy/security
-      console.log(`[GEMINI] Prompt preview: ${prompt.slice(0, 250)}${prompt.length > 250 ? '...' : ''}`);
       
       // Reset processing timer
       this.processingStart = Date.now();
@@ -138,10 +145,7 @@ export class GeminiAdapter implements AIAdapter {
       // Check for potential injection attempts
       const potentialInjection = detectInjectionAttempt(prompt);
       if (potentialInjection) {
-        console.warn(
-          `[GEMINI] Potential prompt injection detected in input: ` +
-          `${prompt.slice(0, 120)}${prompt.length > 120 ? '...' : ''}`
-        );
+        console.warn(`[GEMINI] Potential prompt injection detected in input`);
       }
       
       // Log if text was truncated
@@ -153,7 +157,7 @@ export class GeminiAdapter implements AIAdapter {
       const temperature = 0.2;
       const topP = 0.8;
       const topK = 40;
-      const maxOutputTokens = 750;
+      const maxOutputTokens = 1024;
       
       // Prepare the request with proper placement of systemInstruction as a top-level field
       const requestParams: any = {
@@ -184,7 +188,7 @@ export class GeminiAdapter implements AIAdapter {
           return await this.genAI.models.generateContent(requestParams);
         } catch (e: any) {
           // If the error is one that might be resolved with a retry, try once more
-          if (isSchemaError(e) && shouldRetry(e)) {
+          if (shouldRetry(e)) {
             console.log(`[GEMINI] API call failed with error that warrants retry: ${e.message}`);
             console.log(`[GEMINI] Retrying API call once...`);
             return await this.genAI.models.generateContent(requestParams);
@@ -194,8 +198,7 @@ export class GeminiAdapter implements AIAdapter {
       };
       
       // Determine if we should use streaming based on expected output size
-      const STREAMING_CUTOFF = 500; // empirically Gemini truncates JSON ~700 tokens
-      const useStreaming = maxOutputTokens > STREAMING_CUTOFF;
+      const useStreaming = maxOutputTokens > 1000;
       let result;
       
       if (useStreaming) {
@@ -252,8 +255,9 @@ export class GeminiAdapter implements AIAdapter {
         
         console.log(`[GEMINI] Response usage metrics ${retryInfo}:`, metrics);
       } else {
-        // Log when we don't get usage metrics from the API
-        console.log(`[GEMINI] No usage metrics available from API, metrics will be incomplete`);
+        // Fallback metrics if API doesn't return usage data
+        const estimatedTokens = Math.ceil(prompt.length / 4);
+        console.log(`[GEMINI] Estimated prompt tokens: ${estimatedTokens} (no official metrics available)`);
       }
       
       // Extract text from the response
@@ -289,15 +293,13 @@ export class GeminiAdapter implements AIAdapter {
         console.log(`[GEMINI] Successfully parsed and validated JSON response`);
       } catch (error) {
         console.error(`[GEMINI] JSON parsing or validation failed: ${error instanceof Error ? error.message : String(error)}`);
-        throw new SchemaValidationError(
-          `Gemini returned JSON that failed schema validation`, 
-          text, 
-          error
-        );
+        throw new Error(`Failed to parse or validate AI response: ${error instanceof Error ? error.message : String(error)}`);
       }
       
-      // Use the actual token count from API if available, or set a reasonable default
-      const tokenCount = result.usageMetadata?.totalTokenCount || 1000;
+      // Calculate estimated token count (simple approximation)
+      const inputTokens = Math.ceil(prompt.length / 4);
+      const outputTokens = Math.ceil(text.length / 4);
+      const tokenCount = inputTokens + outputTokens;
       
       // Return the parsed and validated content in the expected interface format
       return {
@@ -338,10 +340,7 @@ export class GeminiAdapter implements AIAdapter {
           // Check for potential injection attempts
           const potentialInjection = detectInjectionAttempt(originalText);
           if (potentialInjection) {
-            console.warn(
-              `[GEMINI] Potential prompt injection detected in multimodal text input: ` +
-              `${originalText.slice(0, 120)}${originalText.length > 120 ? '...' : ''}`
-            );
+            console.warn(`[GEMINI] Potential prompt injection detected in multimodal text input`);
           }
           
           // Log if text was truncated
@@ -354,84 +353,30 @@ export class GeminiAdapter implements AIAdapter {
           });
         } 
         else if (part.type === 'image') {
-          try {
-            // Get file size to determine best handling approach
-            let fileSize = 0;
+          // Convert Buffer to base64 string if needed
+          const base64Data = Buffer.isBuffer(part.content) 
+            ? part.content.toString('base64')
+            : part.content as string;
             
-            if (Buffer.isBuffer(part.content)) {
-              fileSize = part.content.length;
-            } else if (typeof part.content === 'string' && part.content.startsWith('data:')) {
-              // It's a data URL, extract the base64 part and calculate size
-              const base64Data = part.content.split(',')[1];
-              fileSize = base64Data ? Math.ceil(base64Data.length * 0.75) : 0;  // base64 is ~4/3 of binary size
+          // Image parts need specific formatting with MIME type and base64
+          apiParts.push({
+            inlineData: {
+              data: base64Data,
+              mimeType: part.mimeType || 'image/jpeg'
             }
-            
-            const IMAGE_SIZE_THRESHOLD = 5 * 1024 * 1024; // 5MB threshold for Files API
-            
-            if (fileSize > IMAGE_SIZE_THRESHOLD) {
-              console.log(`[GEMINI] Large image detected (${(fileSize / (1024 * 1024)).toFixed(2)}MB), using Files API`);
-              
-              // Use Files API for large images
-              const fileData = await createFileData(
-                this.genAI,
-                part.content as Buffer | string,
-                part.mimeType || 'image/jpeg'
-              );
-              
-              // Convert to the SDK's expected camelCase format
-              const sdkFileData = toSDKFormat(fileData);
-              
-              // Add file data using the SDK's expected structure
-              apiParts.push({
-                fileData: sdkFileData
-              });
-              
-              console.log(`[GEMINI] Successfully uploaded large image to Files API`);
-            } else {
-              // Convert Buffer to base64 string if needed
-              const base64Data = Buffer.isBuffer(part.content)
-                ? part.content.toString('base64')
-                : part.content as string;
-                
-              // Standard image handling for smaller files
-              apiParts.push({
-                inlineData: {
-                  data: base64Data,
-                  mimeType: part.mimeType || 'image/jpeg'
-                }
-              });
-              
-              console.log(`[GEMINI] Added inline image data (${(fileSize / 1024).toFixed(2)}KB)`);
-            }
-          } catch (error) {
-            console.error(`[GEMINI] Error processing image: ${error instanceof Error ? error.message : String(error)}`);
-            throw new Error(`Failed to process image: ${error instanceof Error ? error.message : String(error)}`);
-          }
+          });
         }
         else if (part.type === 'document' || part.type === 'audio' || part.type === 'video') {
-          try {
-            console.log(`[GEMINI] Processing ${part.type} file with mime type ${part.mimeType || 'unknown'}`);
-            
-            // Upload file to Files API first, returns snake_case properly formatted GeminiFileData
-            const fileData = await createFileData(
-              this.genAI,
-              part.content as Buffer | string,
-              part.mimeType || 'application/octet-stream'
-            );
-            
-            // Convert to the SDK's expected camelCase format
-            const sdkFileData = toSDKFormat(fileData);
-            
-            // Add file data using the SDK's expected structure
-            apiParts.push({
-              fileData: sdkFileData
-            });
-            
-            console.log(`[GEMINI] Successfully added ${part.type} file to request`);
-          } catch (error) {
-            console.error(`[GEMINI] Error processing ${part.type} file: ${error instanceof Error ? error.message : String(error)}`);
-            throw new Error(`Failed to process ${part.type} file: ${error instanceof Error ? error.message : String(error)}`);
-          }
+          // For document/audio/video we expect content to be a fileUri string
+          const fileUri = part.content as string;
+          
+          // File data needs specific formatting
+          apiParts.push({
+            fileData: {
+              mimeType: part.mimeType || 'application/octet-stream',
+              fileUri: fileUri
+            }
+          });
         }
       }
       
@@ -442,7 +387,7 @@ export class GeminiAdapter implements AIAdapter {
       const temperature = 0.2;
       const topP = 0.8;
       const topK = 40;
-      const maxOutputTokens = 750;
+      const maxOutputTokens = 1024;
       
       // Create the request object with responseSchema for JSON output
       const requestParams: any = {
@@ -477,7 +422,7 @@ export class GeminiAdapter implements AIAdapter {
           return await this.genAI.models.generateContent(requestParams);
         } catch (e: any) {
           // If the error is one that might be resolved with a retry, try once more
-          if (isSchemaError(e) && shouldRetry(e)) {
+          if (shouldRetry(e)) {
             console.log(`[GEMINI] API call failed with error that warrants retry: ${e.message}`);
             console.log(`[GEMINI] Retrying API call once...`);
             return await this.genAI.models.generateContent(requestParams);
@@ -487,8 +432,7 @@ export class GeminiAdapter implements AIAdapter {
       };
       
       // Determine if we should use streaming based on expected output size
-      const STREAMING_CUTOFF = 500; // empirically Gemini truncates JSON ~700 tokens
-      const useStreaming = maxOutputTokens > STREAMING_CUTOFF;
+      const useStreaming = maxOutputTokens > 1000;
       let result;
       
       if (useStreaming) {
@@ -564,11 +508,7 @@ export class GeminiAdapter implements AIAdapter {
         console.log(`[GEMINI] Successfully parsed and validated JSON response`);
       } catch (error) {
         console.error(`[GEMINI] JSON parsing or validation failed: ${error instanceof Error ? error.message : String(error)}`);
-        throw new SchemaValidationError(
-          `Gemini returned JSON that failed schema validation`, 
-          text, 
-          error
-        );
+        throw new Error(`Failed to parse or validate AI response: ${error instanceof Error ? error.message : String(error)}`);
       }
       
       // Track performance
@@ -596,11 +536,27 @@ export class GeminiAdapter implements AIAdapter {
         console.log(`[GEMINI] Multimodal response usage metrics ${retryInfo}:`, metrics);
       } else {
         // Fall back to estimation if API doesn't provide token counts
-        // Use actual token count from API if available, or provide a reasonable default
-        // Multimodal content (especially images) is typically more token-intensive
-        tokenCount = result.usageMetadata?.totalTokenCount || 5000;
+        // Calculate estimated token count (simple approximation)
+        // Estimate multimodal tokens - images are more expensive
+        let inputTokens = 0;
+        for (const part of parts) {
+          if (part.type === 'text') {
+            // Text token estimation
+            const content = part.content as string;
+            inputTokens += Math.ceil(content.length / 4);
+          } else if (part.type === 'image') {
+            // Images are much more token-intensive
+            inputTokens += 3000; // Conservative estimate for image tokens
+          } else {
+            // Other file types
+            inputTokens += 1000; // Rough estimate for documents, audio, etc.
+          }
+        }
         
-        console.log(`[GEMINI] Multimodal content processed, token count: ${tokenCount}`);
+        const outputTokens = Math.ceil(text.length / 4);
+        tokenCount = inputTokens + outputTokens;
+        
+        console.log(`[GEMINI] Estimated multimodal tokens: ${tokenCount} (no official metrics available)`);
       }
       
       // Return the parsed content with the interface-required format

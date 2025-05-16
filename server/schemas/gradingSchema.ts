@@ -3,6 +3,7 @@
  * This schema ensures consistent structure for feedback data
  */
 import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 // Define schema version for tracking/history
 export const SCHEMA_VERSION = "1.0.0";
@@ -28,6 +29,12 @@ export const GradingSchema = z.object({
 // Freeze all schemas to prevent modification
 Object.freeze(CriteriaScoreSchema);
 Object.freeze(GradingSchema);
+
+// Convert Zod schema to JSON Schema for API requests
+export const gradingJSONSchema = zodToJsonSchema(GradingSchema, {
+  $refStrategy: "none",
+  errorMessages: true,
+});
 
 // Export the types
 export type GradingFeedback = z.infer<typeof GradingSchema>;

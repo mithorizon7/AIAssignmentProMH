@@ -1,0 +1,56 @@
+Below is an updated review and change list for gemini-adapter-7.ts, sequenced by the size of the remaining failure-risk or maintenance cost.
+(Anything I don’t mention already looks solid.)
+
+1 — Eliminate the second copy of the schema
+You now have responseSchema hard-coded inside the adapter and a typed schema (imported as GradingFeedback / SCHEMA_VERSION).
+Two sources will drift and invite silent bugs.
+
+Action – Move the single JSON-Schema definition into /src/schemas/gradingSchema.ts (or wherever you keep GradingFeedback).
+Export it twice:
+the Zod object for parseStrict,
+gradingJSONSchema produced with zodToJsonSchema.
+In the constructor:
+import { gradingJSONSchema } from "../schemas/gradingSchema";
+this.responseSchema = Object.freeze(gradingJSONSchema);
+Delete the in-class literal.
+2 — Stop duplicating the schema in prompts (minor but noisy)
+Docs now say “Don’t paste the schema into the text prompt; quality drops.” 
+ai.google.dev
+
+Verify your systemPrompt no longer contains a “The JSON schema will be provided…” section.
+If it does, strip it.
+
+3 — Use the SDK’s usageMetadata instead of 4-char math
+You already log result.usageMetadata.*TokenCount; the extra approximation lines are dead code and sometimes mis-count UTF-8.
+Remove:
+
+const inputTokens = …;
+const outputTokens = …;
+const tokenCount  = …;
+and any log lines that rely on them.
+
+4 — Surface validation errors to callers, not just logs
+grade() now throws a generic Error('Failed to parse…').
+Return a typed failure object (or re-throw a custom SchemaValidationError) so the service layer can decide whether to show the raw AI text, retry, or let the instructor know.
+
+5 — Shrink the streaming gate
+Today you switch to generateContentStream() only when maxOutputTokens > 1000.
+Empirically Gemini starts truncating around 700–800 tokens of JSON.
+Drop the threshold to 750.
+
+6 — Remove the last console dumps of learner text
+console.log(prompt) (around line ~5600) still prints the full student submission.
+Mask or truncate to 250 chars for GDPR/FERPA safety.
+
+7 — Type the retry helper
+shouldRetry(e) returns boolean but the compiler can’t infer the subtype of e.
+Add a narrow type guard:
+
+function isSchemaError(err: unknown): err is { code: string } {
+  return typeof err === "object" && err !== null && "code" in err;
+}
+Then:
+
+if (isSchemaError(e) && shouldRetry(e)) …
+This prevents swallowing network/permission errors.
+

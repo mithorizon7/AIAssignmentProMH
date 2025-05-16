@@ -3,6 +3,7 @@
  */
 import { z } from "zod";
 import { GradingSchema } from "../schemas/gradingSchema";
+import { SchemaValidationError } from "./schema-errors";
 
 /**
  * Parse and validate JSON text against the GradingSchema
@@ -26,7 +27,11 @@ export function parseStrict(raw: string) {
     console.error("JSON parse or validation error:", error);
     console.error("Raw text (first 200 chars):", raw.substring(0, 200));
     
-    throw new Error(`Failed to parse or validate JSON response: ${error instanceof Error ? error.message : String(error)}`);
+    // Throw custom error with original response for possible retry or fallback
+    throw new SchemaValidationError(
+      `Failed to parse or validate JSON response: ${error instanceof Error ? error.message : String(error)}`,
+      raw
+    );
   }
 }
 
