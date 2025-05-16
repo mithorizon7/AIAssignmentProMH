@@ -5,3 +5,7 @@ server/public
 vite.config.ts.*
 axial-chemist-459819-h4-5c8a24efbaed.json
 *.tar.gz
+# Ignore large binaries we do not need in Git
+attached_assets/*.pdf
+attached_assets/*.png
+*.mov
