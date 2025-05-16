@@ -6,9 +6,9 @@
  * 3. The temporary file approach is working for reliable uploads
  */
 
-const fs = require('fs').promises;
-const path = require('path');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+import { promises as fs } from 'fs';
+import path from 'path';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Ensure you have your API key set
 if (!process.env.GOOGLE_API_KEY) {
@@ -137,4 +137,7 @@ async function testDocxHandling() {
 }
 
 // Run the test
-testDocxHandling();
+testDocxHandling().catch(error => {
+  console.error('Test failed:', error);
+  process.exit(1);
+});
