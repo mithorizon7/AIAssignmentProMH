@@ -597,12 +597,11 @@ export class GeminiAdapter implements AIAdapter {
         
         console.log(`[GEMINI] Multimodal response usage metrics ${retryInfo}:`, metrics);
       } else {
-        // Fall back to estimation if API doesn't provide token counts
-        // Use actual token count from API if available, or provide a reasonable default
-        // Multimodal content (especially images) is typically more token-intensive
-        tokenCount = result.usageMetadata?.totalTokenCount || 5000;
+        // Only use the actual token count from API, no fallbacks to avoid bogus cost data
+        // as per recommendation #4
+        tokenCount = result.usageMetadata?.totalTokenCount;
         
-        console.log(`[GEMINI] Multimodal content processed, token count: ${tokenCount}`);
+        console.log(`[GEMINI] Multimodal content processed, token count: ${tokenCount ?? 'not available'}`);
       }
       
       // Return the parsed content with the interface-required format
