@@ -319,7 +319,7 @@ export class GeminiAdapter implements AIAdapter {
             throw new Error(`Failed to process ${part.type} file: ${error instanceof Error ? error.message : String(error)}`);
           }
         } else {
-          // Handle image data
+          // Handle image and other media data
           if (part.content instanceof Buffer) {
             try {
               // For images under 4MB, we can use fileData API or inlineData depending on size
@@ -341,6 +341,27 @@ export class GeminiAdapter implements AIAdapter {
             } catch (error) {
               console.error(`[GEMINI] Error processing image: ${error instanceof Error ? error.message : String(error)}`);
               throw new Error(`Failed to process image: ${error instanceof Error ? error.message : String(error)}`);
+            }
+          } else if (typeof part.content === 'string') {
+            try {
+              // Handle string content that might be base64 data or data URI
+              let base64Data = part.content;
+              // Check if it's a data URI and extract the base64 part if so
+              if (part.content.startsWith('data:')) {
+                const parts = part.content.split(',');
+                base64Data = parts.length > 1 ? parts[1] : part.content;
+              }
+              
+              // Add as inline data
+              parts.push({
+                inlineData: {
+                  data: base64Data,
+                  mimeType: mimeType
+                }
+              });
+            } catch (error) {
+              console.error(`[GEMINI] Error processing string content: ${error instanceof Error ? error.message : String(error)}`);
+              throw new Error(`Failed to process string content: ${error instanceof Error ? error.message : String(error)}`);
             }
           }
         }
