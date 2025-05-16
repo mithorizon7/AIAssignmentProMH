@@ -10,12 +10,16 @@ import {
   FileData
 } from '@google/genai';
 
-// Custom type for file_data in the format expected by the Gemini API
-// This matches the snake_case format required by the API
+// Custom types for file data in the format expected by the Gemini API
+// Updated to match the latest SDK format requirements
 interface GeminiFilePart {
-  file_data: {
-    file_uri: string;
-    mime_type: string;
+  fileData?: {
+    fileUri: string;
+    mimeType: string;
+  };
+  inlineData?: {
+    data: string;
+    mimeType: string;
   }
 }
 
@@ -432,15 +436,15 @@ export class GeminiAdapter implements AIAdapter {
               const fileData = await createFileData(this.genAI, part.content, mimeType);
               fileDataList.push(fileData);
               
-              // Create properly typed file_data structure with correct snake_case format
-              // Since we're on SDK v0.14.0 which doesn't have Part.fromFile helper
-              const filePart: GeminiFilePart = {
-                file_data: {
-                  file_uri: fileData.file_uri,
-                  mime_type: fileData.mime_type
+              // Create properly typed file_data structure with correct format for Gemini API
+              // Updated to match the required data field format in newer SDK versions
+              const filePart = {
+                inlineData: {
+                  data: fileData.file_uri,
+                  mimeType: fileData.mime_type
                 }
               };
-              apiParts.push(filePart as unknown as Part);
+              apiParts.push(filePart);
             } else {
               // Use inline data for smaller images
               console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB, MIME: ${part.mimeType})`);

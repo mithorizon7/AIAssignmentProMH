@@ -12,9 +12,10 @@ import { promises as fsp } from 'fs';
 import { GoogleGenAI } from '@google/genai';
 import { Redis } from 'ioredis';
 // Define the file data interface locally to avoid circular dependencies
+// Updated to match the format expected by the current SDK version
 export interface GeminiFileData {
-  file_uri: string;
-  mime_type: string;
+  fileUri: string;  // camelCase format for SDK
+  mimeType: string; // camelCase format for SDK
 }
 
 // Initialize Redis client for caching file URIs (with fallback if unavailable)
