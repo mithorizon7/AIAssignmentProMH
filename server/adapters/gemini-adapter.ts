@@ -391,17 +391,23 @@ export class GeminiAdapter implements AIAdapter {
               console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB)`);
               
               // For inline files, use a data URI
-              const inlineData = part.content.startsWith('data:') 
+              // Ensure part.content is a string before using string methods
+              const contentIsString = typeof part.content === 'string';
+              const inlineData = contentIsString && part.content.startsWith('data:') 
                 ? part.content
                 : `data:${part.mimeType};base64,${Buffer.from(part.content).toString('base64')}`;
               
               // Using the appropriate part structure
               // For images, use the inlineData property
               if (contentType === 'image' && !isSVG) {
+                // Safely split the data URI
+                const dataParts = inlineData.split(',');
+                const base64Data = dataParts.length > 1 ? dataParts[1] : inlineData;
+                
                 apiParts.push({
                   inlineData: {
                     mimeType: part.mimeType,
-                    data: inlineData.split(',')[1] // Remove the data:mime/type;base64, prefix
+                    data: base64Data // Remove the data:mime/type;base64, prefix if present
                   }
                 });
               } else {
