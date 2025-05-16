@@ -268,7 +268,7 @@ export class GeminiAdapter implements AIAdapter {
   /**
    * Standard text completion
    */
-  async generateCompletion(prompt: string, systemPrompt?: string) {
+  async generateCompletion(prompt: string, systemPrompt?: string): Promise<AIAdapterResponse> {
     try {
       console.log(`[GEMINI] Generating completion with prompt length: ${prompt.length} chars`);
       // Log preview of the prompt, truncated for privacy/security
@@ -302,12 +302,18 @@ export class GeminiAdapter implements AIAdapter {
       try {
         parsedContent = await parseStrict(raw);
         
-        // Add prompt token count to the response for billing/stats
-        parsedContent._promptTokens = result.usageMetadata?.promptTokenCount;
-        parsedContent._totalTokens = tokenCount;
+        // Create a properly formatted AIAdapterResponse
+        const response: AIAdapterResponse = {
+          ...parsedContent,
+          modelName: this.modelName,
+          rawResponse: JSON.parse(raw),
+          tokenCount: tokenCount,
+          _promptTokens: result.usageMetadata?.promptTokenCount,
+          _totalTokens: tokenCount
+        };
         
         console.log(`[GEMINI] Successfully parsed response JSON (${raw.length} chars)`);
-        return parsedContent;
+        return response;
       } catch (error) {
         console.error(`[GEMINI] Failed to parse response JSON: ${error instanceof Error ? error.message : String(error)}`);
         
