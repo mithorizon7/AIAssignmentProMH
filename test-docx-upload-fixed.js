@@ -37,16 +37,23 @@ async function uploadFileToGemini(filePath) {
     // Create a model instance
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     
-    // Create file content for direct upload using fileData format
-    const content = [
-      { text: "This is a DOCX file test" },
-      { 
-        inlineData: {
-          data: Buffer.from(fileContent).toString('base64'),
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    // Create file content for direct upload using the correct format for Gemini API
+    const content = {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: "This is a DOCX file test" },
+            { 
+              inlineData: {
+                data: Buffer.from(fileContent).toString('base64'),
+                mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+              }
+            }
+          ]
         }
-      }
-    ];
+      ]
+    };
     
     console.log(`File read successfully, size: ${fileContent.length} bytes`);
     
@@ -72,22 +79,27 @@ async function testDocxUploadAndUse() {
     // Now use the file with the model
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     
-    // Create a prompt that uses the uploaded file
-    const prompt = [
-      { text: "Summarize the content of this document:" },
-      // Use the correct fileData format with camelCase properties
-      { 
-        fileData: {
-          fileUri: uploadedFile.uri,
-          mimeType: uploadedFile.mimeType
+    // Create content that uses the uploaded file with the correct format for Gemini API
+    const content = {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: "Summarize the content of this document:" },
+            // Use the correct fileData format with camelCase properties
+            { 
+              inlineData: {
+                data: Buffer.from(fileContent).toString('base64'),
+                mimeType: uploadedFile.mimeType
+              }
+            }
+          ]
         }
-      }
-    ];
+      ]
+    };
     
     console.log('Sending prompt to Gemini model...');
-    const result = await model.generateContent({
-      contents: prompt
-    });
+    const result = await model.generateContent(content);
     
     console.log('Got response from model:');
     console.log(result.response.text());

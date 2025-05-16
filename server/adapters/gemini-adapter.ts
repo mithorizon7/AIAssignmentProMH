@@ -438,13 +438,13 @@ export class GeminiAdapter implements AIAdapter {
               
               // Create properly typed fileData structure with correct format for Gemini API
               // Updated to match the required data field format in newer SDK versions
-              const filePart = {
+              const filePart: GeminiFilePart = {
                 fileData: {
                   fileUri: fileData.fileUri,
                   mimeType: fileData.mimeType
                 }
               };
-              apiParts.push(filePart);
+              apiParts.push(filePart as unknown as Part);
             } else {
               // Use inline data for smaller images
               console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB, MIME: ${part.mimeType})`);
