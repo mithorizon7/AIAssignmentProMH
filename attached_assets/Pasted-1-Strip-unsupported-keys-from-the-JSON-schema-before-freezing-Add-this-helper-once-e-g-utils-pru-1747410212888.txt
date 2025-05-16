@@ -1,0 +1,106 @@
+1 — Strip unsupported keys from the JSON schema before freezing
+Add this helper once (e.g. utils/prune-for-gemini.ts):
+
+const BLOCK = new Set([
+  '$schema', 'title', 'description', 'examples', 'default', 'additionalProperties'
+]);
+
+export function pruneForGemini(schema: any): any {
+  if (Array.isArray(schema)) return schema.map(pruneForGemini);
+  if (schema && typeof schema === 'object') {
+    return Object.fromEntries(
+      Object.entries(schema)
+        .filter(([k]) => !BLOCK.has(k))
+        .map(([k, v]) => [k, pruneForGemini(v)])
+    );
+  }
+  return schema;
+}
+In the adapter constructor replace
+
+this.responseSchema = gradingJSONSchema;
+with
+
+this.responseSchema = Object.freeze(pruneForGemini(gradingJSONSchema));
+2 — Upload every big file to the Gemini Files API
+Create createFileData() inside the adapter (or a shared uploader service):
+
+import crypto from 'crypto';
+import { promises as fsp } from 'fs';
+
+async function fetchToBuffer(src: string): Promise<Buffer> {
+  if (src.startsWith('gs://') || src.startsWith('http')) {
+    const res = await fetch(src);
+    if (!res.ok) throw new Error(`fetch ${src} → ${res.status}`);
+    return Buffer.from(await res.arrayBuffer());
+  }
+  return fsp.readFile(src);              // local path
+}
+
+async function createFileData(
+  source: Buffer | string,
+  mimeType: string
+): Promise<{ file_uri: string; mime_type: string }> {
+
+  const buf = Buffer.isBuffer(source) ? source : await fetchToBuffer(source);
+  const hash = crypto.createHash('sha256').update(buf).digest('hex');
+  const cached = await redis.get(`gemini:file:${hash}`);
+  if (cached) return { file_uri: cached, mime_type: mimeType };
+
+  const file = await this.genAI.files.upload({ buffer: buf, mimeType });
+  await redis.setex(`gemini:file:${hash}`, 47 * 60 * 60, file.uri); // 47-hour TTL
+  return { file_uri: file.uri, mime_type: mimeType };
+}
+When building apiParts:
+
+If the content is an image ≤ 5 MB, continue to use inlineData.
+Otherwise call createFileData() and push:
+apiParts.push({ file_data: await createFileData(part.content, part.mimeType) });
+Remember: snake_case keys (file_data, file_uri, mime_type).
+
+3 — Adopt a single “image-rubric” generation path
+Delete the STREAMING_CUTOFF branch.
+Always stream (generateContentStream) for multimodal submissions.
+Replace maxOutputTokens logic:
+const BASE_MAX = 1200;   // covers 99 % of image feedback
+const RETRY_MAX = 1600;  // bump once on early stop
+let maxOutputTokens = BASE_MAX;
+Wrap the call:
+const run = async (cap: number) => collectStream(buildReq(cap));
+
+let { raw, finishReason } = await run(maxOutputTokens);
+if (finishReason !== 'STOP') {
+  console.warn(`[GEMINI] early stop ${finishReason} – retry ↑ tokens`);
+  ({ raw, finishReason } = await run(RETRY_MAX));
+}
+if (finishReason !== 'STOP') {
+  throw new Error(`Gemini failed twice (reason: ${finishReason})`);
+}
+collectStream concatenates chunk.candidates[0].content.parts[0].text and returns { raw, finishReason }.
+
+4 — Remove token-count fall-backs
+Delete || 1000 and || 5000 defaults. If result.usageMetadata?.totalTokenCount is missing, set tokenCount to undefined. That prevents bogus cost data.
+
+5 — Mask learner text in any remaining logs
+Where you still dump originalText, change to:
+
+console.warn(`[GEMINI] possible injection: ${originalText.slice(0,120)}…`);
+No full text should reach stdout or log aggregators.
+
+6 — Pin the SDK version
+In package.json add:
+
+"overrides": {
+  "@google/genai": "0.14.2"
+}
+npm i will now always install the tested build.
+
+7 — Unit tests to add
+Schema pruning: object sent to the API no longer contains $schema or additionalProperties.
+Large PDF (10 MB) → file uploaded once, file_uri reused on second submission.
+Response truncated on first 1 200-token run returns full JSON after retry at 1 600.
+Unsupported MIME triggers 400 before upload.
+8 — Remove dead code and constants
+Delete STREAMING_CUTOFF.
+Delete any leftover manual token-estimate math.
+Collapse the duplicate retry helpers into one shared callGemini().
