@@ -407,16 +407,16 @@ export class GeminiAdapter implements AIAdapter {
           }
           
           // Handle the special case of SVG, which needs to be treated differently
-          const isSVG = part.mimeType === 'image/svg+xml';
+          const isSVG = promptPart.mimeType === 'image/svg+xml';
           
           // Determine if we should use the Files API for this content
           // Ensure mimeType is a string before passing it to shouldUseFilesAPI
-          const mimeType = typeof part.mimeType === 'string' ? part.mimeType : 'application/octet-stream';
+          const mimeType = typeof promptPart.mimeType === 'string' ? promptPart.mimeType : 'application/octet-stream';
           
           // Get content length safely from either string or Buffer
-          const contentLength = Buffer.isBuffer(part.content) 
-            ? part.content.length 
-            : (typeof part.content === 'string' ? Buffer.from(part.content).length : 0);
+          const contentLength = Buffer.isBuffer(promptPart.content) 
+            ? promptPart.content.length 
+            : (typeof promptPart.content === 'string' ? Buffer.from(promptPart.content).length : 0);
             
           // Add safety check to ensure we have valid content
           if (contentLength <= 0) {
@@ -433,7 +433,7 @@ export class GeminiAdapter implements AIAdapter {
               console.log(`[GEMINI] Using Files API for ${contentType} content (${(contentLength / 1024).toFixed(1)}KB, MIME: ${mimeType})`);
               
               // Pass content as-is to createFileData
-              const fileData = await createFileData(this.genAI, part.content, mimeType);
+              const fileData = await createFileData(this.genAI, promptPart.content, mimeType);
               fileDataList.push(fileData);
               
               // Create properly typed fileData structure with correct format for Gemini API
@@ -448,26 +448,26 @@ export class GeminiAdapter implements AIAdapter {
               apiParts.push(filePart);
             } else {
               // Use inline data for smaller images
-              console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB, MIME: ${part.mimeType})`);
+              console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(promptPart.content.length / 1024).toFixed(1)}KB, MIME: ${promptPart.mimeType})`);
               
               // For inline files, use a data URI
               // Handle both string and Buffer content types safely
               let inlineData = '';
               
-              if (typeof part.content === 'string') {
+              if (typeof promptPart.content === 'string') {
                 // If it's already a data URI, use it as is
-                if (part.content.startsWith('data:')) {
-                  inlineData = part.content;
+                if (promptPart.content.startsWith('data:')) {
+                  inlineData = promptPart.content;
                 } else {
                   // Convert string to base64 data URI
-                  inlineData = `data:${mimeType};base64,${Buffer.from(part.content).toString('base64')}`;
+                  inlineData = `data:${mimeType};base64,${Buffer.from(promptPart.content).toString('base64')}`;
                 }
-              } else if (Buffer.isBuffer(part.content)) {
+              } else if (Buffer.isBuffer(promptPart.content)) {
                 // Convert Buffer to base64 data URI
-                inlineData = `data:${mimeType};base64,${part.content.toString('base64')}`;
+                inlineData = `data:${mimeType};base64,${promptPart.content.toString('base64')}`;
               } else {
                 // Fallback for other content types
-                inlineData = `data:${mimeType};base64,${Buffer.from(String(part.content)).toString('base64')}`;
+                inlineData = `data:${mimeType};base64,${Buffer.from(String(promptPart.content)).toString('base64')}`;
               }
               
               // Using the appropriate part structure
