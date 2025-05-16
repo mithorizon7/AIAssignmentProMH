@@ -517,9 +517,56 @@ export class GeminiAdapter implements AIAdapter {
       // Based on recommendation #3 - adopt a single generation path
       const BASE_MAX = 1200;   // covers 99% of image feedback
       const RETRY_MAX = 1600;  // bump once on early stop
-      let result;
+      // Function to run the content generation with specified token limit
+      const run = async (cap: number) => {
+        // Update the request with the specified token limit
+        requestParams.config.maxOutputTokens = cap;
+        console.log(`[GEMINI] Using streaming for multimodal with token limit: ${cap}`);
+        
+        try {
+          const stream = await this.genAI.models.generateContentStream(requestParams);
+          let streamedText = '';
+          let finishReason = 'STOP'; // Default to successful finish
+          
+          // Process the stream chunks
+          for await (const chunk of stream) {
+            if (chunk.candidates && 
+                chunk.candidates.length > 0) {
+              // Get finish reason from the last chunk if available
+              if (chunk.candidates[0].finishReason) {
+                finishReason = chunk.candidates[0].finishReason;
+              }
+              
+              if (chunk.candidates[0]?.content?.parts) {
+                const part = chunk.candidates[0].content.parts[0];
+                if (part.text) {
+                  streamedText += part.text;
+                }
+              }
+            }
+          }
+          
+          // Create a response object similar to non-streaming API
+          const result = {
+            candidates: [{
+              content: {
+                parts: [{ text: streamedText }]
+              },
+              finishReason
+            }],
+            // Include usage metadata with the correct structure
+            usageMetadata: requestParams.usageMetadata
+          };
+          
+          return { result, finishReason, raw: streamedText };
+        } catch (error) {
+          console.error(`[GEMINI] Multimodal streaming error: ${error instanceof Error ? error.message : String(error)}`);
+          throw error;
+        }
+      };
       
-      if (useStreaming) {
+      // First attempt with base token limit
+      let { result, finishReason, raw } = await run(BASE_MAX);
         console.log(`[GEMINI] Using streaming for large multimodal output (maxOutputTokens: ${maxOutputTokens})`);
         // Use streaming API for large outputs to avoid truncation
         try {
