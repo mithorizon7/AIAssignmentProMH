@@ -26,9 +26,8 @@ export const GradingSchema = z.object({
   schemaVersion: z.string().default(SCHEMA_VERSION)
 });
 
-// Freeze all schemas to prevent modification
-Object.freeze(CriteriaScoreSchema);
-Object.freeze(GradingSchema);
+// We don't freeze the schemas to allow Zod to use its internal caching
+// Object.freeze would prevent Zod from writing to its internal _cached property
 
 // Convert Zod schema to JSON Schema for API requests
 export const gradingJSONSchema = zodToJsonSchema(GradingSchema, {

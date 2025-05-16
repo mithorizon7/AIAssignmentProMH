@@ -256,7 +256,7 @@ export class GeminiAdapter implements AIAdapter {
     
     // Prune the schema to remove fields not supported by Gemini API
     // This prevents the "Unknown name" errors for standard JSON Schema fields
-    this.responseSchema = Object.freeze(pruneForGemini(gradingJSONSchema));
+    this.responseSchema = pruneForGemini(gradingJSONSchema);
     
     console.log(`[GEMINI] Schema pruned for Gemini API compatibility`);
     
