@@ -390,14 +390,26 @@ export class GeminiAdapter implements AIAdapter {
           // Determine if we should use the Files API for this content
           // Ensure mimeType is a string before passing it to shouldUseFilesAPI
           const mimeType = typeof part.mimeType === 'string' ? part.mimeType : 'application/octet-stream';
-          const useFilesAPI = shouldUseFilesAPI(mimeType, part.content.length);
+          
+          // Get content length safely from either string or Buffer
+          const contentLength = Buffer.isBuffer(part.content) 
+            ? part.content.length 
+            : (typeof part.content === 'string' ? Buffer.from(part.content).length : 0);
+            
+          const useFilesAPI = shouldUseFilesAPI(mimeType, contentLength);
           
           try {
             // Create the appropriate file data representation
             // Always use Files API for document content types
             if (useFilesAPI || contentType === 'document') {
-              console.log(`[GEMINI] Using Files API for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB, MIME: ${part.mimeType})`);
-              const fileData = await createFileData(this.genAI, part.content, part.mimeType);
+              console.log(`[GEMINI] Using Files API for ${contentType} content (${(contentLength / 1024).toFixed(1)}KB, MIME: ${mimeType})`);
+              
+              // Convert content to Buffer if it's not already
+              const contentBuffer = Buffer.isBuffer(part.content) 
+                ? part.content 
+                : Buffer.from(typeof part.content === 'string' ? part.content : String(part.content));
+              
+              const fileData = await createFileData(this.genAI, contentBuffer, mimeType);
               fileDataList.push(fileData);
               
               // Convert to SDK format and add to parts
@@ -410,16 +422,29 @@ export class GeminiAdapter implements AIAdapter {
               console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB, MIME: ${part.mimeType})`);
               
               // For inline files, use a data URI
-              // Ensure part.content is a string before using string methods
-              const contentIsString = typeof part.content === 'string';
-              const inlineData = contentIsString && part.content.startsWith('data:') 
-                ? part.content
-                : `data:${part.mimeType};base64,${Buffer.from(part.content).toString('base64')}`;
+              // Handle both string and Buffer content types safely
+              let inlineData = '';
+              
+              if (typeof part.content === 'string') {
+                // If it's already a data URI, use it as is
+                if (part.content.startsWith('data:')) {
+                  inlineData = part.content;
+                } else {
+                  // Convert string to base64 data URI
+                  inlineData = `data:${mimeType};base64,${Buffer.from(part.content).toString('base64')}`;
+                }
+              } else if (Buffer.isBuffer(part.content)) {
+                // Convert Buffer to base64 data URI
+                inlineData = `data:${mimeType};base64,${part.content.toString('base64')}`;
+              } else {
+                // Fallback for other content types
+                inlineData = `data:${mimeType};base64,${Buffer.from(String(part.content)).toString('base64')}`;
+              }
               
               // Using the appropriate part structure
               // For images, use the inlineData property
               if (contentType === 'image' && !isSVG) {
-                // Safely split the data URI
+                // We know inlineData is a string at this point
                 const dataParts = inlineData.split(',');
                 const base64Data = dataParts.length > 1 ? dataParts[1] : inlineData;
                 
@@ -483,9 +508,9 @@ export class GeminiAdapter implements AIAdapter {
               ...parsedContent,
               modelName: this.modelName,
               rawResponse: JSON.parse(repairedJson),
-              tokenCount: tokenCount || 0,
+              tokenCount: tokenCount ? tokenCount : 0,
               _promptTokens: result.usageMetadata?.promptTokenCount,
-              _totalTokens: tokenCount || 0
+              _totalTokens: tokenCount ? tokenCount : 0
             };
             
             console.log(`[GEMINI] Successfully repaired and parsed JSON response`);
