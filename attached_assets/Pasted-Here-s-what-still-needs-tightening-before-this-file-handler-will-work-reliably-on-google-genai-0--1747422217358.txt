@@ -1,0 +1,89 @@
+Here’s what still needs tightening before this file-handler will work reliably on **@google/genai 0.14.x**.
+
+---
+
+### 1 Wrong class name
+
+```ts
+import { GoogleGenAI } from '@google/genai';
+```
+
+*In v0.14 the export is `GoogleGenerativeAI`, not `GoogleGenAI`.*
+
+Fix:
+
+```ts
+import { GoogleGenerativeAI } from '@google/genai';
+```
+
+(All callers that pass the client must use the same class.)
+
+---
+
+### 2 Wrong property in the SDK upload call
+
+```ts
+genAI.files.upload({
+  data: buf,          // ← INVALID for 0.14
+  mimeType
+});
+```
+
+The 0.14 method signature is `buffer`, not `data` (the `data` field appears only in the upcoming 0.15 beta).
+
+```ts
+const file = await genAI.files.upload({
+  buffer: buf,
+  mimeType
+});
+```
+
+Remove the `as any` cast—it’s no longer needed when you pass the correct field.
+
+---
+
+### 3 `toSDKFormat` not needed
+
+You now push parts via:
+
+```ts
+apiParts.push({ file_data: fileData });
+```
+
+With that approach `toSDKFormat()` is unused; delete the function and its import in the adapter to keep the codebase clean.
+
+---
+
+### 4 Leave debug logs out of production
+
+The verbose `[FETCHBUFFER]` console lines are great while diagnosing,
+but delete or behind-a-flag them before merging to main.
+
+---
+
+### 5 Confirm helper signature order
+
+Your `shouldUseFilesAPI` is declared `(mimeType, contentSize)`.
+Verify every call site matches that order:
+
+```ts
+const useFiles = shouldUseFilesAPI(mimeType, contentLength);
+```
+
+---
+
+### Mini-smoke test (run after the two fixes)
+
+| File        | Source kind | Expected path |
+| ----------- | ----------- | ------------- |
+| 200 KB png  | Buffer      | inlineData    |
+| 8 MB png    | Buffer      | file\_data    |
+| 120 KB docx | `gs://…`    | file\_data    |
+| 500 KB pdf  | http URL    | file\_data    |
+
+If all four grade without the “size” crash, you’re done.
+
+---
+
+**Bottom line:**
+Rename the class to `GoogleGenerativeAI`, switch `data:` → `buffer:` in the upload call, remove unused helper, and you’ll have a rock-solid file handler on SDK 0.14.x.
