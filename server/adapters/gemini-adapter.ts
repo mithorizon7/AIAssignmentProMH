@@ -376,8 +376,9 @@ export class GeminiAdapter implements AIAdapter {
           
           try {
             // Create the appropriate file data representation
-            if (useFilesAPI) {
-              console.log(`[GEMINI] Using Files API for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB)`);
+            // Always use Files API for document content types
+            if (useFilesAPI || contentType === 'document') {
+              console.log(`[GEMINI] Using Files API for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB, MIME: ${part.mimeType})`);
               const fileData = await createFileData(this.genAI, part.content, part.mimeType);
               fileDataList.push(fileData);
               
@@ -388,7 +389,7 @@ export class GeminiAdapter implements AIAdapter {
               });
             } else {
               // Use inline data for smaller images
-              console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB)`);
+              console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB, MIME: ${part.mimeType})`);
               
               // For inline files, use a data URI
               // Ensure part.content is a string before using string methods
