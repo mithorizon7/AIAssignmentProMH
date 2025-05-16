@@ -133,7 +133,14 @@ export async function createFileData(
   // Upload file to Gemini Files API
   console.log(`[GEMINI] Uploading ${buf.length} bytes (${mimeType}) to Files API`);
   try {
-    const file = await genAI.files.upload({ buffer: buf, mimeType: mimeType });
+    // Add more detailed logging to help debug the issue
+    console.log(`[GEMINI] Buffer type: ${typeof buf}, isBuffer: ${Buffer.isBuffer(buf)}, length: ${buf.length}`);
+    
+    // Based on SDK v0.14.0, try a different approach with a plain object
+    const file = await genAI.files.upload({
+      data: buf.toString('base64'),
+      mimeType: mimeType
+    });
     console.log(`[GEMINI] File uploaded successfully, URI: ${file.uri}`);
     
     // Cache the file URI for future use (if Redis is available)
