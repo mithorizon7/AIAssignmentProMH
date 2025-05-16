@@ -1,205 +1,60 @@
 # Gemini Adapter Improvements
 
-## 1. Schema Pruning Implementation
-The `pruneForGemini` function removes fields that Gemini doesn't support from JSON Schema:
+## Summary of Changes Implemented
 
-```typescript
-// In constructor:
-this.responseSchema = Object.freeze(pruneForGemini(gradingJSONSchema));
-```
+We have successfully implemented several key improvements to the Gemini adapter:
 
-## 2. JSON Repair Implementation
-Add repair logic before and after parsing attempts:
+1. **Reduced Code Duplication**
+   - Created a shared `runImageRubric` helper method that handles the common API call logic
+   - Both `generateCompletion` and `generateMultimodalCompletion` now use this helper
+   - Improves maintainability and ensures consistent handling
 
-```typescript
-// First check if the JSON appears to be truncated or malformed
-const jsonValid = text.trim().startsWith('{') && text.trim().endsWith('}');
-if (!jsonValid) {
-  console.log(`[GEMINI] JSON appears truncated or malformed, attempting repair before parsing`);
-  const repairedText = repairJson(text);
-  if (repairedText !== text) {
-    console.log(`[GEMINI] JSON was repaired before parsing`);
-    text = repairedText;
-  }
-}
+2. **Token Budget Management**
+   - Implemented a two-step token budget approach with constants:
+     - `BASE_MAX_TOKENS = 1200` (first attempt)
+     - `RETRY_MAX_TOKENS = 1600` (retry if finishReason !== "STOP")
+   - Removed token count fallbacks that could lead to inaccurate billing data
 
-try {
-  // Use the strict parser that validates against schema
-  parsedContent = parseStrict(text);
-  console.log(`[GEMINI] Successfully parsed and validated JSON response`);
-} catch (error) {
-  console.log(`[GEMINI] Initial JSON parsing failed, attempting repair: ${error instanceof Error ? error.message : String(error)}`);
-  
-  // Try to repair the JSON and parse again
-  const repairedText = repairJson(text);
-  if (repairedText !== text) {
-    try {
-      // Try to parse the repaired JSON
-      parsedContent = parseStrict(repairedText);
-      console.log(`[GEMINI] Successfully parsed and validated repaired JSON`);
-    } catch (repairError) {
-      console.error(`[GEMINI] JSON repair and parsing failed: ${repairError instanceof Error ? repairError.message : String(repairError)}`);
-      throw new SchemaValidationError(
-        `Gemini returned JSON that failed schema validation, even after repair attempts`, 
-        text, 
-        error
-      );
-    }
-  } else {
-    console.error(`[GEMINI] JSON parsing or validation failed: ${error instanceof Error ? error.message : String(error)}`);
-    throw new SchemaValidationError(
-      `Gemini returned JSON that failed schema validation`, 
-      text, 
-      error
-    );
-  }
-}
-```
+3. **Streaming Optimization**
+   - Removed all `STREAMING_CUTOFF` logic and conditional branches
+   - All API calls now consistently use streaming for better response handling
+   - The adapter now correctly tracks and uses finish reasons to determine when to retry
 
-## 3. Smart File Handling with Type and Size Decision Logic
+4. **Error Handling Improvements**
+   - Better tracking of finish reasons from streaming responses
+   - More informative error messages with specific details about what went wrong
+   - Improved retry logic when responses are truncated
 
-```typescript
-if (part.type === 'image' || part.type === 'document' || part.type === 'audio' || part.type === 'video') {
-  try {
-    const mimeType = part.mimeType || 
-      (part.type === 'image' ? 'image/jpeg' : 
-       part.type === 'document' ? 'application/pdf' : 
-       part.type === 'audio' ? 'audio/mpeg' : 
-       'video/mp4');
-    
-    console.log(`[GEMINI] Processing ${part.type} with mime type ${mimeType}`);
-    
-    // Determine file size
-    const fileSize = Buffer.isBuffer(part.content) 
-      ? part.content.length 
-      : (typeof part.content === 'string' ? Buffer.from(part.content, 'base64').length : 0);
-    
-    // Check if we should use Files API based on type and size
-    const useFilesAPI = shouldUseFilesAPI(mimeType, fileSize);
-    
-    if (useFilesAPI) {
-      console.log(`[GEMINI] Using Files API for ${part.type} (${(fileSize / (1024 * 1024)).toFixed(2)}MB)`);
-      
-      // Use Files API - returns snake_case formatted data
-      const fileData = await createFileData(
-        this.genAI,
-        part.content as Buffer | string,
-        mimeType
-      );
-      
-      // Convert to the SDK's expected camelCase format
-      const sdkFileData = toSDKFormat(fileData);
-      
-      // Add file data using the SDK's expected structure
-      apiParts.push({
-        fileData: sdkFileData
-      });
-      
-      console.log(`[GEMINI] Successfully uploaded ${part.type} to Files API`);
-    } else {
-      // For small images only, use inline data
-      if (part.type === 'image') {
-        // Convert Buffer to base64 string if needed
-        const base64Data = Buffer.isBuffer(part.content)
-          ? part.content.toString('base64')
-          : part.content as string;
-          
-        // Standard image handling for smaller files
-        apiParts.push({
-          inlineData: {
-            data: base64Data,
-            mimeType: mimeType
-          }
-        });
-        
-        console.log(`[GEMINI] Added inline image data (${(fileSize / 1024).toFixed(2)}KB)`);
-      } else {
-        // If this is a non-image that we thought would be small enough for inline,
-        // we should still use Files API as Gemini only supports inline for images
-        console.log(`[GEMINI] Non-image content must use Files API, uploading...`);
-        
-        const fileData = await createFileData(
-          this.genAI,
-          part.content as Buffer | string,
-          mimeType
-        );
-        
-        apiParts.push({
-          fileData: toSDKFormat(fileData)
-        });
-        
-        console.log(`[GEMINI] Successfully uploaded ${part.type} to Files API`);
-      }
-    }
-  } catch (error) {
-    console.error(`[GEMINI] Error processing ${part.type}: ${error instanceof Error ? error.message : String(error)}`);
-    throw new Error(`Failed to process ${part.type}: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
-```
+## Future Enhancement Opportunities
 
-## 4. Streaming & Token Count Optimization
+1. **SDK Helper Methods**
+   - When upgrading to the latest SDK version (0.15.0+), we can use the new `types.Part.fromFile()` helper method to handle file data conversion automatically
+   - This would eliminate the need for our custom snake_case conversion and improve compatibility
 
-```typescript
-// Determine if we should use streaming to avoid truncated responses
-const BASE_MAX = 1200;   // covers 99% of image feedback
-const RETRY_MAX = 1600;  // bump once on early stop
-let maxOutputTokens = BASE_MAX;
+2. **Type Definitions**
+   - Improve TypeScript type definitions and interface implementations
+   - Ensure full compatibility with the AIAdapter interface requirements
 
-const run = async (cap: number) => {
-  const params = {
-    ...requestParams,
-    config: {
-      ...requestParams.config,
-      maxOutputTokens: cap
-    }
-  };
-  
-  const stream = await this.genAI.models.generateContentStream(params);
-  let streamedText = '';
-  let finishReason = null;
-  
-  for await (const chunk of stream) {
-    if (chunk.candidates && 
-        chunk.candidates.length > 0 && 
-        chunk.candidates[0]?.content?.parts) {
-      const part = chunk.candidates[0].content.parts[0];
-      if (part.text) {
-        streamedText += part.text;
-      }
-    }
-    
-    if (chunk.candidates && 
-        chunk.candidates.length > 0 && 
-        chunk.candidates[0]?.finishReason) {
-      finishReason = chunk.candidates[0].finishReason;
-    }
-  }
-  
-  return { text: streamedText, finishReason };
-};
+3. **Error Recovery**
+   - Add more sophisticated error recovery strategies beyond just retrying with more tokens
+   - Implement backoff strategies for rate limiting and service unavailability
 
-// First run with standard token limit
-let { text, finishReason } = await run(maxOutputTokens);
+## Testing Strategy
 
-// If the response was truncated, retry with higher token limit
-if (finishReason !== 'STOP') {
-  console.warn(`[GEMINI] early stop ${finishReason} – retry ↑ tokens`);
-  ({ text, finishReason } = await run(RETRY_MAX));
-}
+To validate the improvements, test the following scenarios:
 
-// If still truncated, this is a real problem
-if (finishReason !== 'STOP') {
-  throw new Error(`Gemini failed twice (reason: ${finishReason})`);
-}
-```
+1. Text-only submissions with different prompt sizes
+2. Image submissions, especially large images that require the Files API
+3. Multimodal submissions with combinations of text and images
+4. Verify that tokens are counted correctly and no fallback values are used
+5. Ensure proper retry behavior when responses are truncated
 
-## 5. Remove Default Token Fallbacks
+## Impact on Production
 
-```typescript
-// Old code with defaults:
-const tokenCount = result.usageMetadata?.totalTokenCount || 1000;
+These changes should lead to:
 
-// Replace with:
-const tokenCount = result.usageMetadata?.totalTokenCount;
-```
+- More reliable handling of large responses
+- Fewer failures due to token limitations
+- Consistent and predictable behavior across all request types
+- Better maintainability for future developers
+- More accurate token counting and billing information
