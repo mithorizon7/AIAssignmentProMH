@@ -222,7 +222,15 @@ export class GeminiAdapter implements AIAdapter {
       console.log(`[GEMINI] No usage metrics available from API, raw length: ${raw.length} chars`);
     }
     
-    return { raw, finishReason, result, tokenCount };
+    // Ensure tokenCount is always a number (even if it's 0)
+    const finalTokenCount = tokenCount !== undefined ? tokenCount : 0;
+    
+    return { 
+      raw, 
+      finishReason, 
+      result, 
+      tokenCount: finalTokenCount 
+    };
   };
   
   /**
@@ -307,9 +315,9 @@ export class GeminiAdapter implements AIAdapter {
           ...parsedContent,
           modelName: this.modelName,
           rawResponse: JSON.parse(raw),
-          tokenCount: tokenCount,
+          tokenCount: tokenCount !== undefined ? tokenCount : 0,
           _promptTokens: result.usageMetadata?.promptTokenCount,
-          _totalTokens: tokenCount
+          _totalTokens: tokenCount !== undefined ? tokenCount : 0
         };
         
         console.log(`[GEMINI] Successfully parsed response JSON (${raw.length} chars)`);
