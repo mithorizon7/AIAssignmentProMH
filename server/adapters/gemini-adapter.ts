@@ -85,6 +85,134 @@ export class GeminiAdapter implements AIAdapter {
   // File cache cleanup interval
   private fileCacheCleanupInterval: NodeJS.Timeout | null = null;
   
+  // Common configuration for all Gemini requests
+  private readonly defaultConfig = {
+    temperature: 0.2,
+    topP: 0.8,
+    topK: 40
+  };
+  
+  /**
+   * Core shared method for running image-rubric evaluations
+   * This reduces duplication between text and multimodal completion methods
+   */
+  private async runImageRubric(apiParts: Part[], systemPrompt?: string): Promise<{
+    raw: string;
+    finishReason: string;
+    result: any;
+    tokenCount?: number;
+  }> {
+    // Reset processing timer for accurate metrics
+    this.processingStart = Date.now();
+    
+    // Prepare the base request with common parameters
+    const requestParams: any = {
+      model: this.modelName,
+      contents: [{ role: 'user', parts: apiParts }],
+      systemInstruction: systemPrompt,
+      config: {
+        ...this.defaultConfig,
+        maxOutputTokens: BASE_MAX_TOKENS,
+        responseMimeType: "application/json",
+        responseSchema: this.responseSchema
+      }
+    };
+    
+    // Log if system prompt was added
+    if (systemPrompt) {
+      console.log(`[GEMINI] Added system prompt as top-level systemInstruction (${systemPrompt.length} chars)`);
+    }
+    
+    console.log(`[GEMINI] Sending request to Gemini API with responseMimeType: application/json`);
+    
+    // Helper to build request with the specified token cap
+    const buildRequest = (cap: number) => {
+      const req = { ...requestParams };
+      req.config.maxOutputTokens = cap;
+      return req;
+    };
+    
+    // Helper to run streaming request and collect all chunks
+    const collectStream = async (req: any): Promise<{raw: string, finishReason: string}> => {
+      console.log(`[GEMINI] Using streaming with token limit: ${req.config.maxOutputTokens}`);
+      
+      const stream = await this.genAI.models.generateContentStream(req);
+      let streamedText = '';
+      let finishReason = 'STOP'; // Default to successful finish
+      
+      // Process the stream chunks
+      for await (const chunk of stream) {
+        if (chunk.candidates && chunk.candidates.length > 0) {
+          // Get finish reason from the last chunk if available
+          if (chunk.candidates[0].finishReason) {
+            finishReason = chunk.candidates[0].finishReason;
+          }
+          
+          if (chunk.candidates[0]?.content?.parts) {
+            const part = chunk.candidates[0].content.parts[0];
+            if (part.text) {
+              streamedText += part.text;
+            }
+          }
+        }
+      }
+      
+      console.log(`[GEMINI] Stream received ${streamedText.length} characters, finish reason: ${finishReason}`);
+      return { raw: streamedText, finishReason };
+    };
+    
+    // Run the request once with a specific token limit
+    const runOnce = async (cap: number) => collectStream(buildRequest(cap));
+    
+    // First try with base token limit
+    let { raw, finishReason } = await runOnce(BASE_MAX_TOKENS);
+    
+    // If the model stopped early, retry with a higher token limit
+    if (finishReason !== 'STOP') {
+      console.warn(`[GEMINI] early stop ${finishReason} – retry ↑ tokens`);
+      ({ raw, finishReason } = await runOnce(RETRY_MAX_TOKENS));
+    }
+    
+    // If still having issues, throw an error
+    if (finishReason !== 'STOP') {
+      throw new Error(`Gemini failed twice (reason: ${finishReason})`);
+    }
+    
+    // Create a response object similar to the API structure
+    const result = {
+      candidates: [{
+        content: {
+          parts: [{ text: raw }]
+        },
+        finishReason
+      }],
+      usageMetadata: requestParams.usageMetadata
+    };
+    
+    // Get token count from API if available (no fallbacks)
+    const tokenCount = result.usageMetadata?.totalTokenCount;
+    
+    // Log comprehensive usage information
+    if (result.usageMetadata) {
+      const retryInfo = finishReason !== 'STOP' ? '(retry required)' : '';
+      const metrics = {
+        modelName: this.modelName,
+        promptTokens: result.usageMetadata.promptTokenCount || 0,
+        candidatesTokens: result.usageMetadata.candidatesTokenCount || 0,
+        totalTokens: result.usageMetadata.totalTokenCount || 0,
+        streamingUsed: true, // Always using streaming now
+        partsCount: apiParts.length,
+        processingTimeMs: Date.now() - this.processingStart
+      };
+      
+      console.log(`[GEMINI] Response usage metrics ${retryInfo}:`, metrics);
+    } else {
+      console.log(`[GEMINI] No usage metrics available from API, raw length: ${raw.length} chars`);
+    }
+    
+    return { raw, finishReason, result, tokenCount };
+  };
+  
   /**
    * Create a new GeminiAdapter instance
    */
