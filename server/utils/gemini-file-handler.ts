@@ -155,22 +155,26 @@ export function toSDKFormat(fileData: { file_uri: string; mime_type: string }) {
 /**
  * Determine if a file should be sent as inline data or uploaded to Files API
  * 
+ * @param content The file content as a Buffer
  * @param mimeType File MIME type
- * @param size File size in bytes
  * @returns true if file should be uploaded to Files API
  */
-export function shouldUseFilesAPI(mimeType: string, size: number): boolean {
+export function shouldUseFilesAPI(content: Buffer, mimeType: string): boolean {
+  // Safety check to ensure mimeType is a string
+  const mime = typeof mimeType === 'string' ? mimeType : 'application/octet-stream';
+  const size = content.length;
+  
   // Always use Files API for PDF, audio, or video
   if (
-    mimeType.startsWith('application/pdf') ||
-    mimeType.startsWith('audio/') ||
-    mimeType.startsWith('video/')
+    mime.startsWith('application/pdf') ||
+    mime.startsWith('audio/') ||
+    mime.startsWith('video/')
   ) {
     return true;
   }
   
   // Use Files API for large images
-  if (mimeType.startsWith('image/') && size > MAX_INLINE_IMAGE_SIZE) {
+  if (mime.startsWith('image/') && size > MAX_INLINE_IMAGE_SIZE) {
     return true;
   }
   
