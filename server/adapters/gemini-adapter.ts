@@ -405,6 +405,12 @@ export class GeminiAdapter implements AIAdapter {
             ? part.content.length 
             : (typeof part.content === 'string' ? Buffer.from(part.content).length : 0);
             
+          // Add safety check to ensure we have valid content
+          if (contentLength <= 0) {
+            console.error(`[GEMINI] Invalid content length for ${contentType} with MIME type ${mimeType}: ${contentLength}`);
+            throw new Error(`Invalid or empty content for ${contentType} with MIME type ${mimeType}`);
+          }
+            
           const useFilesAPI = shouldUseFilesAPI(mimeType, contentLength);
           
           try {
