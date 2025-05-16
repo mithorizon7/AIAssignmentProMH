@@ -265,13 +265,14 @@ export class GeminiAdapter implements AIAdapter {
       
       // Log comprehensive usage information for monitoring
       if (result.usageMetadata) {
-        const retryInfo = useStreaming ? '(streaming)' : '';
+        const retryInfo = finishReason !== 'STOP' ? '(retry required)' : '';
         const metrics = {
           modelName: this.modelName,
           promptTokens: result.usageMetadata.promptTokenCount || 0,
           candidatesTokens: result.usageMetadata.candidatesTokenCount || 0,
           totalTokens: result.usageMetadata.totalTokenCount || 0,
-          streamingUsed: useStreaming,
+          streamingUsed: true, // Always using streaming now
+          tokenLimit: finishReason !== 'STOP' ? RETRY_MAX : BASE_MAX,
           processingTimeMs: Date.now() - this.processingStart
         };
         
@@ -512,9 +513,10 @@ export class GeminiAdapter implements AIAdapter {
         }
       };
       
-      // Determine if we should use streaming based on expected output size
-      const STREAMING_CUTOFF = 500; // empirically Gemini truncates JSON ~700 tokens
-      const useStreaming = maxOutputTokens > STREAMING_CUTOFF;
+      // Always use streaming for multimodal content to avoid truncation issues
+      // Based on recommendation #3 - adopt a single generation path
+      const BASE_MAX = 1200;   // covers 99% of image feedback
+      const RETRY_MAX = 1600;  // bump once on early stop
       let result;
       
       if (useStreaming) {

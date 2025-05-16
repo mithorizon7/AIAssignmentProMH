@@ -1,0 +1,42 @@
+Remove every reference to STREAMING_CUTOFF
+Delete the constant.
+Delete the useStreaming ternary.
+Call generateContentStream() unconditionally in both generateCompletion and generateMultimodalCompletion.
+2 Replace the token-cap logic with the new two-step budget
+const BASE_MAX_TOKENS  = 1200;   // first attempt
+const RETRY_MAX_TOKENS = 1600;   // only if finishReason !== 'STOP'
+Pass BASE_MAX_TOKENS on the first request.
+If finishReason is not "STOP" (or the JSON fails schema validation), retry once with RETRY_MAX_TOKENS.
+If the second try still stops early, throw new Error("Gemini could not complete JSON feedback") and surface it to the caller.
+3 Delete all manual token-count fallbacks
+const tokenCount = result.usageMetadata?.totalTokenCount;
+Leave it undefined if the API omits the field.
+
+4 Ensure the new return type allows tokenCount: number | undefined
+Update any relevant interface so tokenCount can be undefined or null without a type error.
+
+5 Confirm pruneForGemini() runs exactly once in the constructor
+this.responseSchema = Object.freeze(pruneForGemini(gradingJSONSchema));
+No other copies of the schema should be passed to the API.
+
+6 Change every camel-case fileData object to snake-case file_data
+When you build apiParts, push either
+
+{ inlineData: { … } }
+or
+
+{ file_data: { file_uri, mime_type } }
+Use types.Part.fromFile() if you prefer the SDK helper.
+
+7 Integrate (or verify) the createFileData() uploader
+All PDFs, audio, video, and images > 5 MB must go through the Files API and return files/... URIs before you build the part object.
+
+8 Mask learner text in the last two console logs
+Truncate to 120 chars and add “…”; no full submissions in logs.
+
+9 Delete any residual token-estimate math, the old retry helper, and unused constants
+10 Run the four unit tests
+Schema sent to API has no $schema or additionalProperties.
+10 MB PDF uploads once, URI reused on second submission.
+First run truncated → retry succeeds at 1 600 tokens.
+Unsupported MIME returns 400 before upload.
