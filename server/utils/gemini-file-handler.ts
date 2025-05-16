@@ -11,16 +11,9 @@ import { promises as fsp } from 'fs';
 // Import the GoogleGenAI for file handling
 import { GoogleGenAI } from '@google/genai';
 
-// Extended interface to handle both newer and older SDK versions
-// More flexible typing to accommodate SDK variations
-interface ExtendedGoogleGenAI {
-  uploadFile?: (filePath: string, options?: { mimeType: string }) => Promise<any>;
-  files?: {
-    upload: (options: { file: string, config?: { mimeType: string } }) => Promise<any>;
-  };
-  // Add any other methods we might need for compatibility
-  [key: string]: any;
-}
+// Use a more flexible type for the Google Gemini AI client
+// This allows us to support different SDK versions without type errors
+type GoogleAIClient = any;
 import { Redis } from 'ioredis';
 // Define the file data interface locally to avoid circular dependencies
 // Updated to match the format expected by the current SDK version
@@ -106,7 +99,7 @@ async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
  * @returns File reference with camelCase properties
  */
 export async function createFileData(
-  genAI: ExtendedGoogleGenAI,
+  genAI: GoogleAIClient,
   source: Buffer | string,
   mimeType: string
 ): Promise<GeminiFileData> {
