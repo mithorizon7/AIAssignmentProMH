@@ -16,8 +16,19 @@ export interface GeminiFileData {
   mime_type: string;
 }
 
-// Initialize Redis client for caching file URIs
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+// Initialize Redis client for caching file URIs (with fallback if unavailable)
+let redis: Redis | null = null;
+try {
+  redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+  
+  // Handle connection errors gracefully
+  redis.on('error', (err) => {
+    console.warn(`[REDIS] Connection error (file caching will be disabled): ${err.message}`);
+    redis = null;
+  });
+} catch (err) {
+  console.warn(`[REDIS] Failed to initialize Redis: ${err instanceof Error ? err.message : String(err)}`);
+}
 
 // Size thresholds
 export const MAX_INLINE_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -62,11 +73,21 @@ export async function createFileData(
   const hash = crypto.createHash('sha256').update(buf).digest('hex');
   const cacheKey = `gemini:file:${hash}:${mimeType}`;
   
-  // Check if we've already uploaded this file
-  const cached = await redis.get(cacheKey);
-  if (cached) {
-    console.log(`[GEMINI] Using cached file URI for ${mimeType} (${buf.length} bytes)`);
-    return { file_uri: cached, mime_type: mimeType };
+  // Check if we've already uploaded this file (if Redis is available)
+  let cached = null;
+  if (redis !== null) {
+    try {
+      cached = await redis.get(cacheKey);
+      if (cached) {
+        console.log(`[GEMINI] Using cached file URI for ${mimeType} (${buf.length} bytes)`);
+        return { file_uri: cached, mime_type: mimeType };
+      }
+    } catch (err) {
+      console.warn(`[GEMINI] Redis cache lookup failed: ${err instanceof Error ? err.message : String(err)}`);
+      // Continue without caching if Redis fails
+    }
+  } else {
+    console.log(`[GEMINI] Redis not available, file caching disabled`);
   }
   
   // Upload file to Gemini Files API
@@ -75,8 +96,16 @@ export async function createFileData(
     const file = await genAI.files.upload({ buffer: buf, mimeType: mimeType });
     console.log(`[GEMINI] File uploaded successfully, URI: ${file.uri}`);
     
-    // Cache the file URI for future use
-    await redis.setex(cacheKey, CACHE_TTL, file.uri);
+    // Cache the file URI for future use (if Redis is available)
+    if (redis !== null) {
+      try {
+        await redis.setex(cacheKey, CACHE_TTL, file.uri);
+        console.log(`[GEMINI] Cached file URI for future use (TTL: ${CACHE_TTL}s)`);
+      } catch (err) {
+        console.warn(`[GEMINI] Failed to cache file URI: ${err instanceof Error ? err.message : String(err)}`);
+        // Continue without caching
+      }
+    }
     
     return { file_uri: file.uri, mime_type: mimeType };
   } catch (error) {
