@@ -83,11 +83,11 @@ async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
  */
 export async function createFileData(
   genAI: any,
-  source: Buffer | string,
+  source: Buffer,
   mimeType: string
 ): Promise<GeminiFileData> {
-  // Convert to buffer if it's a URL or path
-  const buf = Buffer.isBuffer(source) ? source : await fetchToBuffer(source);
+  // Already a Buffer (enforced by function signature)
+  const buf = source;
   
   // Generate hash to use as cache key
   const hash = crypto.createHash('sha256').update(buf).digest('hex');
@@ -159,10 +159,9 @@ export function toSDKFormat(fileData: { file_uri: string; mime_type: string }) {
  * @param mimeType File MIME type
  * @returns true if file should be uploaded to Files API
  */
-export function shouldUseFilesAPI(content: Buffer, mimeType: string): boolean {
+export function shouldUseFilesAPI(mimeType: string, contentSize: number): boolean {
   // Safety check to ensure mimeType is a string
   const mime = typeof mimeType === 'string' ? mimeType : 'application/octet-stream';
-  const size = content.length;
   
   // Always use Files API for PDF, audio, or video
   if (
@@ -173,8 +172,19 @@ export function shouldUseFilesAPI(content: Buffer, mimeType: string): boolean {
     return true;
   }
   
+  // Always use Files API for document content types
+  if (
+    mime.includes('document') ||
+    mime.includes('msword') ||
+    mime.includes('wordprocessing') ||
+    mime.includes('spreadsheet') ||
+    mime.includes('presentation')
+  ) {
+    return true;
+  }
+  
   // Use Files API for large images
-  if (mime.startsWith('image/') && size > MAX_INLINE_IMAGE_SIZE) {
+  if (mime.startsWith('image/') && contentSize > MAX_INLINE_IMAGE_SIZE) {
     return true;
   }
   
