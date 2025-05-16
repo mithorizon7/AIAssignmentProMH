@@ -36,7 +36,7 @@ import { GradingFeedback, SCHEMA_VERSION, gradingJSONSchema } from '../schemas/g
 import { sanitizeText, detectInjectionAttempt } from '../utils/text-sanitizer';
 import { isSchemaError, shouldRetry, SchemaValidationError } from '../utils/schema-errors';
 import { pruneForGemini } from '../utils/schema-pruner';
-import { createFileData, GeminiFileData, shouldUseFilesAPI } from '../utils/gemini-file-handler';
+import { createFileData, GeminiFileData, shouldUseFilesAPI, MAX_INLINE_IMAGE_SIZE } from '../utils/gemini-file-handler';
 import { repairJson } from '../utils/json-repair';
 
 // These are the MIME types supported by Google Gemini API
@@ -174,9 +174,9 @@ export class GeminiAdapter implements AIAdapter {
           }
           
           if (chunk.candidates[0]?.content?.parts) {
-            const part = chunk.candidates[0].content.parts[0];
-            if (part.text) {
-              streamedText += part.text;
+            const responsePart = chunk.candidates[0].content.parts[0];
+            if (responsePart.text) {
+              streamedText += responsePart.text;
             }
           }
         }
