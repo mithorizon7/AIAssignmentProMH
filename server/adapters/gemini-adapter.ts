@@ -133,15 +133,26 @@ export class GeminiAdapter implements AIAdapter {
     };
     
     // Helper to run streaming request and collect all chunks
-    const collectStream = async (req: any): Promise<{raw: string, finishReason: string}> => {
+    const collectStream = async (req: any): Promise<{raw: string, finishReason: string, usageMetadata: any}> => {
       console.log(`[GEMINI] Using streaming with token limit: ${req.config.maxOutputTokens}`);
       
       const stream = await this.genAI.models.generateContentStream(req);
       let streamedText = '';
       let finishReason = 'STOP'; // Default to successful finish
+      let usageMetadata = null; // Will store metadata when available
       
       // Process the stream chunks
       for await (const chunk of stream) {
+        // Check for usage metadata in the chunk (typically comes in the last chunk)
+        if (chunk.usageMetadata) {
+          usageMetadata = chunk.usageMetadata;
+          console.log(`[GEMINI] Received usage metadata from stream: `, {
+            promptTokenCount: usageMetadata.promptTokenCount,
+            candidatesTokenCount: usageMetadata.candidatesTokenCount,
+            totalTokenCount: usageMetadata.totalTokenCount
+          });
+        }
+        
         if (chunk.candidates && chunk.candidates.length > 0) {
           // Get finish reason from the last chunk if available
           if (chunk.candidates[0].finishReason) {
@@ -158,19 +169,19 @@ export class GeminiAdapter implements AIAdapter {
       }
       
       console.log(`[GEMINI] Stream received ${streamedText.length} characters, finish reason: ${finishReason}`);
-      return { raw: streamedText, finishReason };
+      return { raw: streamedText, finishReason, usageMetadata };
     };
     
     // Run the request once with a specific token limit
     const runOnce = async (cap: number) => collectStream(buildRequest(cap));
     
     // First try with base token limit
-    let { raw, finishReason } = await runOnce(BASE_MAX_TOKENS);
+    let { raw, finishReason, usageMetadata } = await runOnce(BASE_MAX_TOKENS);
     
     // If the model stopped early, retry with a higher token limit
     if (finishReason !== 'STOP') {
       console.warn(`[GEMINI] early stop ${finishReason} – retry ↑ tokens`);
-      ({ raw, finishReason } = await runOnce(RETRY_MAX_TOKENS));
+      ({ raw, finishReason, usageMetadata } = await runOnce(RETRY_MAX_TOKENS));
     }
     
     // If still having issues, throw an error
@@ -186,10 +197,11 @@ export class GeminiAdapter implements AIAdapter {
         },
         finishReason
       }],
-      usageMetadata: requestParams.usageMetadata
+      // Use actual metadata from the stream (not from request parameters)
+      usageMetadata: usageMetadata 
     };
     
-    // Get token count from API if available (no fallbacks)
+    // Get token count from actually captured metadata (no fallbacks)
     const tokenCount = result.usageMetadata?.totalTokenCount;
     
     // Log comprehensive usage information
