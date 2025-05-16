@@ -140,12 +140,11 @@ export async function createFileData(
     console.log(`[GEMINI] Buffer type: ${typeof buf}, isBuffer: ${Buffer.isBuffer(buf)}, length: ${buf.length}`);
     
     // Based on @google/genai SDK v0.14.0 documentation
-    // Cast to any to bypass strict type checking since the API expects
-    // a flexible object not perfectly matched to the TypeScript types
+    // The correct parameter name is 'buffer', not 'data'
     const file = await genAI.files.upload({
-      data: buf,
+      buffer: buf,
       mimeType: mimeType
-    } as any);
+    });
     console.log(`[GEMINI] File uploaded successfully, URI: ${file.uri}`);
     
     // Cache the file URI for future use (if Redis is available)
