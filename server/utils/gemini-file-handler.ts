@@ -8,7 +8,8 @@
 
 import crypto from 'crypto';
 import { promises as fsp } from 'fs';
-// We'll use the provided GenAI instance from the adapter
+// Import the GoogleGenAI for file handling
+import { GoogleGenAI } from '@google/genai';
 import { Redis } from 'ioredis';
 // Define the file data interface locally to avoid circular dependencies
 export interface GeminiFileData {
@@ -154,21 +155,18 @@ export async function createFileData(
 }
 
 /**
- * Convert snake_case file data to SDK Part using the official helper
+ * Convert snake_case file data to raw file_data structure for Gemini API
  * 
- * This uses the types.Part.fromFile() helper from the SDK
- * which handles the proper conversion to the expected format
+ * The Gemini API expects data in a specific format with correct casing
  */
 export function toSDKFormat(fileData: { file_uri: string; mime_type: string }) {
-  // First convert to SDK format
-  const sdkData = {
-    fileUri: fileData.file_uri,
-    mimeType: fileData.mime_type
+  // Create a properly formatted file_data structure for the API
+  return {
+    file_data: {
+      file_uri: fileData.file_uri,
+      mime_type: fileData.mime_type
+    }
   };
-  
-  // Use the SDK's helper to create the part correctly
-  // Import types from '@google/genai' to use this
-  return sdkData;
 }
 
 /**

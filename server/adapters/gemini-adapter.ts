@@ -6,7 +6,8 @@
 import { 
   GoogleGenAI, 
   GenerateContentResponse,
-  Part
+  Part,
+  FileData
 } from '@google/genai';
 
 // Token budget constants for two-step approach
