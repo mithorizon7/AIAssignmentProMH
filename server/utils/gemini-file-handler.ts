@@ -138,12 +138,10 @@ export async function createFileData(
     // Add more detailed logging to help debug the issue
     console.log(`[GEMINI] Buffer type: ${typeof buf}, isBuffer: ${Buffer.isBuffer(buf)}, length: ${buf.length}`);
     
-    // Match the expected format from Gemini SDK documentation
+    // Match the expected format from Gemini SDK documentation (v0.14.0)
     const file = await genAI.files.upload({
-      file: buf, // Passing the buffer directly
-      config: {
-        mimeType: mimeType
-      }
+      buffer: buf, // Passing the buffer directly
+      mimeType: mimeType
     });
     console.log(`[GEMINI] File uploaded successfully, URI: ${file.uri}`);
     
