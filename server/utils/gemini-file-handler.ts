@@ -12,11 +12,14 @@ import { promises as fsp } from 'fs';
 import { GoogleGenAI } from '@google/genai';
 
 // Extended interface to handle both newer and older SDK versions
-interface ExtendedGoogleGenAI extends GoogleGenAI {
+// More flexible typing to accommodate SDK variations
+interface ExtendedGoogleGenAI {
   uploadFile?: (filePath: string, options?: { mimeType: string }) => Promise<any>;
   files?: {
     upload: (options: { file: string, config?: { mimeType: string } }) => Promise<any>;
   };
+  // Add any other methods we might need for compatibility
+  [key: string]: any;
 }
 import { Redis } from 'ioredis';
 // Define the file data interface locally to avoid circular dependencies

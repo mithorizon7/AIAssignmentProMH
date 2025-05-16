@@ -36,7 +36,8 @@ import { GradingFeedback, SCHEMA_VERSION, gradingJSONSchema } from '../schemas/g
 import { sanitizeText, detectInjectionAttempt } from '../utils/text-sanitizer';
 import { isSchemaError, shouldRetry, SchemaValidationError } from '../utils/schema-errors';
 import { pruneForGemini } from '../utils/schema-pruner';
-import { createFileData, GeminiFileData, shouldUseFilesAPI, MAX_INLINE_IMAGE_SIZE } from '../utils/gemini-file-handler-fixed';
+// Fixed import path for file handler functions
+import { createFileData, GeminiFileData, shouldUseFilesAPI, MAX_INLINE_IMAGE_SIZE } from '../utils/gemini-file-handler';
 import { repairJson } from '../utils/json-repair';
 
 // These are the MIME types supported by Google Gemini API
