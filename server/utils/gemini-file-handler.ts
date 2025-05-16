@@ -189,12 +189,12 @@ export async function createFileData(
  * 
  * The Gemini API expects data in a specific format with correct casing
  */
-export function toSDKFormat(fileData: { file_uri: string; mime_type: string }) {
-  // Create a properly formatted file_data structure for the API
+export function toSDKFormat(fileData: { fileUri: string; mimeType: string }) {
+  // Create a properly formatted fileData structure for the API
   return {
-    file_data: {
-      file_uri: fileData.file_uri,
-      mime_type: fileData.mime_type
+    fileData: {
+      fileUri: fileData.fileUri,
+      mimeType: fileData.mimeType
     }
   };
 }
