@@ -37,15 +37,35 @@ const CACHE_TTL = 47 * 60 * 60; // 47 hours (just under Gemini's 48-hour limit)
 /**
  * Fetch a file from URL or local path and convert to Buffer
  */
-async function fetchToBuffer(src: string): Promise<Buffer> {
-  if (src.startsWith('gs://') || src.startsWith('http')) {
-    const res = await fetch(src);
-    if (!res.ok) {
-      throw new Error(`Failed to download file from URL: ${src} (status: ${res.status})`);
-    }
-    return Buffer.from(await res.arrayBuffer());
+async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
+  // If already a Buffer, return it directly
+  if (Buffer.isBuffer(src)) {
+    return src;
   }
-  return fsp.readFile(src); // local path
+  
+  // Handle URL or local file path
+  if (typeof src === 'string') {
+    if (src.startsWith('gs://') || src.startsWith('http')) {
+      const res = await fetch(src);
+      if (!res.ok) {
+        throw new Error(`Failed to download file from URL: ${src} (status: ${res.status})`);
+      }
+      return Buffer.from(await res.arrayBuffer());
+    }
+    
+    // Only try to read from filesystem if it looks like a file path
+    // This prevents trying to read MIME types as file paths
+    if (src.includes('/') || src.includes('\\') || !src.includes('/')) {
+      try {
+        return await fsp.readFile(src); // local path
+      } catch (err) {
+        throw new Error(`Failed to read file from path: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+  
+  // If we reach here, it's not a valid source
+  throw new Error(`Invalid file source: ${typeof src === 'string' ? src : 'non-string value'}`);
 }
 
 /**
