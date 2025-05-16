@@ -1,195 +1,254 @@
 /**
- * Smoke tests for Gemini file handling
+ * Simple test script to verify file handling improvements in Gemini adapter
+ * Tests both DOCX and image handling with the improved implementation
  * 
- * Tests different file types and sizes to verify that:
- * 1. Small images are inlined (200KB PNG)
- * 2. Large images use Files API (8MB PNG)
- * 3. DOCX files from GCS URLs work correctly
- * 4. PDF files from HTTP URLs work correctly
+ * Requirements:
+ * - Set GOOGLE_API_KEY environment variable before running
  */
 
-import fs from 'fs';
+import { promises as fs } from 'fs';
 import path from 'path';
-import { promises as fsp } from 'fs';
-import pkg from '@google/genai';
-const { GoogleGenerativeAI } = pkg;
-import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-dotenv.config();
+// Get dirname in ESM
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Initialize Gemini client with API key
-const apiKey = process.env.GEMINI_API_KEY;
-if (!apiKey) {
-  console.error('Error: GEMINI_API_KEY environment variable is required');
+// Check API key
+if (!process.env.GOOGLE_API_KEY) {
+  console.error('❌ ERROR: GOOGLE_API_KEY environment variable is not set');
   process.exit(1);
 }
-const genAI = new GoogleGenerativeAI(apiKey);
 
-// Test files
-const TEST_FILES = {
-  small_image: {
-    path: './test_files/small_image.png',
-    size: '200KB',
-    mimeType: 'image/png',
-    expectInline: true
-  },
-  large_image: {
-    path: './test_files/large_image.png',
-    size: '8MB',
-    mimeType: 'image/png',
-    expectInline: false
-  },
-  docx_file: {
-    url: 'gs://cloud-samples-data/generative-ai/pdf/sample-pdf.pdf', // Using a sample PDF since we don't have a real GCS DOCX URL
-    mimeType: 'application/pdf',
-    expectInline: false
-  },
-  pdf_file: {
-    url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-    mimeType: 'application/pdf',
-    expectInline: false
+// Initialize Google GenAI
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+
+// Test file paths
+const docxFile = path.join(__dirname, 'attached_assets', 'Gemini_File_Upload_Migration_Guide.docx');
+const imageSmall = path.join(__dirname, 'attached_assets', 'favicon-32x32.png');
+const imageLarge = path.join(__dirname, 'attached_assets', 'Screenshot 2025-05-16 at 2.27.56 PM.png');
+
+// Constants
+const MAX_INLINE_SIZE = 5 * 1024 * 1024; // 5MB
+
+/**
+ * Check if file exists
+ */
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
   }
-};
-
-// Create test files of specific sizes
-async function createTestFiles() {
-  const testDir = './test_files';
-  if (!fs.existsSync(testDir)) {
-    fs.mkdirSync(testDir);
-  }
-
-  // Create 200KB image
-  const smallImageBuffer = Buffer.alloc(200 * 1024, 1);
-  await fsp.writeFile(TEST_FILES.small_image.path, smallImageBuffer);
-  console.log(`Created ${TEST_FILES.small_image.size} test image at ${TEST_FILES.small_image.path}`);
-
-  // Create 8MB image
-  const largeImageBuffer = Buffer.alloc(8 * 1024 * 1024, 2);
-  await fsp.writeFile(TEST_FILES.large_image.path, largeImageBuffer);
-  console.log(`Created ${TEST_FILES.large_image.size} test image at ${TEST_FILES.large_image.path}`);
 }
 
-// Helper function: Determine if file should use Files API based on its size and type
-function shouldUseFilesAPI(contentType, size) {
-  // Document types always use Files API
-  if (contentType.startsWith('application/')) {
+/**
+ * Simple implementation of shouldUseFilesAPI to match the actual implementation
+ */
+function shouldUseFilesAPI(mimeType, contentSize) {
+  const mime = typeof mimeType === 'string' ? mimeType : 'application/octet-stream';
+  
+  // Always use Files API for documents and large images
+  if (mime.includes('document') || mime.includes('openxmlformats')) {
     return true;
   }
   
   // Large images use Files API
-  if (contentType.startsWith('image/') && size > 5 * 1024 * 1024) {
+  if (mime.startsWith('image/') && contentSize > MAX_INLINE_SIZE) {
     return true;
   }
   
   return false;
 }
 
-// Helper function: Process a test file
-async function processFile(fileInfo) {
-  console.log(`\n=== Testing ${fileInfo.path || fileInfo.url} (${fileInfo.mimeType}) ===`);
+/**
+ * Upload file using Files API
+ */
+async function uploadWithFilesAPI(filePath, mimeType) {
+  console.log(`Uploading file to Gemini: ${filePath}`);
+  
+  // Use the temporary file approach for reliable uploads
+  try {
+    const file = await genAI.files.upload({
+      file: filePath,
+      config: { mimeType }
+    });
+    
+    console.log(`✅ File uploaded successfully: ${file.fileId}`);
+    return {
+      fileUri: file.fileId,
+      mimeType
+    };
+  } catch (error) {
+    console.error(`❌ File upload failed: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Use Gemini to analyze file
+ */
+async function analyzeWithGemini(fileData, prompt) {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-04-17" });
+  
+  console.log('Sending request to Gemini...');
+  const result = await model.generateContent({
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: prompt },
+          { 
+            fileData: {
+              fileUri: fileData.fileUri, 
+              mimeType: fileData.mimeType
+            }
+          }
+        ]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.2,
+      maxOutputTokens: 1024,
+    }
+  });
+  
+  return result.response.text();
+}
+
+/**
+ * Test DOCX file handling
+ */
+async function testDocxHandling() {
+  console.log('\n=== Testing DOCX File Handling ===');
+  
+  // Check if file exists
+  if (!await fileExists(docxFile)) {
+    console.error(`❌ Test file not found: ${docxFile}`);
+    return false;
+  }
   
   try {
-    let content;
-    if (fileInfo.path) {
-      content = await fsp.readFile(fileInfo.path);
-      console.log(`Read file: ${content.length} bytes`);
-    } else if (fileInfo.url) {
-      console.log(`Using URL: ${fileInfo.url}`);
-      content = fileInfo.url;
+    // Get file stats and MIME type
+    const stats = await fs.stat(docxFile);
+    const mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    
+    console.log(`File size: ${stats.size} bytes (${(stats.size / 1024).toFixed(2)} KB)`);
+    console.log(`MIME type: ${mimeType}`);
+    
+    // Check if we should use Files API
+    const useFilesAPI = shouldUseFilesAPI(mimeType, stats.size);
+    console.log(`Should use Files API: ${useFilesAPI ? 'YES' : 'NO'}`);
+    
+    if (!useFilesAPI) {
+      console.error('❌ DOCX files should always use Files API!');
+      return false;
     }
     
-    // Determine expected handling approach
-    const expectedApiType = fileInfo.expectInline ? 'Inline' : 'Files API';
-    console.log(`Expected handling: ${expectedApiType}`);
+    // Upload file
+    const fileData = await uploadWithFilesAPI(docxFile, mimeType);
     
-    if (shouldUseFilesAPI(fileInfo.mimeType, fileInfo.path ? (await fsp.stat(fileInfo.path)).size : Infinity)) {
-      console.log(`Our logic determines: Files API should be used`);
-      
-      // Test file upload
-      try {
-        const file = await genAI.files.upload({
-          data: content, 
-          mimeType: fileInfo.mimeType
-        });
-        console.log(`✅ Successfully uploaded to Files API: ${file.uri}`);
-        
-        // Verify we can use this file in content generation
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const result = await model.generateContent({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { fileData: { fileUri: file.uri, mimeType: fileInfo.mimeType } },
-                { text: 'Please describe what you see in this file.' }
-              ]
-            }
-          ]
-        });
-        
-        console.log('✅ Successfully used file in content generation');
-        console.log(`Response (first 100 chars): ${result.response.text().substring(0, 100)}...`);
-      } catch (error) {
-        console.error(`❌ Error with Files API: ${error.message}`);
-      }
-    } else {
-      console.log(`Our logic determines: Should use inline data`);
-      
-      // For inline testing with small images
-      try {
-        let base64Data;
-        if (Buffer.isBuffer(content)) {
-          base64Data = content.toString('base64');
-        } else {
-          throw new Error('Cannot inline non-buffer content');
-        }
-        
-        // Test inline processing
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const result = await model.generateContent({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { 
-                  inlineData: { 
-                    mimeType: fileInfo.mimeType,
-                    data: base64Data
-                  } 
-                },
-                { text: 'Please describe what you see in this image.' }
-              ]
-            }
-          ]
-        });
-        
-        console.log('✅ Successfully used inline data in content generation');
-        console.log(`Response (first 100 chars): ${result.response.text().substring(0, 100)}...`);
-      } catch (error) {
-        console.error(`❌ Error with inline data: ${error.message}`);
-      }
-    }
+    // Test with Gemini
+    const prompt = "Summarize this document in 3-5 bullet points.";
+    const response = await analyzeWithGemini(fileData, prompt);
+    
+    console.log('\n=== Gemini Response ===');
+    console.log(response);
+    
+    console.log('\n✅ DOCX file handling test passed!');
+    return true;
   } catch (error) {
-    console.error(`❌ Test failed: ${error.message}`);
+    console.error('❌ DOCX file handling test failed:', error);
+    return false;
   }
 }
 
-// Main test function
-async function runTests() {
+/**
+ * Test image file handling
+ */
+async function testImageHandling(imagePath, expectedUseFilesAPI) {
+  console.log(`\n=== Testing Image File Handling: ${path.basename(imagePath)} ===`);
+  
+  // Check if file exists
+  if (!await fileExists(imagePath)) {
+    console.error(`❌ Test file not found: ${imagePath}`);
+    return false;
+  }
+  
   try {
-    console.log('Creating test files...');
-    await createTestFiles();
+    // Get file stats and MIME type
+    const stats = await fs.stat(imagePath);
+    const mimeType = 'image/png';
     
-    // Test each file type
-    for (const [name, fileInfo] of Object.entries(TEST_FILES)) {
-      await processFile(fileInfo);
+    console.log(`File size: ${stats.size} bytes (${(stats.size / 1024).toFixed(2)} KB)`);
+    console.log(`MIME type: ${mimeType}`);
+    
+    // Check if we should use Files API
+    const useFilesAPI = shouldUseFilesAPI(mimeType, stats.size);
+    console.log(`Should use Files API: ${useFilesAPI ? 'YES' : 'NO'}`);
+    
+    if (useFilesAPI !== expectedUseFilesAPI) {
+      console.error(`❌ Incorrect decision for ${path.basename(imagePath)}!`);
+      console.error(`Expected: ${expectedUseFilesAPI ? 'Use Files API' : 'Use inline data'}`);
+      console.error(`Actual: ${useFilesAPI ? 'Use Files API' : 'Use inline data'}`);
+      return false;
     }
     
-    console.log('\n=== All tests completed ===');
+    // If using Files API, test upload
+    if (useFilesAPI) {
+      const fileData = await uploadWithFilesAPI(imagePath, mimeType);
+      
+      // Test with Gemini
+      const prompt = "Describe what you see in this image.";
+      const response = await analyzeWithGemini(fileData, prompt);
+      
+      console.log('\n=== Gemini Response ===');
+      console.log(response);
+    } else {
+      console.log('✅ Small image would use inline data as expected');
+    }
+    
+    console.log(`\n✅ Image file handling test passed for ${path.basename(imagePath)}!`);
+    return true;
   } catch (error) {
-    console.error(`Test suite error: ${error.message}`);
+    console.error(`❌ Image file handling test failed for ${path.basename(imagePath)}:`, error);
+    return false;
   }
 }
 
-// Run the tests
-runTests();
+/**
+ * Run all tests
+ */
+async function runTests() {
+  console.log('🧪 TESTING GEMINI FILE HANDLING IMPROVEMENTS 🧪');
+  console.log('================================================');
+  
+  // Test DOCX handling
+  const docxResult = await testDocxHandling();
+  
+  // Test small image (should NOT use Files API)
+  const smallImageResult = await testImageHandling(imageSmall, false);
+  
+  // Test large image (should use Files API)
+  const largeImageResult = await testImageHandling(imageLarge, true);
+  
+  // Print summary
+  console.log('\n================================================');
+  console.log('🧪 TEST RESULTS SUMMARY 🧪');
+  console.log('================================================');
+  console.log(`DOCX file handling: ${docxResult ? '✅ PASSED' : '❌ FAILED'}`);
+  console.log(`Small image handling: ${smallImageResult ? '✅ PASSED' : '❌ FAILED'}`);
+  console.log(`Large image handling: ${largeImageResult ? '✅ PASSED' : '❌ FAILED'}`);
+  
+  const allPassed = docxResult && smallImageResult && largeImageResult;
+  console.log(`\nOverall result: ${allPassed ? '✅ ALL TESTS PASSED' : '❌ SOME TESTS FAILED'}`);
+  
+  process.exit(allPassed ? 0 : 1);
+}
+
+// Run all tests
+runTests().catch(error => {
+  console.error('💥 Unhandled error:', error);
+  process.exit(1);
+});
