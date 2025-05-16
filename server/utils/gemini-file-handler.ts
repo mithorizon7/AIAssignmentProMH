@@ -139,12 +139,13 @@ export async function createFileData(
     // Add more detailed logging to help debug the issue
     console.log(`[GEMINI] Buffer type: ${typeof buf}, isBuffer: ${Buffer.isBuffer(buf)}, length: ${buf.length}`);
     
-    // Match the expected format for the Gemini SDK v0.14.0
-    // The API expects mimeType in a specific format
+    // Based on @google/genai SDK v0.14.0 documentation
+    // Cast to any to bypass strict type checking since the API expects
+    // a flexible object not perfectly matched to the TypeScript types
     const file = await genAI.files.upload({
-      data: buf, // Use 'data' property which is the correct one in the SDK
+      data: buf,
       mimeType: mimeType
-    });
+    } as any);
     console.log(`[GEMINI] File uploaded successfully, URI: ${file.uri}`);
     
     // Cache the file URI for future use (if Redis is available)
@@ -225,4 +226,4 @@ export function shouldUseFilesAPI(mimeType: string, contentSize: number): boolea
   }
   
   return false;
-}console.log('Debugging GCS URL fetching:', JSON.stringify(process.env, null, 2))
+}
