@@ -104,11 +104,12 @@ async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
  * @returns File reference in snake_case format for API
  */
 export async function createFileData(
-  genAI: any,
+  genAI: GoogleGenAI,
   source: Buffer | string,
   mimeType: string
 ): Promise<GeminiFileData> {
-  // Resolve to a Buffer no matter what we get
+  // Use fetchToBuffer to handle the different source types
+  // This function properly converts string paths/URLs to Buffers
   const buf = await fetchToBuffer(source);
   
   // Generate hash to use as cache key
@@ -138,15 +139,16 @@ export async function createFileData(
     // Add more detailed logging to help debug the issue
     console.log(`[GEMINI] Buffer type: ${typeof buf}, isBuffer: ${Buffer.isBuffer(buf)}, length: ${buf.length}`);
     
-    // Match the expected format from Gemini SDK documentation (v0.14.0)
+    // Match the expected format for the Gemini SDK v0.14.0
+    // The API expects mimeType in a specific format
     const file = await genAI.files.upload({
-      buffer: buf, // Passing the buffer directly
+      data: buf, // Use 'data' property which is the correct one in the SDK
       mimeType: mimeType
     });
     console.log(`[GEMINI] File uploaded successfully, URI: ${file.uri}`);
     
     // Cache the file URI for future use (if Redis is available)
-    if (redis !== null) {
+    if (redis !== null && file && file.uri) {
       try {
         await redis.setex(cacheKey, CACHE_TTL, file.uri);
         console.log(`[GEMINI] Cached file URI for future use (TTL: ${CACHE_TTL}s)`);
@@ -154,6 +156,11 @@ export async function createFileData(
         console.warn(`[GEMINI] Failed to cache file URI: ${err instanceof Error ? err.message : String(err)}`);
         // Continue without caching
       }
+    }
+    
+    // Ensure we have a valid URI before returning
+    if (!file || !file.uri) {
+      throw new Error("File upload failed: No URI returned from Gemini API");
     }
     
     return { file_uri: file.uri, mime_type: mimeType };
@@ -205,8 +212,10 @@ export function shouldUseFilesAPI(mimeType: string, contentSize: number): boolea
     mime.includes('msword') ||
     mime.includes('wordprocessing') ||
     mime.includes('spreadsheet') ||
-    mime.includes('presentation')
+    mime.includes('presentation') ||
+    mime.includes('openxmlformats') // Covers docx, xlsx, pptx
   ) {
+    console.log(`[GEMINI] Using Files API for document type: ${mime}`);
     return true;
   }
   

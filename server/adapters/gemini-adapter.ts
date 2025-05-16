@@ -10,6 +10,15 @@ import {
   FileData
 } from '@google/genai';
 
+// Custom type for file_data in the format expected by the Gemini API
+// This matches the snake_case format required by the API
+interface GeminiFilePart {
+  file_data: {
+    file_uri: string;
+    mime_type: string;
+  }
+}
+
 // Token budget constants for two-step approach
 const BASE_MAX_TOKENS = 1200;   // first attempt
 const RETRY_MAX_TOKENS = 1600;  // if finishReason !== "STOP"
@@ -423,15 +432,15 @@ export class GeminiAdapter implements AIAdapter {
               const fileData = await createFileData(this.genAI, part.content, mimeType);
               fileDataList.push(fileData);
               
-              // Manually create the snake_case file data structure
+              // Create properly typed file_data structure using our GeminiFilePart interface
               // This is needed because SDK v0.14.0 doesn't have Part.fromFile helper
-              // Cast to any to bypass type checking since the runtime format is correct
-              apiParts.push({
+              const filePart: GeminiFilePart = {
                 file_data: {
                   file_uri: fileData.file_uri,
                   mime_type: fileData.mime_type
                 }
-              } as any);
+              };
+              apiParts.push(filePart as unknown as Part);
             } else {
               // Use inline data for smaller images
               console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB, MIME: ${part.mimeType})`);
@@ -474,15 +483,15 @@ export class GeminiAdapter implements AIAdapter {
                 const fileData = await createFileData(this.genAI, part.content, part.mimeType);
                 fileDataList.push(fileData);
                 
-                // Manually create the snake_case file data structure
+                // Create properly typed file_data structure using our GeminiFilePart interface
                 // This is needed because SDK v0.14.0 doesn't have Part.fromFile helper
-                // Cast to any to bypass type checking since the runtime format is correct
-                apiParts.push({
+                const filePart: GeminiFilePart = {
                   file_data: {
                     file_uri: fileData.file_uri,
                     mime_type: fileData.mime_type
                   }
-                } as any);
+                };
+                apiParts.push(filePart as unknown as Part);
               }
             }
           } catch (error) {
