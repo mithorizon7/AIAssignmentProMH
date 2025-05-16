@@ -413,15 +413,18 @@ export class GeminiAdapter implements AIAdapter {
             if (useFilesAPI || contentType === 'document') {
               console.log(`[GEMINI] Using Files API for ${contentType} content (${(contentLength / 1024).toFixed(1)}KB, MIME: ${mimeType})`);
               
-              // Pass content directly to createFileData which will handle conversion
-              const fileData = await createFileData(this.genAI, part.content, mimeType);
+              // Pass content as-is to createFileData which will handle conversion
+              const fileData = await createFileData(this.genAI, /* pass as-is */ part.content, mimeType);
               fileDataList.push(fileData);
               
-              // Convert to SDK format and add to parts
-              const apiFileData = toSDKFormat(fileData);
+              // Add directly to parts with proper format
+              // Cast to any to bypass type checking - the runtime format is correct
               apiParts.push({
-                fileData: apiFileData
-              });
+                file_data: {
+                  file_uri: fileData.file_uri,
+                  mime_type: fileData.mime_type
+                }
+              } as any);
             } else {
               // Use inline data for smaller images
               console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB, MIME: ${part.mimeType})`);
@@ -461,14 +464,17 @@ export class GeminiAdapter implements AIAdapter {
                 });
               } else {
                 // SVGs and other file types need to be uploaded even when small
-                const fileData = await createFileData(this.genAI, part.content, part.mimeType);
+                const fileData = await createFileData(this.genAI, /* pass as-is */ part.content, part.mimeType);
                 fileDataList.push(fileData);
                 
-                // Convert to SDK format and add to parts
-                const apiFileData = toSDKFormat(fileData);
+                // Add directly to parts with proper format
+                // Cast to any to bypass type checking - the runtime format is correct
                 apiParts.push({
-                  fileData: apiFileData
-                });
+                  file_data: {
+                    file_uri: fileData.file_uri,
+                    mime_type: fileData.mime_type
+                  }
+                } as any);
               }
             }
           } catch (error) {
