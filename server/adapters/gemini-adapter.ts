@@ -194,50 +194,74 @@ export class GeminiAdapter implements AIAdapter {
         }
       };
       
-      // Determine if we should use streaming based on expected output size
-      const STREAMING_CUTOFF = 500; // empirically Gemini truncates JSON ~700 tokens
-      const useStreaming = maxOutputTokens > STREAMING_CUTOFF;
-      let result;
+      // Always use streaming for all requests to avoid truncation issues
+      // Based on recommendation #3 - adopt a single generation path
+      const BASE_MAX = 1200;   // covers 99% of image feedback
+      const RETRY_MAX = 1600;  // bump once on early stop
       
-      if (useStreaming) {
-        console.log(`[GEMINI] Using streaming for large output (maxOutputTokens: ${maxOutputTokens})`);
-        // Use streaming API for large outputs to avoid truncation
+      // Function to run the content generation with specified token limit
+      const run = async (cap: number) => {
+        // Update the request with the specified token limit
+        requestParams.config.maxOutputTokens = cap;
+        console.log(`[GEMINI] Using streaming with token limit: ${cap}`);
+        
         try {
           const stream = await this.genAI.models.generateContentStream(requestParams);
           let streamedText = '';
+          let finishReason = 'STOP'; // Default to successful finish
           
           // Process the stream chunks
           for await (const chunk of stream) {
             if (chunk.candidates && 
-                chunk.candidates.length > 0 && 
-                chunk.candidates[0]?.content?.parts) {
-              const part = chunk.candidates[0].content.parts[0];
-              if (part.text) {
-                streamedText += part.text;
+                chunk.candidates.length > 0) {
+              // Get finish reason from the last chunk if available
+              if (chunk.candidates[0].finishReason) {
+                finishReason = chunk.candidates[0].finishReason;
+              }
+              
+              if (chunk.candidates[0]?.content?.parts) {
+                const part = chunk.candidates[0].content.parts[0];
+                if (part.text) {
+                  streamedText += part.text;
+                }
               }
             }
           }
           
           // Create a response object similar to non-streaming API
-          result = {
+          const result = {
             candidates: [{
               content: {
                 parts: [{ text: streamedText }]
-              }
-            }]
+              },
+              finishReason
+            }],
+            // Copy usage metadata structure to maintain compatibility
+            usageMetadata: requestParams.usageMetadata
           };
           
-          console.log(`[GEMINI] Streaming complete, received ${streamedText.length} characters`);
+          return { result, finishReason, raw: streamedText };
         } catch (error) {
           console.error(`[GEMINI] Streaming error: ${error instanceof Error ? error.message : String(error)}`);
-          // Fall back to non-streaming if streaming fails
-          console.log(`[GEMINI] Falling back to non-streaming API`);
-          result = await gradeWithRetry();
+          throw error;
         }
-      } else {
-        // Standard API call for normal outputs
-        result = await gradeWithRetry();
+      };
+      
+      // First attempt with base token limit
+      let { result, finishReason, raw } = await run(BASE_MAX);
+      
+      // If the model stopped early, retry with a higher token limit
+      if (finishReason !== 'STOP') {
+        console.warn(`[GEMINI] early stop ${finishReason} – retry with increased token limit`);
+        ({ result, finishReason, raw } = await run(RETRY_MAX));
+        
+        // If still not successful, throw an error
+        if (finishReason !== 'STOP') {
+          throw new Error(`Gemini failed twice (reason: ${finishReason})`);
+        }
       }
+      
+      console.log(`[GEMINI] Streaming complete, received ${raw.length} characters, finish reason: ${finishReason}`);
       
       // Log comprehensive usage information for monitoring
       if (result.usageMetadata) {
@@ -306,7 +330,7 @@ export class GeminiAdapter implements AIAdapter {
         ...parsedContent,
         modelName: this.modelName,
         rawResponse: JSON.parse(text), // Convert string to Record<string, unknown>
-        tokenCount: tokenCount
+        tokenCount: tokenCount ?? 0 // Use 0 as fallback for the interface requirement
       };
     } catch (error) {
       console.error(`[GEMINI] Error in generateCompletion: ${error instanceof Error ? error.message : String(error)}`);
@@ -609,7 +633,7 @@ export class GeminiAdapter implements AIAdapter {
         ...parsedContent,
         modelName: this.modelName,
         rawResponse: JSON.parse(text), // Convert string to Record<string, unknown>
-        tokenCount: tokenCount
+        tokenCount: tokenCount ?? 0 // Use 0 as fallback for the interface requirement
       };
     } catch (error) {
       console.error(`[GEMINI] Error in generateMultimodalCompletion: ${error instanceof Error ? error.message : String(error)}`);
