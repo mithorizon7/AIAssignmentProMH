@@ -7,15 +7,21 @@
 
 import crypto from 'crypto';
 import { promises as fsp } from 'fs';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, GoogleGenerativeAI } from '@google/genai';
 import { Redis } from 'ioredis';
 import path from 'path';
 
-// Define the file data interface 
+// Type definitions for different Google Gemini SDK versions
+// These types allow us to handle both older and newer SDK formats
+
+// Unified file data interface used by our adapter
 export interface GeminiFileData {
-  fileUri: string;  // camelCase format for SDK
+  fileUri: string;  // camelCase format for SDK 
   mimeType: string; // camelCase format for SDK
 }
+
+// For handling different SDK versions
+type GenAIType = GoogleGenAI | any;
 
 // Initialize Redis client for caching (fallback if unavailable)
 let redis: Redis | null = null;
