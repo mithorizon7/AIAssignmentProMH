@@ -336,7 +336,7 @@ export class GeminiAdapter implements AIAdapter {
   async generateMultimodalCompletion(
     multimodalPromptParts: MultimodalPromptPart[], 
     systemPrompt?: string
-  ) {
+  ): Promise<AIAdapterResponse> {
     try {
       console.log(`[GEMINI] Generating multimodal completion with ${multimodalPromptParts.length} parts`);
       
@@ -352,21 +352,21 @@ export class GeminiAdapter implements AIAdapter {
       // Process each part
       for (const part of multimodalPromptParts) {
         // Text part
-        if (part.type === 'text') {
-          const sanitizedText = sanitizeText(part.text, 8000);
+        if (part.type === 'text' && typeof part.content === 'string') {
+          const sanitizedText = sanitizeText(part.content, 8000);
           
           // Check for potential injection attempts
-          const potentialInjection = detectInjectionAttempt(part.text);
+          const potentialInjection = detectInjectionAttempt(part.content);
           if (potentialInjection) {
             console.warn(
               `[GEMINI] Potential prompt injection detected in text part: ` +
-              `${part.text.slice(0, 120)}${part.text.length > 120 ? '...' : ''}`
+              `${part.content.slice(0, 120)}${part.content.length > 120 ? '...' : ''}`
             );
           }
           
           // Log if text was truncated
-          if (sanitizedText.length < part.text.length) {
-            console.log(`[GEMINI] Text part truncated from ${part.text.length} to ${sanitizedText.length} characters`);
+          if (sanitizedText.length < part.content.length) {
+            console.log(`[GEMINI] Text part truncated from ${part.content.length} to ${sanitizedText.length} characters`);
           }
           
           apiParts.push({ text: sanitizedText });
@@ -456,12 +456,18 @@ export class GeminiAdapter implements AIAdapter {
       try {
         parsedContent = await parseStrict(raw);
         
-        // Add prompt token count to the response for billing/stats
-        parsedContent._promptTokens = result.usageMetadata?.promptTokenCount;
-        parsedContent._totalTokens = tokenCount;
+        // Create a properly formatted AIAdapterResponse
+        const response: AIAdapterResponse = {
+          ...parsedContent,
+          modelName: this.modelName,
+          rawResponse: JSON.parse(raw),
+          tokenCount: tokenCount ? tokenCount : 0,
+          _promptTokens: result.usageMetadata?.promptTokenCount,
+          _totalTokens: tokenCount ? tokenCount : 0
+        };
         
         console.log(`[GEMINI] Successfully parsed response JSON (${raw.length} chars)`);
-        return parsedContent;
+        return response;
       } catch (error) {
         console.error(`[GEMINI] Failed to parse response JSON: ${error instanceof Error ? error.message : String(error)}`);
         
@@ -472,12 +478,18 @@ export class GeminiAdapter implements AIAdapter {
             const repairedJson = repairJson(raw);
             parsedContent = await parseStrict(repairedJson);
             
-            // Add token count to the response for billing
-            parsedContent._promptTokens = result.usageMetadata?.promptTokenCount;
-            parsedContent._totalTokens = tokenCount;
+            // Create a properly formatted AIAdapterResponse with the repaired JSON
+            const response: AIAdapterResponse = {
+              ...parsedContent,
+              modelName: this.modelName,
+              rawResponse: JSON.parse(repairedJson),
+              tokenCount: tokenCount || 0,
+              _promptTokens: result.usageMetadata?.promptTokenCount,
+              _totalTokens: tokenCount || 0
+            };
             
             console.log(`[GEMINI] Successfully repaired and parsed JSON response`);
-            return parsedContent;
+            return response;
           } catch (repairError) {
             console.error(`[GEMINI] Repair attempt failed: ${repairError instanceof Error ? repairError.message : String(repairError)}`);
           }
