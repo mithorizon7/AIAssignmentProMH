@@ -371,38 +371,38 @@ export class GeminiAdapter implements AIAdapter {
       // Track files to cleanup from cache later
       const fileDataList: GeminiFileData[] = [];
       
-      // Process each part
-      for (const part of multimodalPromptParts) {
+      // Process each prompt part
+      for (const promptPart of multimodalPromptParts) {
         // Text part
-        if (part.type === 'text' && typeof part.content === 'string') {
-          const sanitizedText = sanitizeText(part.content, 8000);
+        if (promptPart.type === 'text' && typeof promptPart.content === 'string') {
+          const sanitizedText = sanitizeText(promptPart.content, 8000);
           
           // Check for potential injection attempts
-          const potentialInjection = detectInjectionAttempt(part.content);
+          const potentialInjection = detectInjectionAttempt(promptPart.content);
           if (potentialInjection) {
             console.warn(
               `[GEMINI] Potential prompt injection detected in text part: ` +
-              `${part.content.slice(0, 120)}${part.content.length > 120 ? '...' : ''}`
+              `${promptPart.content.slice(0, 120)}${promptPart.content.length > 120 ? '...' : ''}`
             );
           }
           
           // Log if text was truncated
-          if (sanitizedText.length < part.content.length) {
-            console.log(`[GEMINI] Text part truncated from ${part.content.length} to ${sanitizedText.length} characters`);
+          if (sanitizedText.length < promptPart.content.length) {
+            console.log(`[GEMINI] Text part truncated from ${promptPart.content.length} to ${sanitizedText.length} characters`);
           }
           
           apiParts.push({ text: sanitizedText });
         }
         // Image or other file content
-        else if (part.mimeType) {
+        else if (promptPart.mimeType) {
           let contentType: ContentType = 'image';
           
           // Determine content type from MIME type
-          if (SUPPORTED_MIME_TYPES.video.includes(part.mimeType)) {
+          if (SUPPORTED_MIME_TYPES.video.includes(promptPart.mimeType)) {
             contentType = 'video';
-          } else if (SUPPORTED_MIME_TYPES.audio.includes(part.mimeType)) {
+          } else if (SUPPORTED_MIME_TYPES.audio.includes(promptPart.mimeType)) {
             contentType = 'audio';
-          } else if (SUPPORTED_MIME_TYPES.document.includes(part.mimeType)) {
+          } else if (SUPPORTED_MIME_TYPES.document.includes(promptPart.mimeType)) {
             contentType = 'document';
           }
           
@@ -439,13 +439,13 @@ export class GeminiAdapter implements AIAdapter {
               // Create properly typed fileData structure with correct format for Gemini API
               // Updated to match the required data field format in newer SDK versions
               // Create properly typed part structure
-              const part: Part = {
+              const filePart: Part = {
                 fileData: {
                   fileUri: fileData.fileUri,
                   mimeType: fileData.mimeType
                 }
               };
-              apiParts.push(part);
+              apiParts.push(filePart);
             } else {
               // Use inline data for smaller images
               console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(part.content.length / 1024).toFixed(1)}KB, MIME: ${part.mimeType})`);
@@ -489,13 +489,13 @@ export class GeminiAdapter implements AIAdapter {
                 fileDataList.push(fileData);
                 
                 // Create properly typed part structure directly
-                const part: Part = {
+                const filePart: Part = {
                   fileData: {
                     fileUri: fileData.fileUri,
                     mimeType: fileData.mimeType
                   }
                 };
-                apiParts.push(part);
+                apiParts.push(filePart);
               }
             }
           } catch (error) {
