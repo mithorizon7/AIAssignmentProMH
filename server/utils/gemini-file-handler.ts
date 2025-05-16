@@ -10,6 +10,14 @@ import crypto from 'crypto';
 import { promises as fsp } from 'fs';
 // Import the GoogleGenAI for file handling
 import { GoogleGenAI } from '@google/genai';
+
+// Extended interface to handle both newer and older SDK versions
+interface ExtendedGoogleGenAI extends GoogleGenAI {
+  uploadFile?: (filePath: string, options?: { mimeType: string }) => Promise<any>;
+  files?: {
+    upload: (options: { file: string, config?: { mimeType: string } }) => Promise<any>;
+  };
+}
 import { Redis } from 'ioredis';
 // Define the file data interface locally to avoid circular dependencies
 // Updated to match the format expected by the current SDK version
@@ -64,7 +72,8 @@ async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
     
     // Only try to read from filesystem if it looks like a file path
     // This prevents trying to read MIME types as file paths
-    if (src.includes('/') || src.includes('\\') || !src.includes('/')) {
+    // Fixed logic to avoid always evaluating to true 
+    if (src.includes('/') || src.includes('\\')) {
       try {
         const fileBuffer = await fsp.readFile(src); // local path
         return fileBuffer;
@@ -94,7 +103,7 @@ async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
  * @returns File reference with camelCase properties
  */
 export async function createFileData(
-  genAI: GoogleGenAI,
+  genAI: ExtendedGoogleGenAI,
   source: Buffer | string,
   mimeType: string
 ): Promise<GeminiFileData> {
@@ -123,11 +132,27 @@ export async function createFileData(
     const tempFilePath = `/tmp/gemini-upload-${crypto.randomBytes(8).toString('hex')}`;
     await fsp.writeFile(tempFilePath, buf);
     
-    // Upload using the 'file' parameter (not 'buffer') as specified in SDK v0.14.0
-    const file = await genAI.files.upload({
-      file: tempFilePath,
-      config: { mimeType: mimeType }
-    });
+    // Upload using the current SDK method for file uploads
+    // Handle both version formats for backwards compatibility
+    let file;
+    try {
+      // First try the newer SDK format if available
+      if (genAI.files && typeof genAI.files.upload === 'function') {
+        file = await genAI.files.upload({
+          file: tempFilePath,
+          config: { mimeType: mimeType }
+        });
+      } else if (genAI.uploadFile) {
+        // Fallback to older SDK format if needed
+        file = await genAI.uploadFile(tempFilePath, { mimeType });
+      } else {
+        throw new Error("No compatible file upload method found in Gemini SDK");
+      }
+    } catch (uploadError) {
+      const errorMsg = uploadError instanceof Error ? uploadError.message : String(uploadError);
+      console.error(`[GEMINI] File upload error: ${errorMsg}`);
+      throw new Error(`Failed to upload file to Gemini: ${errorMsg}`);
+    }
     
     // Clean up the temp file after successful upload
     try {
@@ -146,11 +171,15 @@ export async function createFileData(
     }
     
     // Ensure we have a valid URI before returning
-    if (!file || !file.uri) {
-      throw new Error("File upload failed: No URI returned from Gemini API");
+    // Handle both fileId (newer SDK) and uri (older SDK) formats
+    const fileUri = file?.fileId || file?.uri || file?.name || null;
+    
+    if (!fileUri) {
+      throw new Error("File upload failed: No valid file identifier returned from Gemini API");
     }
     
-    return { fileUri: file.uri, mimeType: mimeType };
+    console.log(`[GEMINI] Successfully uploaded file to Gemini, identifier: ${fileUri}`);
+    return { fileUri: fileUri, mimeType: mimeType };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to upload file to Gemini: ${errorMessage}`);
