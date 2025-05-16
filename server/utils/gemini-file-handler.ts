@@ -83,11 +83,11 @@ async function fetchToBuffer(src: string | Buffer): Promise<Buffer> {
  */
 export async function createFileData(
   genAI: any,
-  source: Buffer,
+  source: Buffer | string,
   mimeType: string
 ): Promise<GeminiFileData> {
-  // Already a Buffer (enforced by function signature)
-  const buf = source;
+  // Resolve to a Buffer no matter what we get
+  const buf = await fetchToBuffer(source);
   
   // Generate hash to use as cache key
   const hash = crypto.createHash('sha256').update(buf).digest('hex');

@@ -412,12 +412,8 @@ export class GeminiAdapter implements AIAdapter {
             if (useFilesAPI || contentType === 'document') {
               console.log(`[GEMINI] Using Files API for ${contentType} content (${(contentLength / 1024).toFixed(1)}KB, MIME: ${mimeType})`);
               
-              // Convert content to Buffer if it's not already
-              const contentBuffer = Buffer.isBuffer(part.content) 
-                ? part.content 
-                : Buffer.from(typeof part.content === 'string' ? part.content : String(part.content));
-              
-              const fileData = await createFileData(this.genAI, contentBuffer, mimeType);
+              // Pass content directly to createFileData which will handle conversion
+              const fileData = await createFileData(this.genAI, part.content, mimeType);
               fileDataList.push(fileData);
               
               // Convert to SDK format and add to parts
