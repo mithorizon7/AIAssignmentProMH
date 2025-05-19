@@ -10,6 +10,10 @@ This directory contains reference documentation for the Google Gemini API, focus
 - [Text Generation](./text-generation.md) - Basic text generation capabilities and configuration
 - [Structured Output](./structured-output.md) - How to generate JSON and other structured formats
 - [Caching](./caching.md) - Using the context caching API for improved performance and cost savings
+- [Parts and Content](./parts-and-content.md) - Working with multi-part content in requests and responses
+- [Function Calling](./function-calling.md) - Implementing function calling capabilities in your application
+- [Code Execution](./code-execution.md) - Generating and executing code with Gemini
+- [Schema Reference](./schema-reference.md) - Detailed schema definitions for all Gemini API resources
 
 ## Usage
 
