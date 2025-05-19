@@ -42,9 +42,10 @@ describe('Multimodal Processor Utils', () => {
       // Verify
       expect(result).toBeDefined();
       expect(result.contentType).toBe('text');
+      expect(result.isProcessable).toBe(true);
       expect(result.content).toBe(textContent);
       expect(result.textContent).toBe(textContent);
-      expect(result.mimeType).toBe('text/plain');
+      expect(result.fileSize).toBe(buffer.length);
       expect(fs.promises.readFile).toHaveBeenCalledWith('/path/to/file.txt');
       expect(determineContentType).toHaveBeenCalledWith('txt', 'text/plain');
     });
@@ -65,9 +66,10 @@ describe('Multimodal Processor Utils', () => {
       // Verify
       expect(result).toBeDefined();
       expect(result.contentType).toBe('image');
+      expect(result.isProcessable).toBe(true);
       expect(result.content).toBe(imageBuffer);
       expect(result.textContent).toBeUndefined();
-      expect(result.mimeType).toBe('image/jpeg');
+      expect(result.fileSize).toBe(imageBuffer.length);
       expect(determineContentType).toHaveBeenCalledWith('jpg', 'image/jpeg');
     });
 
@@ -87,8 +89,9 @@ describe('Multimodal Processor Utils', () => {
       // Verify
       expect(result).toBeDefined();
       expect(result.contentType).toBe('document');
+      expect(result.isProcessable).toBe(true);
       expect(result.content).toBe(docBuffer);
-      expect(result.mimeType).toBe('application/pdf');
+      expect(result.fileSize).toBe(docBuffer.length);
       expect(determineContentType).toHaveBeenCalledWith('pdf', 'application/pdf');
     });
 
@@ -109,7 +112,8 @@ describe('Multimodal Processor Utils', () => {
       // Verify
       expect(result).toBeDefined();
       expect(result.contentType).toBe('document');
-      expect(result.mimeType).toBe('text/csv');
+      expect(result.isProcessable).toBe(true);
+      expect(result.fileSize).toBe(buffer.length);
       expect(determineContentType).toHaveBeenCalledWith('csv', 'text/csv');
     });
 
@@ -129,7 +133,7 @@ describe('Multimodal Processor Utils', () => {
       // Verify
       expect(result).toBeDefined();
       expect(result.contentType).toBe('text');
-      expect(result.mimeType).toBe('application/octet-stream');
+      expect(result.fileSize).toBe(unknownContent.length);
       expect(determineContentType).toHaveBeenCalledWith('bin', 'application/octet-stream');
     });
     

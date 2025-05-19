@@ -18,31 +18,6 @@ import crypto from 'crypto';
 // Import GCS client properly - will be available throughout the module 
 import * as gcsClient from './gcs-client';
 
-// Default hosts that are considered safe for downloading files
-const DEFAULT_ALLOWED_HOSTS = [
-  'storage.googleapis.com',
-  'googleapis.com',
-  'googleusercontent.com'
-];
-
-function getAllowedHosts(): string[] {
-  const extra = process.env.ALLOWED_DOWNLOAD_HOSTS;
-  if (!extra) {
-    return DEFAULT_ALLOWED_HOSTS;
-  }
-  return [
-    ...DEFAULT_ALLOWED_HOSTS,
-    ...extra.split(',').map((h) => h.trim()).filter(Boolean)
-  ];
-}
-
-function isHostAllowed(hostname: string): boolean {
-  const allowed = getAllowedHosts();
-  return allowed.some(
-    (host) => hostname === host || hostname.endsWith(`.${host}`)
-  );
-}
-
 const readFileAsync = promisify(fs.readFile);
 // fs.exists does not follow the Node callback convention, so promisify will
 // mis-handle its boolean argument. Use fs.promises.access instead.
@@ -435,7 +410,6 @@ export function isRemoteUrl(path: string): boolean {
 export async function downloadFromUrl(url: string, mimeType?: string): Promise<{ 
   buffer: Buffer, 
   localPath: string,
-  mimeType?: string,
   cleanup: () => Promise<void>
 }> {
   try {
@@ -451,15 +425,6 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
     // Validate URL
     if (!url || url.trim() === '') {
       throw new Error('Empty URL provided to downloadFromUrl');
-    }
-
-    // Validate host if this is an HTTP/HTTPS URL
-    if (!url.startsWith('gs://')) {
-      const hostname = new URL(url).hostname;
-      if (!isHostAllowed(hostname)) {
-        console.warn(`[DOWNLOAD] Disallowed host attempted: ${hostname}`);
-        throw new Error(`Disallowed host: ${hostname}`);
-      }
     }
     
     // Generate a temporary file path
@@ -503,7 +468,6 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
         
         // Write to temp file for operations that need a file path
         await writeFileAsync(localPath, fileBuffer);
-      mimeType,
         console.log(`[DOWNLOAD] Wrote GCS file data to temporary path: ${localPath} (${fileBuffer.length} bytes)`);
       } catch (gcsError) {
         console.error('[DOWNLOAD] Error downloading from GCS:', gcsError);
@@ -529,7 +493,6 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
             }
             
             await writeFileAsync(localPath, fileBuffer);
-      mimeType,
             console.log(`[DOWNLOAD] Wrote GCS file data to temporary path: ${localPath}`);
           } else {
             throw new Error(`Cannot process GCS path ${url} - GCS not configured`);
@@ -554,7 +517,6 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
           
           // Write to temp file for operations that need a file path
           await writeFileAsync(localPath, fileBuffer);
-      mimeType,
           console.log(`[DOWNLOAD] Wrote HTTP file data to temporary path: ${localPath}`);
         }
       } catch (fetchError) {
@@ -567,7 +529,6 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
     return { 
       buffer: fileBuffer, 
       localPath,
-      mimeType,
       // Function to clean up the temporary file
       cleanup: async () => {
         try {
@@ -642,7 +603,6 @@ export async function processFileForMultimodal(
         fileContent = downloadResult.buffer;
         temporaryFilePath = downloadResult.localPath;
         cleanup = downloadResult.cleanup;
-        mimeType = downloadResult.mimeType || mimeType;
         
         console.log(`[MULTIMODAL] Successfully downloaded file from URL, size: ${fileContent.length} bytes`);
         

@@ -14,7 +14,6 @@ This directory contains reference documentation for the Google Gemini API, focus
 - [Function Calling](./function-calling.md) - Implementing function calling capabilities in your application
 - [Code Execution](./code-execution.md) - Generating and executing code with Gemini
 - [Schema Reference](./schema-reference.md) - Detailed schema definitions for all Gemini API resources
-- [Troubleshooting Guide](./troubleshooting.md) - Solutions for common Gemini API issues and errors
 
 ## Usage
 

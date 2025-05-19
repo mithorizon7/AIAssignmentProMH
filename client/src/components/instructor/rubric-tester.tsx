@@ -28,7 +28,6 @@ interface FeedbackResult {
 export function RubricTester({ rubric, assignmentTitle, assignmentDescription }: RubricTesterProps) {
   const [activeTab, setActiveTab] = useState<string>("upload");
   const [file, setFile] = useState<File | null>(null);
-  const [uploadedFileData, setUploadedFileData] = useState<{ data: string; fileName: string; mimeType: string } | null>(null);
   const [codeContent, setCodeContent] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<FeedbackResult | null>(null);
@@ -57,41 +56,26 @@ export function RubricTester({ rubric, assignmentTitle, assignmentDescription }:
     multiple: true,
     onDrop: (acceptedFiles) => {
       if (acceptedFiles && acceptedFiles.length > 0) {
+        // Set the first file for displaying in the UI
         setFile(acceptedFiles[0]);
-
+        
+        // Read content of all files
         const allContents: string[] = [];
         let filesProcessed = 0;
-
+        
         acceptedFiles.forEach(file => {
           const reader = new FileReader();
-          const isText = file.type.startsWith('text') || file.type.includes('json') || file.type === '';
-
           reader.onload = (e) => {
             if (e.target?.result) {
-              if (isText) {
-                allContents.push(`File: ${file.name}\n\n${e.target.result as string}\n\n`);
-              } else {
-                const dataUrl = e.target.result as string;
-                setUploadedFileData({
-                  data: dataUrl.split(',')[1],
-                  fileName: file.name,
-                  mimeType: file.type
-                });
-                allContents.push(`File: ${file.name}\n\n[binary file]\n\n`);
-              }
-
+              allContents.push(`File: ${file.name}\n\n${e.target.result as string}\n\n`);
+              
               filesProcessed++;
               if (filesProcessed === acceptedFiles.length) {
                 setCodeContent(allContents.join('----------\n\n'));
               }
             }
           };
-
-          if (isText) {
-            reader.readAsText(file);
-          } else {
-            reader.readAsDataURL(file);
-          }
+          reader.readAsText(file);
         });
       }
     },
@@ -115,7 +99,6 @@ export function RubricTester({ rubric, assignmentTitle, assignmentDescription }:
 
   const handleReset = () => {
     setFile(null);
-    setUploadedFileData(null);
     setCodeContent("");
     setFeedback(null);
   };
@@ -149,22 +132,11 @@ ${rubricContext}
 Please evaluate this submission according to the above rubric criteria.
       `;
 
-      let payload: any = { assignmentContext };
-      if (uploadedFileData) {
-        payload = {
-          fileData: uploadedFileData.data,
-          fileName: uploadedFileData.fileName,
-          mimeType: uploadedFileData.mimeType,
-          assignmentContext
-        };
-      } else {
-        payload = {
-          content: codeContent,
-          assignmentContext
-        };
-      }
-
-      const response = await apiRequest('POST', '/api/test-rubric', payload);
+      // Send API request to test rubric
+      const response = await apiRequest('POST', '/api/test-rubric', {
+        content: codeContent,
+        assignmentContext
+      });
 
       const result = await response.json();
       setFeedback(result);
