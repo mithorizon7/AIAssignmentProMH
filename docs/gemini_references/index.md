@@ -9,6 +9,7 @@ This directory contains reference documentation for the Google Gemini API, focus
 - [Document Understanding](./document-understanding.md) - Working with PDFs and other document formats
 - [Text Generation](./text-generation.md) - Basic text generation capabilities and configuration
 - [Structured Output](./structured-output.md) - How to generate JSON and other structured formats
+- [Caching](./caching.md) - Using the context caching API for improved performance and cost savings
 
 ## Usage
 
