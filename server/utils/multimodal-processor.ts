@@ -558,15 +558,21 @@ export async function processFileForMultimodal(
   fileName: string,
   mimeType: string
 ): Promise<ProcessedFile> {
+  // Safe guard against undefined or null paths
+  if (!filePath) {
+    console.error(`[MULTIMODAL] Invalid file path: ${filePath}`);
+    throw new Error("Invalid file path: File path cannot be empty or undefined");
+  }
+  
   console.log(`[MULTIMODAL] Processing file for multimodal analysis:`, {
-    fileName,
-    mimeType,
+    fileName: fileName || 'unnamed-file',
+    mimeType: mimeType || 'application/octet-stream',
     filePathLength: filePath.length,
     // For debugging purposes, show part of the path without exposing the full URL
-    filePathStart: filePath.substring(0, 30) + '...',
+    filePathStart: filePath.substring(0, Math.min(30, filePath.length)) + (filePath.length > 30 ? '...' : ''),
     isGcsPath: filePath.startsWith('submissions/') || filePath.startsWith('anonymous-submissions/'),
     isSignedUrl: filePath.includes('storage.googleapis.com') && filePath.includes('Signature='),
-    imageType: mimeType.startsWith('image/') ? mimeType : 'not-image'
+    imageType: mimeType?.startsWith('image/') ? mimeType : 'not-image'
   });
   
   let temporaryFilePath: string | null = null;

@@ -185,7 +185,23 @@ Please evaluate this submission according to the above rubric criteria.
       }
 
       const result = await response.json();
-      setFeedback(result);
+      
+      // Check if the response has an error
+      if (result.error || !result.strengths || !result.improvements || !result.suggestions) {
+        console.error("API error response:", result);
+        throw new Error(result.message || result.error || "Invalid response format from server");
+      }
+      
+      // Ensure all required arrays exist to prevent rendering errors
+      const normalizedResult = {
+        ...result,
+        strengths: Array.isArray(result.strengths) ? result.strengths : [],
+        improvements: Array.isArray(result.improvements) ? result.improvements : [],
+        suggestions: Array.isArray(result.suggestions) ? result.suggestions : [],
+        summary: result.summary || "AI analysis completed"
+      };
+      
+      setFeedback(normalizedResult);
 
       toast({
         title: "Feedback Generated",
