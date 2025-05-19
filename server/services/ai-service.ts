@@ -213,6 +213,34 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
   }
 
   /**
+   * Analyzes an image submission using Gemini's multimodal capabilities
+   * @param params Object containing the image path and assignment context
+   */
+  async analyzeImageSubmission(params: { imagePath: string; assignmentContext?: string }): Promise<FeedbackResponse> {
+    return this.analyzeMultimodalSubmission({
+      filePath: params.imagePath,
+      fileName: params.imagePath.split('/').pop() || 'image.jpg',
+      mimeType: 'image/jpeg', // Default mime type, the processFileForMultimodal will detect the actual type
+      assignmentTitle: "Image Analysis",
+      assignmentDescription: params.assignmentContext
+    });
+  }
+
+  /**
+   * Analyzes a document submission (PDF, DOCX, etc.)
+   * @param params Object containing the document path and assignment context
+   */
+  async analyzeDocumentSubmission(params: { documentPath: string; assignmentContext?: string }): Promise<FeedbackResponse> {
+    return this.analyzeMultimodalSubmission({
+      filePath: params.documentPath,
+      fileName: params.documentPath.split('/').pop() || 'document.pdf',
+      mimeType: 'application/pdf', // Default mime type, the processFileForMultimodal will detect the actual type
+      assignmentTitle: "Document Analysis",
+      assignmentDescription: params.assignmentContext
+    });
+  }
+
+  /**
    * Analyzes a multimodal student submission (images, PDFs, etc.)
    * @param params Object containing file information, assignment details, and optional rubric
    */

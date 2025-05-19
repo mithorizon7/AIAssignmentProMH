@@ -5,6 +5,7 @@ import { configureAuth } from "./auth";
 import { submissionQueue } from "./queue/worker";
 import multer from "multer";
 import path from "path";
+import * as fs from 'fs';
 import { StorageService } from "./services/storage-service";
 import { AIService } from "./services/ai-service";
 import { GeminiAdapter, SUPPORTED_MIME_TYPES } from "./adapters/gemini-adapter";
@@ -1422,7 +1423,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
   }));
 
-  // Test rubric with AI (instructor only)
+  // Using fs for file operations
+
+// Test rubric with AI (instructor only)
   app.post('/api/test-rubric', requireAuth, requireRole('instructor'), 
     // Use multer middleware to handle file uploads
     upload.single('file'),
@@ -1452,16 +1455,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (isImage) {
             // For images, we use multimodal analysis
             console.log(`Processing image file: ${file.originalname} (${file.mimetype})`);
-            feedback = await aiService.analyzeImageSubmission({
-              imagePath: file.path,
-              assignmentContext
+            feedback = await aiService.analyzeMultimodalSubmission({
+              filePath: file.path,
+              fileName: file.originalname,
+              mimeType: file.mimetype,
+              assignmentTitle: "Image Analysis",
+              assignmentDescription: assignmentContext
             });
           } else if (isDocument) {
             // For documents, we use the document handling API
             console.log(`Processing document file: ${file.originalname} (${file.mimetype})`);
-            feedback = await aiService.analyzeDocumentSubmission({
-              documentPath: file.path,
-              assignmentContext
+            feedback = await aiService.analyzeMultimodalSubmission({
+              filePath: file.path,
+              fileName: file.originalname,
+              mimeType: file.mimetype,
+              assignmentTitle: "Document Analysis",
+              assignmentDescription: assignmentContext
             });
           } else {
             // For other files (text, code, etc.), read the file if we don't have content
@@ -1486,7 +1495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Clean up the temporary file if it exists
         if (file && file.path) {
-          fs.unlink(file.path, (err) => {
+          fs.unlink(file.path, (err: NodeJS.ErrnoException | null) => {
             if (err) console.error("Error removing temporary file:", err);
           });
         }
@@ -1503,7 +1512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Clean up the temporary file if it exists
         if (file && file.path) {
-          fs.unlink(file.path, (err) => {
+          fs.unlink(file.path, (err: NodeJS.ErrnoException | null) => {
             if (err) console.error("Error removing temporary file:", err);
           });
         }
