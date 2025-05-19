@@ -1423,8 +1423,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
   }));
 
-  // Using fs for file operations
-
 // Test rubric with AI (instructor only)
   app.post('/api/test-rubric', requireAuth, requireRole('instructor'), 
     // Use multer middleware to handle file uploads
