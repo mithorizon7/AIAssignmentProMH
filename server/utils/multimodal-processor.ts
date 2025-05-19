@@ -435,6 +435,7 @@ export function isRemoteUrl(path: string): boolean {
 export async function downloadFromUrl(url: string, mimeType?: string): Promise<{ 
   buffer: Buffer, 
   localPath: string,
+  mimeType?: string,
   cleanup: () => Promise<void>
 }> {
   try {
@@ -502,6 +503,7 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
         
         // Write to temp file for operations that need a file path
         await writeFileAsync(localPath, fileBuffer);
+      mimeType,
         console.log(`[DOWNLOAD] Wrote GCS file data to temporary path: ${localPath} (${fileBuffer.length} bytes)`);
       } catch (gcsError) {
         console.error('[DOWNLOAD] Error downloading from GCS:', gcsError);
@@ -527,6 +529,7 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
             }
             
             await writeFileAsync(localPath, fileBuffer);
+      mimeType,
             console.log(`[DOWNLOAD] Wrote GCS file data to temporary path: ${localPath}`);
           } else {
             throw new Error(`Cannot process GCS path ${url} - GCS not configured`);
@@ -551,6 +554,7 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
           
           // Write to temp file for operations that need a file path
           await writeFileAsync(localPath, fileBuffer);
+      mimeType,
           console.log(`[DOWNLOAD] Wrote HTTP file data to temporary path: ${localPath}`);
         }
       } catch (fetchError) {
@@ -563,6 +567,7 @@ export async function downloadFromUrl(url: string, mimeType?: string): Promise<{
     return { 
       buffer: fileBuffer, 
       localPath,
+      mimeType,
       // Function to clean up the temporary file
       cleanup: async () => {
         try {
@@ -637,6 +642,7 @@ export async function processFileForMultimodal(
         fileContent = downloadResult.buffer;
         temporaryFilePath = downloadResult.localPath;
         cleanup = downloadResult.cleanup;
+        mimeType = downloadResult.mimeType || mimeType;
         
         console.log(`[MULTIMODAL] Successfully downloaded file from URL, size: ${fileContent.length} bytes`);
         
