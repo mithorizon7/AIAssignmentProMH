@@ -1,0 +1,41 @@
+The rubric testing UI reads any uploaded file as text. If you upload a non‑text file (e.g., a DOCX or PDF rubric), the entire binary contents are read as a large text string and sent directly to Gemini. That binary data can easily expand to tens of thousands of tokens.
+
+In client/src/components/instructor/rubric-tester.tsx, every dropped file is processed using FileReader.readAsText, regardless of its type:
+
+48  ...,
+57  onDrop: (acceptedFiles) => {
+58    if (acceptedFiles && acceptedFiles.length > 0) {
+60      setFile(acceptedFiles[0]);
+66      acceptedFiles.forEach(file => {
+67        const reader = new FileReader();
+68        reader.onload = (e) => {
+69          if (e.target?.result) {
+70            allContents.push(`File: ${file.name}\n\n${e.target.result as string}\n\n`);
+74            setCodeContent(allContents.join('----------\n\n'));
+77          }
+78        };
+79        reader.readAsText(file);          // reads every file as text
+80      });
+
+Because binary files are turned into long text strings, the prompt fed to Gemini becomes extremely large. The Gemini adapter logs the token usage and fails once that huge prompt exceeds limits:
+
+219      // Get token count from actually captured metadata (no fallbacks)
+220      const tokenCount = result.usageMetadata?.totalTokenCount;
+223      if (result.usageMetadata) {
+224        const retryInfo = finishReason !== 'STOP' ? '(retry required)' : '';
+225        const metrics = {
+226          modelName: this.modelName,
+227          promptTokens: result.usageMetadata.promptTokenCount || 0,
+228          candidatesTokens: result.usageMetadata.candidatesTokenCount || 0,
+229          totalTokens: result.usageMetadata.totalTokenCount || 0,
+...
+
+Hence, even though your rubric text is small, uploading the file directly (especially in DOCX/PDF format) causes the binary contents to inflate the prompt to over 20 000 tokens, triggering the “MAX_TOKENS” error.
+
+To avoid this, convert the rubric to plain text before uploading (or modify the front‑end to upload the file as a real file rather than reading it as text). This will keep the prompt size small and prevent the token limit error.
+
+Summary
+
+The rubric tester reads all file types as text (FileReader.readAsText), so non‑text files turn into huge strings.
+Those large strings make the Gemini prompt exceed token limits, leading to the MAX_TOKENS failure.
+Converting the rubric to plain text (or adjusting the file upload logic) will prevent this token explosion.

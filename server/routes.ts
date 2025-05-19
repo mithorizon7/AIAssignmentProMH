@@ -1423,23 +1423,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Test rubric with AI (instructor only)
-  app.post('/api/test-rubric', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
-      const { content, assignmentContext } = req.body;
+  app.post('/api/test-rubric', requireAuth, requireRole('instructor'), 
+    // Use multer middleware to handle file uploads
+    upload.single('file'),
+    asyncHandler(async (req: Request, res: Response) => {
+      let content = req.body.content;
+      const { assignmentContext } = req.body;
+      let file = req.file;
       
-      if (!content) {
-        return res.status(400).json({ message: 'Content is required' });
+      // Check if we have either content or a file
+      if (!content && !file) {
+        return res.status(400).json({ message: 'Content or file is required' });
       }
       
       // Use AI service to analyze the content - always use GeminiAdapter since we have that key
       const aiService = new AIService(new GeminiAdapter());
       
       try {
-        const feedback = await aiService.analyzeProgrammingAssignment({
-          content,
-          assignmentContext
-        });
+        let feedback;
+        
+        if (file) {
+          // Handle image and binary file types differently
+          const isImage = file.mimetype.startsWith('image/');
+          const isDocument = file.mimetype.includes('pdf') || 
+                           file.mimetype.includes('word') || 
+                           file.mimetype.includes('doc');
+          
+          if (isImage) {
+            // For images, we use multimodal analysis
+            console.log(`Processing image file: ${file.originalname} (${file.mimetype})`);
+            feedback = await aiService.analyzeImageSubmission({
+              imagePath: file.path,
+              assignmentContext
+            });
+          } else if (isDocument) {
+            // For documents, we use the document handling API
+            console.log(`Processing document file: ${file.originalname} (${file.mimetype})`);
+            feedback = await aiService.analyzeDocumentSubmission({
+              documentPath: file.path,
+              assignmentContext
+            });
+          } else {
+            // For other files (text, code, etc.), read the file if we don't have content
+            if (!content) {
+              content = fs.readFileSync(file.path, 'utf8');
+            }
+            
+            feedback = await aiService.analyzeProgrammingAssignment({
+              content,
+              assignmentContext
+            });
+          }
+        } else {
+          // Text-only submission
+          feedback = await aiService.analyzeProgrammingAssignment({
+            content,
+            assignmentContext
+          });
+        }
         
         console.log("AI feedback generated successfully:", JSON.stringify(feedback).slice(0, 200) + "...");
+        
+        // Clean up the temporary file if it exists
+        if (file && file.path) {
+          fs.unlink(file.path, (err) => {
+            if (err) console.error("Error removing temporary file:", err);
+          });
+        }
         
         return res.json({
           strengths: feedback.strengths,
@@ -1450,6 +1500,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (error) {
         console.error("Error generating AI feedback:", error);
+        
+        // Clean up the temporary file if it exists
+        if (file && file.path) {
+          fs.unlink(file.path, (err) => {
+            if (err) console.error("Error removing temporary file:", err);
+          });
+        }
+        
         return res.status(500).json({ 
           message: 'Failed to generate AI feedback',
           error: error instanceof Error ? error.message : String(error)

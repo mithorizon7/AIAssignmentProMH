@@ -60,22 +60,45 @@ export function RubricTester({ rubric, assignmentTitle, assignmentDescription }:
         setFile(acceptedFiles[0]);
         
         // Read content of all files
-        const allContents: string[] = [];
+        const allFiles: File[] = [];
+        let textContents: string[] = [];
         let filesProcessed = 0;
         
         acceptedFiles.forEach(file => {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            if (e.target?.result) {
-              allContents.push(`File: ${file.name}\n\n${e.target.result as string}\n\n`);
+          allFiles.push(file);
+          
+          // Only read text files directly - binary files will be handled by the backend
+          const isTextFile = file.type.startsWith('text/') || 
+                             ['.py', '.java', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.json', '.md']
+                             .some(ext => file.name.toLowerCase().endsWith(ext));
+          
+          if (isTextFile) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              if (e.target?.result) {
+                textContents.push(`File: ${file.name}\n\n${e.target.result as string}\n\n`);
+              }
               
               filesProcessed++;
               if (filesProcessed === acceptedFiles.length) {
-                setCodeContent(allContents.join('----------\n\n'));
+                // Only join text contents
+                if (textContents.length > 0) {
+                  setCodeContent(textContents.join('----------\n\n'));
+                } else {
+                  setCodeContent(`Processing ${allFiles.length} files (including non-text files)`);
+                }
               }
+            };
+            reader.readAsText(file);
+          } else {
+            // For non-text files, just note that they will be processed by the backend
+            textContents.push(`File: ${file.name}\n\n[Binary file - will be processed directly]\n\n`);
+            filesProcessed++;
+            
+            if (filesProcessed === acceptedFiles.length) {
+              setCodeContent(textContents.join('----------\n\n'));
             }
-          };
-          reader.readAsText(file);
+          }
         });
       }
     },
@@ -132,11 +155,34 @@ ${rubricContext}
 Please evaluate this submission according to the above rubric criteria.
       `;
 
-      // Send API request to test rubric
-      const response = await apiRequest('POST', '/api/test-rubric', {
-        content: codeContent,
-        assignmentContext
-      });
+      let response;
+      
+      // Handle file upload differently based on file type
+      if (file) {
+        // Use FormData for file uploads to preserve binary data
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('assignmentContext', assignmentContext);
+        
+        // For text files that we've already read, include the content
+        if (codeContent) {
+          formData.append('content', codeContent);
+        }
+        
+        // Use fetch directly instead of apiRequest for FormData
+        response = await fetch('/api/test-rubric', {
+          method: 'POST',
+          body: formData,
+          // Don't set Content-Type header, let the browser set it with boundary
+          credentials: 'include'
+        });
+      } else {
+        // Text-only submission - use the regular API request
+        response = await apiRequest('POST', '/api/test-rubric', {
+          content: codeContent,
+          assignmentContext
+        });
+      }
 
       const result = await response.json();
       setFeedback(result);
