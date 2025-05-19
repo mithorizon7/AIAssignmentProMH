@@ -31,6 +31,15 @@ The adapter pattern allows for interchangeable AI services:
 - `adapters/gemini-adapter.ts`: Implementation using Google's Gemini API
 - `adapters/openai-adapter.ts`: Alternative implementation using OpenAI's API
 
+For comprehensive documentation on Gemini API integration, refer to the [Gemini API References](/docs/gemini_references/index.md) which includes detailed guides for:
+
+- File handling and uploads
+- Image and document processing
+- Multipart content handling
+- Function calling
+- Code execution
+- Schema definitions and more
+
 ### Services
 
 Services implement core business logic:
