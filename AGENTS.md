@@ -140,6 +140,19 @@ When writing code that uses Gemini:
 4. **Cache responses when appropriate**: Use Redis caching for identical prompts
 5. **Track token usage**: Log consumption for monitoring and optimization
 
+## How to Work in This Repository
+
+1. **Understand the Task**: Clarify the requirements.
+2. **Consult Documentation**:
+   - For general structure, refer to the main [README.md](README.md) and specific directory READMEs.
+   - **For ANY AI-related tasks (Gemini API, prompts, AI feedback logic), ALWAYS start with [docs/README.md](docs/README.md) and dive deep into the relevant files within [docs/gemini_references/](docs/gemini_references/).**
+3. **Locate Relevant Code**: Use the directory structure and READMEs to find the modules you need to modify.
+4. **Implement Changes**: Write clear, maintainable code following established patterns.
+5. **Test Thoroughly**: Run relevant tests and add new tests as needed.
+6. **Validate**: Run linters and type checkers.
+7. **Document**: Update any necessary documentation, especially for AI changes.
+8. **Prepare PR**: Follow the PR instructions above.
+
 ## Internal Implementation Details
 
 Implementation specifics:
@@ -147,7 +160,12 @@ Implementation specifics:
 - File handling utilities in `server/utils/gemini-file-handler.ts` handle data URIs and Files API
 - Response schemas follow the formats defined in `server/schemas/gradingSchema.ts`
 - Token usage tracking implemented in adapter response handling
+- AI adapters are in `server/adapters/` with the primary Gemini adapter at `server/adapters/gemini-adapter.ts`
+- The general AI adapter interface is defined in `server/adapters/ai-adapter.ts`
 
 For detailed information on architecture and implementation, refer to:
 - [Server Documentation](server/README.md)
+- [Client Documentation](client/README.md)
+- [Shared Types Documentation](shared/README.md)
+- [Testing Documentation](test/README.md)
 - [Gemini Adapter Improvements](gemini_adapter_improvements.md)
