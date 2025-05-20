@@ -1,8 +1,19 @@
-# AI Agent Guidelines for AIGrader
+# AIGrader - Agent Contributor Guide
 
 This document provides essential guidance for AI agents working with the AIGrader platform, focusing on best practices for prompt engineering, Gemini API usage, and AI-powered assessment.
 
-## Required Documentation Resources
+## Overview
+
+The AIGrader platform is designed to enhance educational workflows through intelligent error handling and robust parsing mechanisms, scaling for large classes.
+
+- **Main Project README**: For a comprehensive overview of the project, features, technology stack, and setup, please refer to the main [README.md](README.md).
+- **Directory Structure**: A detailed directory structure is available in the main [README.md](README.md). Familiarize yourself with the `client/`, `server/`, `shared/`, and `test/` directories.
+
+## Critical AI Integration Documentation
+
+**This is the most critical section for tasks involving AI functionality.**
+
+### Required Documentation Resources
 
 All agents MUST review these key resources before working with the AIGrader codebase:
 
@@ -13,15 +24,44 @@ All agents MUST review these key resources before working with the AIGrader code
 - **[Document Understanding Guide](docs/gemini_references/document-understanding.md)**: Working with PDFs and documents
 - **[Structured Output Guide](docs/gemini_references/structured-output.md)**: Generating JSON and structured formats
 - **[Function Calling Guide](docs/gemini_references/function-calling.md)**: Using function calling with Gemini
+- **[Files API Overview](docs/gemini_references/files-api-overview.md)**: Working with the Gemini Files API for file uploads
+- **[Parts and Content](docs/gemini_references/parts-and-content.md)**: Multi-part content in requests and responses
+- **[Code Execution](docs/gemini_references/code-execution.md)**: Generating and executing code with Gemini
+- **[Caching](docs/gemini_references/caching.md)**: Context caching API for improved performance
+- **[Schema Reference](docs/gemini_references/schema-reference.md)**: Detailed schema definitions for all API resources
+
+**Before implementing any changes to AI features, verify your understanding by reviewing the relevant `docs/gemini_references/` documents.**
 
 ## Development Environment Setup
 
-- Run `npm run dev` to start the development server
-- Use `npm run db:push` to migrate database schema changes
+- **Prerequisites**: Ensure Node.js and PostgreSQL are installed
+- **Installation**: Run `npm install` to install dependencies
+- **Environment Variables**: Copy `.env.example` to `.env` and configure as needed. Critical variables include `NODE_ENV`, `GEMINI_API_KEY`, `DATABASE_URL`, and Redis settings
+- **Database Setup**: Run `npm run db:push` to migrate database schema changes
+- **Development Server**: Run `npm run dev` to start the development server (runs both backend and frontend with hot reloading)
 - For testing Gemini API changes, use the test scripts in project root (e.g., `test-gemini-adapter.js`)
 - Test image upload handling with small images (< 5MB) using data URIs
 - For larger files, use the Files API with proper MIME type specification
-- Run tests with `npm test` before submitting changes
+
+## Testing Instructions
+
+Comprehensive testing is crucial for maintaining quality:
+
+- **Running All Tests**: `npm test`
+- **Specific Test Types**:
+  ```bash
+  ./test/run-tests.sh unit
+  ./test/run-tests.sh integration
+  ./test/run-tests.sh components
+  ./test/run-tests.sh e2e
+  ```
+- **Linting**: `npm run lint`
+- **Type Checking**: `npm run typecheck` or `npm run check`
+- **Validation**:
+  - All code changes should pass relevant tests
+  - Fix any test or type errors until the entire suite passes
+  - After moving files or changing imports, run linting to ensure rules still pass
+  - Add or update tests for the code you change, even if not explicitly asked
 
 ## File Structure Conventions
 
@@ -63,15 +103,22 @@ Configure the Gemini API with these parameters:
 4. **Response format**: Set `responseMimeType` to "application/json" for structured outputs
 5. **System instructions**: Use to set global behavioral constraints
 
-## PR Requirements
+## PR Instructions
 
 When submitting changes:
 
-1. **Testing**: All changes must pass existing tests and include new tests for added functionality
-2. **Documentation**: Update relevant docs in `/docs/gemini_references/` when changing API behavior
-3. **Error handling**: Implement robust error handling for API failures
-4. **Performance**: Consider token usage and optimize prompts for efficiency
-5. **Accessibility**: Ensure all feedback is clearly formatted and easy to understand
+1. **Title Format**: `[area_of_code] Brief description of changes` (e.g., `[server/gemini] Fix for file upload handling`)
+2. **Description**:
+   - Clearly describe the problem and the solution
+   - Reference any relevant issue numbers
+   - Detail how to test the changes
+   - **Explicitly state which `docs/gemini_references/` documents were consulted if the changes involve AI/Gemini API features**
+3. **Code Quality Requirements**:
+   - **Testing**: All changes must pass existing tests and include new tests for added functionality
+   - **Documentation**: Update relevant docs in `/docs/gemini_references/` when changing API behavior
+   - **Error handling**: Implement robust error handling for API failures
+   - **Performance**: Consider token usage and optimize prompts for efficiency
+   - **Accessibility**: Ensure all feedback is clearly formatted and easy to understand
 
 ## Best Practices for AI Assessment
 
