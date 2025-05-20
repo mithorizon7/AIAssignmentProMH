@@ -1463,55 +1463,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
               console.log(`Using ${isSmallImage ? 'data URI' : 'buffer'} for image processing`);
               
-              // Parse the assignment context properly from the form data
-              let parsedContext;
-              try {
-                // Check if we have a proper assignment context
-                if (assignmentContext) {
-                  // Extract title, description, and rubric from the context
-                  const titleMatch = assignmentContext.match(/Assignment: (.*?)(?:\n|$)/);
-                  const descriptionMatch = assignmentContext.match(/Description: ([\s\S]*?)(?:\n\n|$)/);
-                  const rubricMatch = assignmentContext.match(/Rubric:\n([\s\S]*?)(?:\n\n|$)/);
-                  
-                  parsedContext = {
-                    title: titleMatch ? titleMatch[1].trim() : "Image Analysis",
-                    description: descriptionMatch ? descriptionMatch[1].trim() : "",
-                    rubric: rubricMatch ? rubricMatch[1].trim() : ""
-                  };
-                  
-                  console.log("Extracted assignment context:", {
-                    title: parsedContext.title,
-                    descriptionPreview: parsedContext.description.substring(0, 50) + "...",
-                    hasRubric: !!parsedContext.rubric
-                  });
-                }
-              } catch (parseError) {
-                console.error("Error parsing assignment context:", parseError);
-                // Continue with default values if parsing fails
-              }
-              
-              // Create a more detailed prompt that emphasizes assignment requirements
-              const enhancedPrompt = `
-# ASSIGNMENT CONTEXT
-Assignment: ${parsedContext?.title || "Image Analysis"}
-
-${assignmentContext || "Please analyze this image submission."}
-
-IMPORTANT EVALUATION INSTRUCTIONS:
-1. First determine if the image content matches the assignment requirements above
-2. The submission MUST be evaluated primarily on how well it fulfills the specific requirements
-3. If the submission does not address the assignment topic, provide critical feedback highlighting this mismatch
-4. Analyze content, composition, technical execution in relation to the assignment requirements
-5. Provide specific feedback that references how elements fulfill or fail to fulfill assignment criteria
-`;
-              
               feedback = await aiService.analyzeMultimodalSubmission({
                 fileBuffer: file.buffer,
                 fileDataUri: imageDataUri, // Add data URI for small images
                 fileName: file.originalname,
                 mimeType: file.mimetype,
-                assignmentTitle: parsedContext?.title || "Image Analysis",
-                assignmentDescription: enhancedPrompt
+                assignmentTitle: "Image Analysis",
+                assignmentDescription: assignmentContext || "Please analyze this image submission."
               });
             } catch (error: any) {
               console.error(`Error analyzing image: ${error.message || 'Unknown error'}`, error);

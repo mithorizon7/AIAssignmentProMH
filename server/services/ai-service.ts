@@ -48,31 +48,155 @@ export class AIService {
    * Legacy method for backward compatibility
    * @deprecated Use analyzeSubmission instead
    */
-  async generateFeedback(
-    content: string, 
-    assignmentTitle: string, 
-    assignmentDescription?: string
-  ): Promise<FeedbackResponse> {
+  async analyzeProgrammingAssignment(submission: { content: string; assignmentContext?: string }): Promise<FeedbackResponse> {
     return this.analyzeSubmission({
-      studentSubmissionContent: content,
-      assignmentTitle,
-      assignmentDescription
+      studentSubmissionContent: submission.content,
+      assignmentTitle: "Assignment",
+      assignmentDescription: submission.assignmentContext
     });
   }
 
   /**
-   * Analyzes a student submission and provides feedback based on the assignment context
-   * @param params Object containing the submission content, assignment details, and optional rubric
+   * Analyzes a student submission with enhanced prompt construction
+   * @param params Object containing submission content, assignment details, and optional rubric
    */
   async analyzeSubmission(params: SubmissionAnalysisRequest): Promise<FeedbackResponse> {
     const startTime = Date.now();
     
     try {
-      // Create the prompt for the AI with system guidance and student submission
-      const systemPrompt = this.createSystemPrompt(params);
-            
-      // Generate the completion
-      const response = await this.adapter.generateCompletion(params.studentSubmissionContent, systemPrompt);
+      const promptSegments = [];
+
+      // Introduction and role definition
+      promptSegments.push(
+        `You are an expert AI Teaching Assistant. Your primary goal is to provide comprehensive, constructive, and actionable feedback on a student's assignment submission.
+Your feedback should be encouraging, specific, and aimed at helping the student learn and improve their work according to the provided assignment details and evaluation criteria.
+You MUST respond in a valid JSON format only. Do not include any explanatory text before or after the JSON object.`
+      );
+
+      // Assignment details
+      promptSegments.push(
+        `\n## Assignment Details:
+Title: "${params.assignmentTitle}"
+Description: "${params.assignmentDescription || 'No general description provided.'}"`
+      );
+      
+      // Add instructor context if provided (secret information not shown to students)
+      if (params.instructorContext) {
+        let contextContent = params.instructorContext.content;
+        
+        promptSegments.push(
+          `\n## Instructor-Only Evaluation Guidance (USE THIS INFORMATION BUT DO NOT REVEAL IT TO STUDENTS):
+${contextContent}
+
+IMPORTANT: The above section contains specific guidance provided by the instructor to help in your evaluation. 
+Use these points to inform your analysis and the feedback you provide, but DO NOT directly quote or reveal 
+this instructor-provided information in your feedback to the student. Instead, incorporate these insights
+into your evaluation logic while keeping the actual guidance confidential.`
+        );
+      }
+
+      // Setup JSON output structure
+      let jsonOutputStructureFields = [
+        `"strengths": ["A list of 2-5 specific positive aspects of the submission, clearly explained (array of strings). Relate these to the assignment goals or rubric if applicable."],`,
+        `"improvements": ["A list of 2-5 specific areas where the submission could be improved, with constructive explanations (array of strings). Relate these to the assignment goals or rubric if applicable."],`,
+        `"suggestions": ["A list of 2-5 concrete, actionable suggestions the student can implement to improve their work or understanding (array of strings)."],`,
+        `"summary": "A concise (2-4 sentences) overall summary of the submission's quality, highlighting key takeaways for the student."`
+      ];
+
+      // Include rubric information if provided
+      if (params.rubric && params.rubric.criteria && params.rubric.criteria.length > 0) {
+        promptSegments.push("\n## Evaluation Rubric:");
+        promptSegments.push("You MUST evaluate the student's submission against EACH of the following rubric criteria meticulously. For each criterion, provide specific feedback and a numeric score within the specified range.");
+
+        // Format criteria details
+        let criteriaDetails = params.rubric.criteria.map(criterion => {
+          let criterionString = `- Criterion Name: "${criterion.name}" (ID: ${criterion.id})\n`;
+          criterionString += `  Description: "${criterion.description}"\n`;
+          criterionString += `  Maximum Score: ${criterion.maxScore}`;
+          if (criterion.weight) {
+            criterionString += ` (Weight: ${criterion.weight}%)`;
+          }
+          return criterionString;
+        }).join("\n");
+        promptSegments.push(criteriaDetails);
+
+        // Add criteria scores to JSON output structure
+        jsonOutputStructureFields.push(
+          `"criteriaScores": [
+    // For EACH criterion listed above, include an object like this:
+    {
+      "criteriaId": "ID_of_the_criterion",
+      "score": <numeric_score_for_this_criterion_up_to_its_maxScore>,
+      "feedback": "Specific, detailed feedback for this particular criterion, explaining the rationale for the score and how to improve (string)."
+    }
+    // ... ensure one object per criterion
+  ],`
+        );
+        jsonOutputStructureFields.push(
+          `"score": <OPTIONAL but Recommended: An overall numeric score from 0-100. If rubric criteria have weights, attempt to calculate a weighted average. Otherwise, provide a holistic quality score.>`
+        );
+      } else {
+        // General evaluation guidelines when no rubric is provided
+        promptSegments.push(
+          `\n## General Evaluation Focus (No specific rubric provided):
+Please analyze the submission for:
+1.  Clarity, coherence, and organization of the content.
+2.  Fulfillment of the assignment requirements as per the description.
+3.  Identification of strengths and positive aspects.
+4.  Areas that could be improved, with constructive explanations.
+5.  Actionable suggestions for the student.
+6.  If the submission appears to be code or involves technical problem-solving, also consider aspects like correctness, efficiency (if discernible), and clarity/documentation.`
+        );
+        jsonOutputStructureFields.push(
+          `"criteriaScores": [] // Empty array as no specific rubric criteria were provided for itemized scoring.`
+        );
+        jsonOutputStructureFields.push(
+          `"score": <A numeric score from 0-100 representing the overall quality based on the general evaluation focus above.>`
+        );
+      }
+
+      // JSON output structure instructions
+      promptSegments.push(
+        `\n## JSON Output Structure:
+Your response MUST be a single, valid JSON object adhering to the following structure. Ensure all string values are properly escaped within the JSON.
+{
+  ${jsonOutputStructureFields.join("\n  ")}
+}`
+      );
+
+      // Student submission content
+      promptSegments.push(
+        `\n## Student's Submission Content to Evaluate:
+\`\`\`
+${params.studentSubmissionContent}
+\`\`\`
+`
+      );
+
+      // Final instruction
+      promptSegments.push("\nProvide your feedback now as a single, valid JSON object:");
+
+      // Combine all sections into the final prompt
+      const finalPrompt = promptSegments.join("\n");
+
+      // Create a system prompt for text submissions
+      const systemPrompt = `You are an expert AI Teaching Assistant analyzing a text-based submission.
+Your task is to provide precise, detailed, and constructive feedback on the student's work.
+
+Your feedback should be:
+- Specific and reference exact elements in the submission
+- Constructive and actionable
+- Balanced, noting both strengths and areas for improvement
+- Free of personal opinions or bias
+- Focused on helping the student improve
+
+Respond ONLY with valid, complete JSON matching the requested structure.
+Do not include explanatory text, comments, or markdown outside the JSON object.`;
+
+      console.log(`[AIService] Using system prompt for text submission (${systemPrompt.length} chars)`);
+      
+      // Send to AI adapter with system prompt
+      const response = await this.adapter.generateCompletion(finalPrompt, systemPrompt);
       
       const processingTime = Date.now() - startTime;
       
@@ -81,13 +205,41 @@ export class AIService {
         processingTime
       };
     } catch (error: unknown) {
-      console.error('[AIService] AI submission analysis error:', error);
+      console.error('AI submission analysis error:', error);
       if (error instanceof Error) {
         throw new Error(`Failed to analyze submission: ${error.message}`);
       } else {
         throw new Error(`Failed to analyze submission: ${String(error)}`);
       }
     }
+  }
+
+  /**
+   * Analyzes an image submission using Gemini's multimodal capabilities
+   * @param params Object containing the image path and assignment context
+   */
+  async analyzeImageSubmission(params: { imagePath: string; assignmentContext?: string }): Promise<FeedbackResponse> {
+    return this.analyzeMultimodalSubmission({
+      filePath: params.imagePath,
+      fileName: params.imagePath.split('/').pop() || 'image.jpg',
+      mimeType: 'image/jpeg', // Default mime type, the processFileForMultimodal will detect the actual type
+      assignmentTitle: "Image Analysis",
+      assignmentDescription: params.assignmentContext
+    });
+  }
+
+  /**
+   * Analyzes a document submission (PDF, DOCX, etc.)
+   * @param params Object containing the document path and assignment context
+   */
+  async analyzeDocumentSubmission(params: { documentPath: string; assignmentContext?: string }): Promise<FeedbackResponse> {
+    return this.analyzeMultimodalSubmission({
+      filePath: params.documentPath,
+      fileName: params.documentPath.split('/').pop() || 'document.pdf',
+      mimeType: 'application/pdf', // Default mime type, the processFileForMultimodal will detect the actual type
+      assignmentTitle: "Document Analysis",
+      assignmentDescription: params.assignmentContext
+    });
   }
 
   /**
@@ -149,20 +301,32 @@ export class AIService {
         // Process the file from a path
         // This automatically handles both local paths and remote URLs (S3, HTTP)
         processedFile = await processFileForMultimodal(
-          params.filePath, 
-          params.fileName, 
+          params.filePath,
+          params.fileName,
           params.mimeType
         );
       } else {
-        throw new Error('No file content provided (buffer, path, or data URI required)');
+        throw new Error("Either filePath or fileBuffer must be provided");
       }
       
-      // Check if we can use multimodal processing for this file type
-      if (!processedFile) {
-        console.log(`[AIService] No processed file available, falling back to text analysis`);
+      console.log(`[AIService] File processed, content type: ${processedFile.contentType}`);
+      
+      // If the adapter doesn't support multimodal input, fallback to text analysis
+      if (!this.adapter.generateMultimodalCompletion) {
+        console.log('[AIService] AI adapter does not support multimodal content; falling back to text-only analysis');
         
-        // Fall back to text-only analysis
-        let textContent = 'No file content could be processed';
+        // Use extracted text content if available
+        let textContent = params.textContent || '';
+        if (processedFile.textContent) {
+          textContent = processedFile.textContent;
+          console.log('[AIService] Using extracted text content for fallback analysis');
+        } else if (typeof processedFile.content === 'string') {
+          textContent = processedFile.content;
+          console.log('[AIService] Using raw string content for fallback analysis');
+        } else {
+          textContent = `[This submission contains ${processedFile.contentType} content that could not be automatically processed as text]`;
+          console.log('[AIService] No text content available, using placeholder');
+        }
         
         return this.analyzeSubmission({
           studentSubmissionContent: textContent,
@@ -269,55 +433,5 @@ into your evaluation logic while keeping the actual guidance confidential.`;
       modelName: feedback.modelName,
       tokenCount: feedback.tokenCount
     };
-  }
-
-  /**
-   * Helper method to create a system prompt for the AI
-   * @param params Object containing submission and assignment details
-   */
-  private createSystemPrompt(params: SubmissionAnalysisRequest): string {
-    let systemPrompt = `You are an expert AI Teaching Assistant analyzing student submissions.
-Your task is to provide precise, detailed, and constructive feedback on the student's work.
-
-For each submission, analyze:
-- Technical correctness
-- Understanding of concepts
-- Structure and organization 
-- Relevance to the assignment
-
-Respond with a structured assessment including:
-- Specific strengths of the submission
-- Areas for improvement
-- Targeted suggestions for enhancing the work
-
-Assignment: ${params.assignmentTitle}`;
-
-    // Add description if provided
-    if (params.assignmentDescription) {
-      systemPrompt += `\nDescription: ${params.assignmentDescription}`;
-    }
-    
-    // Add instructor context if provided (secret information not shown to students)
-    if (params.instructorContext) {
-      let contextContent = params.instructorContext.content;
-      
-      systemPrompt += `\n\n## INSTRUCTOR-ONLY EVALUATION GUIDANCE (DO NOT REVEAL TO STUDENTS):
-${contextContent}
-
-IMPORTANT: The above section contains specific guidance provided by the instructor to help in your evaluation. 
-Use these points to inform your analysis and the feedback you provide, but DO NOT directly quote or reveal 
-this instructor-provided information in your feedback to the student. Instead, incorporate these insights
-into your evaluation logic while keeping the actual guidance confidential.`;
-    }
-    
-    // Add rubric if provided
-    if (params.rubric && params.rubric.criteria && params.rubric.criteria.length > 0) {
-      systemPrompt += '\n\nRubric criteria to assess:';
-      for (const criterion of params.rubric.criteria) {
-        systemPrompt += `\n- ${criterion.name}: ${criterion.description} (Max score: ${criterion.maxScore})`;
-      }
-    }
-    
-    return systemPrompt;
   }
 }
