@@ -1454,7 +1454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // For images, we use multimodal analysis
             console.log(`Processing image file: ${file.originalname} (${file.mimetype})`);
             feedback = await aiService.analyzeMultimodalSubmission({
-              filePath: file.path,
+              fileBuffer: file.buffer, // Use buffer instead of path since we're using memoryStorage
               fileName: file.originalname,
               mimeType: file.mimetype,
               assignmentTitle: "Image Analysis",
@@ -1464,7 +1464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // For documents, we use the document handling API
             console.log(`Processing document file: ${file.originalname} (${file.mimetype})`);
             feedback = await aiService.analyzeMultimodalSubmission({
-              filePath: file.path,
+              fileBuffer: file.buffer, // Use buffer instead of path since we're using memoryStorage
               fileName: file.originalname,
               mimeType: file.mimetype,
               assignmentTitle: "Document Analysis",
