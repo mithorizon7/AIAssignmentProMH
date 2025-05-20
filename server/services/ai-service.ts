@@ -257,7 +257,27 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
       if (params.fileBuffer) {
         console.log(`[AIService] Processing file from buffer (${params.fileBuffer.length} bytes)`);
         // If we have a buffer (from multer memory storage), process it directly
-        const contentType = determineContentType(params.mimeType, params.fileName);
+        // Get content type directly from the utils
+        let contentType: ContentType = 'image';
+        
+        // Determine content type based on MIME type
+        if (params.mimeType.startsWith('image/')) {
+          contentType = 'image';
+        } else if (params.mimeType.startsWith('text/') || 
+                  params.mimeType.includes('javascript') || 
+                  params.mimeType.includes('json')) {
+          contentType = 'text';
+        } else if (params.mimeType.includes('pdf') || 
+                  params.mimeType.includes('word') || 
+                  params.mimeType.includes('excel') || 
+                  params.mimeType.includes('powerpoint') || 
+                  params.mimeType.includes('document')) {
+          contentType = 'document';
+        } else if (params.mimeType.startsWith('audio/')) {
+          contentType = 'audio';
+        } else if (params.mimeType.startsWith('video/')) {
+          contentType = 'video';
+        }
         processedFile = {
           content: params.fileBuffer,
           contentType,
