@@ -1500,8 +1500,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 // If we parsed a rubric, create a rubric object for the AI
                 rubric: parsedContext?.rubric ? {
                   criteria: parsedContext.rubric.split('\n')
-                    .filter(line => line.trim().length > 0)
-                    .map(line => {
+                    .filter((line: string) => line.trim().length > 0)
+                    .map((line: string) => {
                       const match = line.match(/(.*?)\s*\((.*?), Max Score: (.*?), Weight: (.*?)\): (.*)/);
                       if (match) {
                         return {
