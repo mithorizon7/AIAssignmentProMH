@@ -74,14 +74,17 @@ Key directories to understand:
 
 ## Effective Prompt Design Guidelines
 
-When designing prompts, follow these principles from the [Prompting Strategies Guide](docs/gemini_references/prompting-strategies.md):
+When designing prompts (i.e., when Codex is writing or modifying prompts that AIGrader will send to the Gemini API), follow these principles, guided by the detailed [Prompting Strategies Guide](docs/gemini_references/prompting-strategies.md):
 
-1. **Be clear and specific**: Provide explicit instructions to minimize ambiguity
-2. **Use few-shot examples**: Include 2-3 examples to demonstrate desired outputs
-3. **Add relevant context**: Provide necessary background information
-4. **Format responses appropriately**: Request specific output formats (JSON, markdown)
-5. **Break down complex tasks**: Divide multi-step assignments into smaller components
-6. **Apply constraints**: Set explicit boundaries on response length, style, etc.
+1.  **Be clear and specific**: Provide explicit instructions to minimize ambiguity. This aligns with the guidance to provide clear and specific instructions to customize model behavior.
+2.  **Prefer few-shot examples for clarity and consistency**:
+    * While zero-shot prompts (no examples) can be effective for simpler tasks if instructions are very clear, few-shot examples (typically 2-3) can sometimes be helpful for guiding the Gemini model. They are often more effective for complex tasks, achieving specific output formatting, or conveying nuanced response patterns.
+    * The goal is to provide the clearest possible guidance to the model. Sometimes, clear instructions suffice; often, examples make the desired output unambiguous.
+    * Always refer to the main [Prompting Strategies Guide](docs/gemini_references/prompting-strategies.md) for detailed advice on when and how to use few-shot examples, and when experimentation might be needed.
+3.  **Add relevant context**: Provide necessary background information or data the model needs.
+4.  **Format responses appropriately**: Request specific output formats (e.g., JSON, markdown) if needed, and consider using the completion strategy to guide formatting.
+5.  **Break down complex tasks**: Divide multi-step assignments into smaller, more manageable prompt components or chains if necessary.
+6.  **Apply constraints**: Set explicit boundaries on response length, style, or what the model should or shouldn't do.
 
 ## Multimodal Content Processing
 
