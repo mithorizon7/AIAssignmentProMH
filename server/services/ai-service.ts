@@ -14,6 +14,7 @@ interface SubmissionAnalysisRequest {
 interface MultimodalSubmissionAnalysisRequest {
   filePath?: string;               // Path to the uploaded file (optional if fileBuffer is provided)
   fileBuffer?: Buffer;             // Buffer with file content (optional if filePath is provided)
+  fileDataUri?: string;            // Data URI representation of the file (for small images)
   fileName: string;                // Original file name
   mimeType: string;                // MIME type of the file
   textContent?: string;            // Optional extracted text content
@@ -253,14 +254,25 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
       
       let processedFile;
       
-      // Handle either file buffer or file path
-      if (params.fileBuffer) {
-        console.log(`[AIService] Processing file from buffer (${params.fileBuffer.length} bytes)`);
-        // If we have a buffer (from multer memory storage), process it directly
-        // Get content type directly from the utils
+      // Handle file data in different forms (data URI, buffer, or path)
+      if (params.fileDataUri && params.mimeType.startsWith('image/')) {
+        // Use data URI for small images for reliable processing
+        console.log(`[AIService] Processing image from data URI`);
         let contentType: ContentType = 'image';
         
+        processedFile = {
+          content: params.fileDataUri, // Use the data URI directly
+          contentType,
+          mimeType: params.mimeType,
+          textContent: params.textContent
+        };
+      } else if (params.fileBuffer) {
+        console.log(`[AIService] Processing file from buffer (${params.fileBuffer.length} bytes)`);
+        // If we have a buffer (from multer memory storage), process it directly
+        
         // Determine content type based on MIME type
+        let contentType: ContentType = 'image';
+        
         if (params.mimeType.startsWith('image/')) {
           contentType = 'image';
         } else if (params.mimeType.startsWith('text/') || 
@@ -278,6 +290,7 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
         } else if (params.mimeType.startsWith('video/')) {
           contentType = 'video';
         }
+        
         processedFile = {
           content: params.fileBuffer,
           contentType,

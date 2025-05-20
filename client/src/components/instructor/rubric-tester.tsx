@@ -159,7 +159,10 @@ Please evaluate this submission according to the above rubric criteria.
       
       // Handle file upload differently based on file type
       if (file) {
-        // Use FormData for file uploads to preserve binary data
+        // Log the file details to help debug
+        console.log(`Uploading file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
+        
+        // Create FormData for file uploads to preserve binary data
         const formData = new FormData();
         formData.append('file', file);
         formData.append('assignmentContext', assignmentContext);
@@ -168,6 +171,11 @@ Please evaluate this submission according to the above rubric criteria.
         if (codeContent) {
           formData.append('content', codeContent);
         }
+        
+        // Include file metadata to help the server identify the file type correctly
+        formData.append('fileName', file.name);
+        formData.append('mimeType', file.type);
+        formData.append('fileSize', file.size.toString());
         
         // Use fetch directly instead of apiRequest for FormData
         response = await fetch('/api/test-rubric', {

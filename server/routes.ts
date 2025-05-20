@@ -1455,8 +1455,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Processing image file: ${file.originalname} (${file.mimetype}), buffer size: ${file.buffer.length} bytes`);
             
             try {
+              // Convert buffer to data URI for small images (under 5MB) to avoid file path issues
+              const isSmallImage = file.buffer.length < 5 * 1024 * 1024;
+              const imageDataUri = isSmallImage 
+                ? `data:${file.mimetype};base64,${file.buffer.toString('base64')}`
+                : undefined;
+                
+              console.log(`Using ${isSmallImage ? 'data URI' : 'buffer'} for image processing`);
+              
               feedback = await aiService.analyzeMultimodalSubmission({
-                fileBuffer: file.buffer, // Use buffer instead of path since we're using memoryStorage
+                fileBuffer: file.buffer,
+                fileDataUri: imageDataUri, // Add data URI for small images
                 fileName: file.originalname,
                 mimeType: file.mimetype,
                 assignmentTitle: "Image Analysis",
