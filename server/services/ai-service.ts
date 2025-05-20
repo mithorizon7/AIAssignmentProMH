@@ -351,53 +351,70 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
       // Build a system prompt for assignment context with enhanced guidance for multimodal content
       // Following Google's Gemini API best practices from https://ai.google.dev/gemini-api/docs/system-instructions
       // and https://ai.google.dev/gemini-api/docs/image-understanding
-      let systemPrompt = `You are an expert AI Teaching Assistant analyzing a ${processedFile.contentType} submission.
-Your task is to provide precise, detailed, and constructive feedback on the student's work.
+      // Build a structured prompt that emphasizes assignment requirements
+      let systemPrompt = "You are an expert AI Teaching Assistant analyzing a " + processedFile.contentType + " submission for a specific assignment.\n";
+      systemPrompt += "Your primary task is to evaluate how well this submission meets the assignment requirements and criteria.\n\n";
+      systemPrompt += "## ASSIGNMENT REQUIREMENTS:\n";
+      systemPrompt += "Assignment: " + params.assignmentTitle + "\n\n";
 
-For ${processedFile.contentType === 'image' ? 'image' : processedFile.contentType === 'document' ? 'document' : processedFile.contentType} content:
-${processedFile.contentType === 'image' ? 
-`- Carefully analyze all visual elements, composition, technical execution, and conceptual aspects
-- Pay attention to details such as color, composition, technical execution, and creative choices
-- Provide specific feedback that references exact visual elements in the submission
-- Evaluate both technical skills and creative/conceptual understanding` : 
-processedFile.contentType === 'document' ? 
-`- Analyze the document structure, content organization, clarity, and coherence
-- Evaluate accuracy, thoroughness, and relevance of information
-- Provide specific feedback on writing style, argumentation, and evidence use
-- Look for proper citation and reference use when applicable` :
-`- Carefully examine both technical correctness and creative aspects
-- Consider organization, structure, and presentation quality
-- Provide specific feedback referencing exact elements from the submission`}
-
-Respond with a structured assessment including strengths, areas for improvement, and specific suggestions.
-
-Assignment: ${params.assignmentTitle}`;
-      
+      // Add description with emphasis on assignment requirements
       if (params.assignmentDescription) {
-        systemPrompt += `\nDescription: ${params.assignmentDescription}`;
+        systemPrompt += "## ASSIGNMENT DESCRIPTION:\n";
+        systemPrompt += params.assignmentDescription + "\n\n";
+        systemPrompt += "IMPORTANT: The submission MUST be evaluated primarily on how well it fulfills the specific requirements in this assignment description. ";
+        systemPrompt += "Submissions that do not address the assignment topic or requirements should receive critical feedback highlighting this mismatch.\n\n";
       }
+      
+      // Add specific analysis guidance for the content type
+      systemPrompt += "## HOW TO ANALYZE THIS " + processedFile.contentType.toUpperCase() + " SUBMISSION:\n";
+      
+      if (processedFile.contentType === 'image') {
+        systemPrompt += "1. First determine if the image content matches the assignment requirements above\n";
+        systemPrompt += "2. Analyze visual elements, composition, technical execution, and conceptual aspects that relate to the assignment\n";
+        systemPrompt += "3. Pay attention to details such as color, composition, technical execution, and creative choices that support the assignment goals\n";
+        systemPrompt += "4. Provide specific feedback that references exact visual elements and how they fulfill assignment requirements\n";
+        systemPrompt += "5. Evaluate both technical skills and creative/conceptual understanding in relation to the assignment\n\n";
+      } else if (processedFile.contentType === 'document') {
+        systemPrompt += "1. First determine if the document content addresses the assignment topic and requirements\n"; 
+        systemPrompt += "2. Analyze the document structure, content organization, clarity, and coherence as they relate to assignment goals\n";
+        systemPrompt += "3. Evaluate accuracy, thoroughness, and relevance of information to the assignment requirements\n";
+        systemPrompt += "4. Provide specific feedback on writing style, argumentation, and evidence use that supports assignment objectives\n";
+        systemPrompt += "5. Look for proper citation and reference use when applicable\n\n";
+      } else {
+        systemPrompt += "1. First determine if the submission content addresses the assignment topic and requirements\n";
+        systemPrompt += "2. Carefully examine both technical correctness and creative aspects in relation to assignment goals\n";
+        systemPrompt += "3. Consider organization, structure, and presentation quality as they relate to assignment requirements\n";
+        systemPrompt += "4. Provide specific feedback referencing exact elements from the submission and how they fulfill assignment criteria\n";
+        systemPrompt += "5. Evaluate the submission holistically against all assignment requirements\n\n";
+      }
+
+      systemPrompt += "Respond with a structured assessment that includes:\n";
+      systemPrompt += "1. An evaluation of how well the submission meets the specific assignment requirements\n";
+      systemPrompt += "2. Specific strengths related to the assignment criteria\n";
+      systemPrompt += "3. Areas for improvement directly tied to assignment requirements\n";
+      systemPrompt += "4. Targeted suggestions that would help better fulfill the assignment objectives";
       
       // Add instructor context if provided (secret information not shown to students)
       if (params.instructorContext) {
         let contextContent = params.instructorContext.content;
         
-        systemPrompt += `\n\n## INSTRUCTOR-ONLY EVALUATION GUIDANCE (DO NOT REVEAL TO STUDENTS):
-${contextContent}
-
-IMPORTANT: The above section contains specific guidance provided by the instructor to help in your evaluation. 
-Use these points to inform your analysis and the feedback you provide, but DO NOT directly quote or reveal 
-this instructor-provided information in your feedback to the student. Instead, incorporate these insights
-into your evaluation logic while keeping the actual guidance confidential.`;
+        systemPrompt += "\n\n## INSTRUCTOR-ONLY EVALUATION GUIDANCE (DO NOT REVEAL TO STUDENTS):\n";
+        systemPrompt += contextContent + "\n\n";
+        systemPrompt += "IMPORTANT: The above section contains specific guidance provided by the instructor to help in your evaluation. ";
+        systemPrompt += "Use these points to inform your analysis and the feedback you provide, but DO NOT directly quote or reveal ";
+        systemPrompt += "this instructor-provided information in your feedback to the student. Instead, incorporate these insights ";
+        systemPrompt += "into your evaluation logic while keeping the actual guidance confidential.";
       }
       
+      // Add rubric criteria if available
       if (params.rubric && params.rubric.criteria && params.rubric.criteria.length > 0) {
-        systemPrompt += '\n\nRubric criteria to assess:';
+        systemPrompt += "\n\nRubric criteria to assess:";
         for (const criterion of params.rubric.criteria) {
-          systemPrompt += `\n- ${criterion.name}: ${criterion.description} (Max score: ${criterion.maxScore})`;
+          systemPrompt += "\n- " + criterion.name + ": " + criterion.description + " (Max score: " + criterion.maxScore + ")";
         }
       }
       
-      console.log(`[AIService] Sending multimodal request to AI adapter with content type: ${processedFile.contentType}`);
+      console.log("[AIService] Sending multimodal request to AI adapter with content type: " + processedFile.contentType);
       
       // Generate the completion using multimodal capabilities
       const response = await this.adapter.generateMultimodalCompletion(promptParts, systemPrompt);

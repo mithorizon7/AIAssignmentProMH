@@ -1463,13 +1463,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
               console.log(`Using ${isSmallImage ? 'data URI' : 'buffer'} for image processing`);
               
+              // Parse the assignment context properly from the form data
+              let parsedContext;
+              try {
+                // Check if we have a proper assignment context
+                if (assignmentContext) {
+                  // Extract title, description, and rubric from the context
+                  const titleMatch = assignmentContext.match(/Assignment: (.*?)(?:\n|$)/);
+                  const descriptionMatch = assignmentContext.match(/Description: ([\s\S]*?)(?:\n\n|$)/);
+                  const rubricMatch = assignmentContext.match(/Rubric:\n([\s\S]*?)(?:\n\n|$)/);
+                  
+                  parsedContext = {
+                    title: titleMatch ? titleMatch[1].trim() : "Image Analysis",
+                    description: descriptionMatch ? descriptionMatch[1].trim() : "",
+                    rubric: rubricMatch ? rubricMatch[1].trim() : ""
+                  };
+                  
+                  console.log("Extracted assignment context:", {
+                    title: parsedContext.title,
+                    descriptionPreview: parsedContext.description.substring(0, 50) + "...",
+                    hasRubric: !!parsedContext.rubric
+                  });
+                }
+              } catch (parseError) {
+                console.error("Error parsing assignment context:", parseError);
+                // Continue with default values if parsing fails
+              }
+              
               feedback = await aiService.analyzeMultimodalSubmission({
                 fileBuffer: file.buffer,
                 fileDataUri: imageDataUri, // Add data URI for small images
                 fileName: file.originalname,
                 mimeType: file.mimetype,
-                assignmentTitle: "Image Analysis",
-                assignmentDescription: assignmentContext || "Please analyze this image submission."
+                assignmentTitle: parsedContext?.title || "Image Analysis",
+                assignmentDescription: assignmentContext || "Please analyze this image submission.",
+                // If we parsed a rubric, create a rubric object for the AI
+                rubric: parsedContext?.rubric ? {
+                  criteria: parsedContext.rubric.split('\n')
+                    .filter(line => line.trim().length > 0)
+                    .map(line => {
+                      const match = line.match(/(.*?)\s*\((.*?), Max Score: (.*?), Weight: (.*?)\): (.*)/);
+                      if (match) {
+                        return {
+                          name: match[1].trim(),
+                          type: match[2].trim(),
+                          maxScore: parseInt(match[3].trim(), 10),
+                          weight: parseFloat(match[4].trim()),
+                          description: match[5].trim()
+                        };
+                      }
+                      // Fallback for lines that don't match the expected format
+                      return { name: 'Criterion', type: 'scale', maxScore: 10, weight: 1, description: line };
+                    })
+                } : undefined
               });
             } catch (error: any) {
               console.error(`Error analyzing image: ${error.message || 'Unknown error'}`, error);
