@@ -1452,24 +1452,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (isImage) {
             // For images, we use multimodal analysis
-            console.log(`Processing image file: ${file.originalname} (${file.mimetype})`);
-            feedback = await aiService.analyzeMultimodalSubmission({
-              fileBuffer: file.buffer, // Use buffer instead of path since we're using memoryStorage
-              fileName: file.originalname,
-              mimeType: file.mimetype,
-              assignmentTitle: "Image Analysis",
-              assignmentDescription: assignmentContext
-            });
+            console.log(`Processing image file: ${file.originalname} (${file.mimetype}), buffer size: ${file.buffer.length} bytes`);
+            
+            try {
+              feedback = await aiService.analyzeMultimodalSubmission({
+                fileBuffer: file.buffer, // Use buffer instead of path since we're using memoryStorage
+                fileName: file.originalname,
+                mimeType: file.mimetype,
+                assignmentTitle: "Image Analysis",
+                assignmentDescription: assignmentContext || "Please analyze this image submission."
+              });
+            } catch (error: any) {
+              console.error(`Error analyzing image: ${error.message || 'Unknown error'}`, error);
+              return res.status(500).json({
+                error: "Failed to analyze image",
+                message: error.message || 'Unknown error',
+                strengths: ["We encountered an error analyzing your image."],
+                improvements: ["Please try a different image or a text submission."],
+                suggestions: ["Make sure your image is a standard format (JPEG, PNG, etc)."],
+                summary: "There was an error processing your image submission. For best results, try using a standard image format under 5MB."
+              });
+            }
           } else if (isDocument) {
             // For documents, we use the document handling API
-            console.log(`Processing document file: ${file.originalname} (${file.mimetype})`);
-            feedback = await aiService.analyzeMultimodalSubmission({
-              fileBuffer: file.buffer, // Use buffer instead of path since we're using memoryStorage
-              fileName: file.originalname,
-              mimeType: file.mimetype,
-              assignmentTitle: "Document Analysis",
-              assignmentDescription: assignmentContext
-            });
+            console.log(`Processing document file: ${file.originalname} (${file.mimetype}), buffer size: ${file.buffer.length} bytes`);
+            
+            try {
+              feedback = await aiService.analyzeMultimodalSubmission({
+                fileBuffer: file.buffer, // Use buffer instead of path since we're using memoryStorage
+                fileName: file.originalname,
+                mimeType: file.mimetype,
+                assignmentTitle: "Document Analysis",
+                assignmentDescription: assignmentContext || "Please analyze this document submission."
+              });
+            } catch (error: any) {
+              console.error(`Error analyzing document: ${error.message || 'Unknown error'}`, error);
+              return res.status(500).json({
+                error: "Failed to analyze document",
+                message: error.message || 'Unknown error',
+                strengths: ["We encountered an error analyzing your document."],
+                improvements: ["Please try a different document format or a text submission."],
+                suggestions: ["Make sure your document is a standard format (PDF, DOCX, etc)."],
+                summary: "There was an error processing your document. For best results, try using a standard document format like PDF or DOCX under 5MB."
+              });
+            }
           } else {
             // For other files (text, code, etc.), read the file if we don't have content
             if (!content) {
