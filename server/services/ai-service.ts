@@ -1,7 +1,7 @@
 import { InsertFeedback, Rubric, CriteriaScore, InstructorContext } from '@shared/schema';
 import { AIAdapter, MultimodalPromptPart } from '../adapters/ai-adapter';
 import { processFileForMultimodal } from '../utils/multimodal-processor';
-import { ContentType } from '../utils/file-type-settings';
+import { ContentType, determineContentType } from '../utils/file-type-settings';
 
 interface SubmissionAnalysisRequest {
   studentSubmissionContent: string;
@@ -12,7 +12,8 @@ interface SubmissionAnalysisRequest {
 }
 
 interface MultimodalSubmissionAnalysisRequest {
-  filePath: string;                // Path to the uploaded file
+  filePath?: string;               // Path to the uploaded file (optional if fileBuffer is provided)
+  fileBuffer?: Buffer;             // Buffer with file content (optional if filePath is provided)
   fileName: string;                // Original file name
   mimeType: string;                // MIME type of the file
   textContent?: string;            // Optional extracted text content
@@ -250,13 +251,30 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
     try {
       console.log(`[AIService] Analyzing multimodal submission: ${params.fileName} (${params.mimeType})`);
       
-      // Process the file to extract content based on file type
-      // This now automatically handles both local paths and remote URLs (S3, HTTP)
-      const processedFile = await processFileForMultimodal(
-        params.filePath,
-        params.fileName,
-        params.mimeType
-      );
+      let processedFile;
+      
+      // Handle either file buffer or file path
+      if (params.fileBuffer) {
+        console.log(`[AIService] Processing file from buffer (${params.fileBuffer.length} bytes)`);
+        // If we have a buffer (from multer memory storage), process it directly
+        const contentType = determineContentType(params.mimeType, params.fileName);
+        processedFile = {
+          content: params.fileBuffer,
+          contentType,
+          mimeType: params.mimeType,
+          textContent: params.textContent
+        };
+      } else if (params.filePath) {
+        // Process the file from a path
+        // This automatically handles both local paths and remote URLs (S3, HTTP)
+        processedFile = await processFileForMultimodal(
+          params.filePath,
+          params.fileName,
+          params.mimeType
+        );
+      } else {
+        throw new Error("Either filePath or fileBuffer must be provided");
+      }
       
       console.log(`[AIService] File processed, content type: ${processedFile.contentType}`);
       
