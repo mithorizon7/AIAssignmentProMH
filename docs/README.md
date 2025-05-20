@@ -9,6 +9,7 @@ This directory contains comprehensive documentation for the AIGrader platform.
 The [Gemini API References](./gemini_references/index.md) directory contains detailed documentation for Google's Gemini API integration in our application:
 
 - **Core Capabilities**
+  - [Prompting Strategies](./gemini_references/prompting-strategies.md) - Best practices and strategies for designing effective prompts
   - [Text Generation](./gemini_references/text-generation.md) - Basic text generation capabilities and configuration
   - [Image Understanding](./gemini_references/image-understanding.md) - Using Gemini for processing and analyzing images
   - [Document Understanding](./gemini_references/document-understanding.md) - Working with PDFs and other document formats

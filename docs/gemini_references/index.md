@@ -4,6 +4,7 @@ This directory contains reference documentation for the Google Gemini API, focus
 
 ## Contents
 
+- [Prompting Strategies](./prompting-strategies.md) - Best practices and strategies for designing effective prompts
 - [Files API Overview](./files-api-overview.md) - How to work with the Gemini Files API for uploading and managing files
 - [Image Understanding](./image-understanding.md) - Using Gemini for processing and analyzing images
 - [Document Understanding](./document-understanding.md) - Working with PDFs and other document formats

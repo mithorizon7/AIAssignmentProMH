@@ -151,6 +151,7 @@ For more detailed information about production optimizations, see [BUILD_OPTIMIZ
 - [Build Optimization Guide](BUILD_OPTIMIZATION.md): Production build configuration
 - [Security Policy and Practices](SECURITY.md): Security requirements and best practices
 - [Gemini API Reference](docs/gemini_references/index.md): Comprehensive documentation for Google Gemini API integration
+- [Gemini Prompting Strategies](docs/gemini_references/prompting-strategies.md): Best practices for designing effective prompts
 
 ## License
 
