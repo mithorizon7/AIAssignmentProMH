@@ -1490,32 +1490,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 // Continue with default values if parsing fails
               }
               
+              // Create a more detailed prompt that emphasizes assignment requirements
+              const enhancedPrompt = `
+# ASSIGNMENT CONTEXT
+Assignment: ${parsedContext?.title || "Image Analysis"}
+
+${assignmentContext || "Please analyze this image submission."}
+
+IMPORTANT EVALUATION INSTRUCTIONS:
+1. First determine if the image content matches the assignment requirements above
+2. The submission MUST be evaluated primarily on how well it fulfills the specific requirements
+3. If the submission does not address the assignment topic, provide critical feedback highlighting this mismatch
+4. Analyze content, composition, technical execution in relation to the assignment requirements
+5. Provide specific feedback that references how elements fulfill or fail to fulfill assignment criteria
+`;
+              
               feedback = await aiService.analyzeMultimodalSubmission({
                 fileBuffer: file.buffer,
                 fileDataUri: imageDataUri, // Add data URI for small images
                 fileName: file.originalname,
                 mimeType: file.mimetype,
                 assignmentTitle: parsedContext?.title || "Image Analysis",
-                assignmentDescription: assignmentContext || "Please analyze this image submission.",
-                // If we parsed a rubric, create a rubric object for the AI
-                rubric: parsedContext?.rubric ? {
-                  criteria: parsedContext.rubric.split('\n')
-                    .filter((line: string) => line.trim().length > 0)
-                    .map((line: string) => {
-                      const match = line.match(/(.*?)\s*\((.*?), Max Score: (.*?), Weight: (.*?)\): (.*)/);
-                      if (match) {
-                        return {
-                          name: match[1].trim(),
-                          type: match[2].trim(),
-                          maxScore: parseInt(match[3].trim(), 10),
-                          weight: parseFloat(match[4].trim()),
-                          description: match[5].trim()
-                        };
-                      }
-                      // Fallback for lines that don't match the expected format
-                      return { name: 'Criterion', type: 'scale', maxScore: 10, weight: 1, description: line };
-                    })
-                } : undefined
+                assignmentDescription: enhancedPrompt
               });
             } catch (error: any) {
               console.error(`Error analyzing image: ${error.message || 'Unknown error'}`, error);
