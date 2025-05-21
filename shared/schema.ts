@@ -37,6 +37,13 @@
    * InstructorContext represents private information provided by instructors
    * that is only shared with the AI for evaluation purposes and never shown to students.
    * It typically contains HTML content created with a rich text editor (QuillJS).
+   *
+   * Common use cases:
+   * - Sample solutions
+   * - Evaluation guidelines
+   * - Common pitfalls to watch for
+   * - Specific feedback patterns to provide
+   * - Grading emphasis details
    */
   export interface InstructorContext {
     content: string;        // HTML content from rich text editor
@@ -44,15 +51,47 @@
     lastUpdated?: Date;     // Optional timestamp of last update
   }
 
-  // Enums
+  // Additional system configuration types (from HEAD branch)
+  export interface LmsSettings {
+    enableLms: boolean;
+    lmsProvider: string;
+    lmsUrl: string;
+    clientId: string;
+    clientSecret: string;
+    callbackUrl: string;
+    enableGradeSync: boolean;
+    enableRoster: boolean;
+  }
+
+  export interface StorageSettings {
+    storageProvider: string;
+    bucketName?: string;
+    region?: string;
+    accessKey?: string;
+    secretKey?: string;
+    retentionPolicy: string;
+    compressionEnabled: boolean;
+    encryptionEnabled: boolean;
+  }
+
+  export interface SecuritySettings {
+    sessionTimeout: number;
+    mfaEnabled: boolean; // Note: users table from main also has mfaEnabled field
+    passwordPolicy: string;
+    rateLimit: number;
+    allowedDomains: string;
+    ipRestrictions: string;
+  }
+
+  // Enums (ensuring all enums from both branches are present and consistently defined)
   export const userRoleEnum = pgEnum('user_role', ['student', 'instructor', 'admin']);
   export const assignmentStatusEnum = pgEnum('assignment_status', ['active', 'completed', 'upcoming']);
   export const submissionStatusEnum = pgEnum('submission_status', ['pending', 'processing', 'completed', 'failed']);
   export const contentTypeEnum = pgEnum('content_type', ['text', 'image', 'audio', 'video', 'document']);
-  export const lmsProviderEnum = pgEnum('lms_provider', ['canvas', 'blackboard', 'moodle', 'd2l']);
-  export const syncStatusEnum = pgEnum('sync_status', ['pending', 'in_progress', 'completed', 'failed']);
+  export const lmsProviderEnum = pgEnum('lms_provider', ['canvas', 'blackboard', 'moodle', 'd2l']); // From main
+  export const syncStatusEnum = pgEnum('sync_status', ['pending', 'in_progress', 'completed', 'failed']); // From main
 
-  // Users
+  // Users (using main's version which includes MFA fields)
   export const users = pgTable("users", {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
@@ -63,8 +102,8 @@
     auth0Sub: text("auth0_sub").unique(), 
     mitHorizonSub: text("mit_horizon_sub").unique(), 
     emailVerified: boolean("email_verified").default(false).notNull(), 
-    mfaEnabled: boolean("mfa_enabled").default(false).notNull(),
-    mfaSecret: text("mfa_secret"),
+    mfaEnabled: boolean("mfa_enabled").default(false).notNull(), // From main
+    mfaSecret: text("mfa_secret"), // From main
     createdAt: timestamp("created_at").defaultNow().notNull(),
   }, (table) => {
     return {
@@ -153,7 +192,7 @@
     };
   });
 
-  // Feedback
+  // Feedback (using main's version which includes rawResponse, modelName, tokenCount)
   export const feedback = pgTable("feedback", {
     id: serial("id").primaryKey(),
     submissionId: integer("submission_id").references(() => submissions.id).notNull(),
@@ -164,9 +203,9 @@
     score: smallint("score"),
     criteriaScores: json("criteria_scores").$type<CriteriaScore[]>(),
     processingTime: integer("processing_time").notNull(), 
-    rawResponse: json("raw_response").$type<Record<string, unknown>>(),
-    modelName: text("model_name"),
-    tokenCount: integer("token_count"),
+    rawResponse: json("raw_response").$type<Record<string, unknown>>(), // From main
+    modelName: text("model_name"), // From main
+    tokenCount: integer("token_count"), // From main
     createdAt: timestamp("created_at").defaultNow().notNull(),
   }, (table) => {
     return {
@@ -177,11 +216,14 @@
     };
   });
 
-  // System Settings
+  // System Settings (using HEAD's version with new lms, storage, security columns)
   export const systemSettings = pgTable("system_settings", {
     id: serial("id").primaryKey(),
     key: text("key").notNull().unique(),
     value: json("value").$type<Record<string, unknown>>().notNull(),
+    lms: json("lms").$type<Record<string, unknown> | null>().default(null),         // New in HEAD
+    storage: json("storage").$type<Record<string, unknown> | null>().default(null), // New in HEAD
+    security: json("security").$type<Record<string, unknown> | null>().default(null),// New in HEAD
     description: text("description"),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     updatedBy: integer("updated_by").references(() => users.id),
@@ -225,7 +267,7 @@
     };
   });
 
-  // Newsletter Subscribers (from main branch, if present)
+  // Newsletter Subscribers (from main branch)
   export const newsletterSubscribers = pgTable("newsletter_subscribers", {
     id: serial("id").primaryKey(),
     email: text("email").notNull().unique(),
@@ -236,7 +278,7 @@
     };
   });
 
-  // LMS Integration - Credentials (from main branch, if present)
+  // LMS Integration - Credentials (from main branch)
   export const lmsCredentials = pgTable("lms_credentials", {
     id: serial("id").primaryKey(),
     provider: lmsProviderEnum("provider").notNull(),
@@ -256,7 +298,7 @@
     };
   });
 
-  // LMS Sync Jobs (from main branch, if present)
+  // LMS Sync Jobs (from main branch)
   export const lmsSyncJobs = pgTable("lms_sync_jobs", {
     id: serial("id").primaryKey(),
     credentialId: integer("credential_id").references(() => lmsCredentials.id).notNull(),
@@ -277,7 +319,7 @@
     };
   });
 
-  // LMS Course Mappings (from main branch, if present)
+  // LMS Course Mappings (from main branch)
   export const lmsCourseMappings = pgTable("lms_course_mappings", {
     id: serial("id").primaryKey(),
     courseId: integer("course_id").references(() => courses.id).notNull(),
@@ -297,79 +339,76 @@
     };
   });
 
-  // Schema Relationships - using explicit parameter types to avoid TypeScript errors
+  // Schema Relationships - (Combined)
   export const usersRelations = {
     // @ts-ignore - Correctly typed at runtime by Drizzle
-    submissions: (users) => ({
+    submissions: (users: any) => ({ 
       one: { submissions, fields: [users.id], references: [submissions.userId] },
     }),
     // @ts-ignore - Correctly typed at runtime by Drizzle
-    enrollments: (users) => ({
+    enrollments: (users: any) => ({ 
       one: { enrollments, fields: [users.id], references: [enrollments.userId] },
     }),
   };
 
   export const coursesRelations = {
     // @ts-ignore - Correctly typed at runtime by Drizzle
-    assignments: (courses) => ({
+    assignments: (courses: any) => ({ 
       one: { assignments, fields: [courses.id], references: [assignments.courseId] },
     }),
     // @ts-ignore - Correctly typed at runtime by Drizzle
-    enrollments: (courses) => ({
+    enrollments: (courses: any) => ({ 
       one: { enrollments, fields: [courses.id], references: [enrollments.courseId] },
     }),
   };
 
-  // Added from main branch
   export const assignmentsRelations = {
     // @ts-ignore - Correctly typed at runtime by Drizzle
-    submissions: (assignments) => ({
+    submissions: (assignments: any) => ({ 
       one: { submissions, fields: [assignments.id], references: [submissions.assignmentId] },
     }),
     // @ts-ignore - Correctly typed at runtime by Drizzle
-    course: (assignments) => ({
+    course: (assignments: any) => ({ 
       many: { courses, fields: [assignments.courseId], references: [courses.id] },
     }),
   };
 
-  // Added from main branch
   export const submissionsRelations = {
     // @ts-ignore - Correctly typed at runtime by Drizzle
-    feedback: (submissions) => ({
+    feedback: (submissions: any) => ({ 
       one: { feedback, fields: [submissions.id], references: [feedback.submissionId] },
     }),
     // @ts-ignore - Correctly typed at runtime by Drizzle
-    assignment: (submissions) => ({
+    assignment: (submissions: any) => ({ 
       many: { assignments, fields: [submissions.assignmentId], references: [assignments.id] },
     }),
     // @ts-ignore - Correctly typed at runtime by Drizzle
-    user: (submissions) => ({
+    user: (submissions: any) => ({ 
       many: { users, fields: [submissions.userId], references: [users.id] },
     }),
   };
 
   export const feedbackRelations = {
     // @ts-ignore - Correctly typed at runtime by Drizzle
-    submission: (feedback) => ({
+    submission: (feedback: any) => ({ 
       many: { submissions, fields: [feedback.submissionId], references: [submissions.id] },
     }),
   };
 
   // Insert Schemas (Consolidated)
-  // Using main's version for insertUserSchema assuming mfaEnabled/mfaSecret are from main
-  export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, mfaEnabled: true, mfaSecret: true });
+  export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, mfaEnabled: true, mfaSecret: true }); // From main (includes MFA omissions)
   export const insertCourseSchema = createInsertSchema(courses).omit({ id: true, createdAt: true });
   export const insertEnrollmentSchema = createInsertSchema(enrollments).omit({ id: true, createdAt: true });
   export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true, createdAt: true, updatedAt: true });
   export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true, createdAt: true, updatedAt: true });
   export const insertFeedbackSchema = createInsertSchema(feedback).omit({ id: true, createdAt: true });
-  export const insertSystemSettingsSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true });
+  export const insertSystemSettingsSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true }); // For extended systemSettings table
   export const insertFileTypeSettingsSchema = createInsertSchema(fileTypeSettings).omit({ id: true, updatedAt: true }); // From HEAD
   export const insertUserNotificationSettingsSchema = createInsertSchema(userNotificationSettings).omit({ id: true, updatedAt: true }); // From HEAD
-  export const insertNewsletterSubscriberSchema = createInsertSchema(newsletterSubscribers).omit({ id: true, createdAt: true }); // From main (if present)
-  export const insertLmsCredentialsSchema = createInsertSchema(lmsCredentials).omit({ id: true, createdAt: true, updatedAt: true }); // From main (if present)
-  export const insertLmsSyncJobSchema = createInsertSchema(lmsSyncJobs).omit({ id: true, createdAt: true }); // From main (if present)
-  export const insertLmsCourseMappingSchema = createInsertSchema(lmsCourseMappings).omit({ id: true, createdAt: true, updatedAt: true }); // From main (if present)
+  export const insertNewsletterSubscriberSchema = createInsertSchema(newsletterSubscribers).omit({ id: true, createdAt: true }); // From main
+  export const insertLmsCredentialsSchema = createInsertSchema(lmsCredentials).omit({ id: true, createdAt: true, updatedAt: true }); // From main
+  export const insertLmsSyncJobSchema = createInsertSchema(lmsSyncJobs).omit({ id: true, createdAt: true }); // From main
+  export const insertLmsCourseMappingSchema = createInsertSchema(lmsCourseMappings).omit({ id: true, createdAt: true, updatedAt: true }); // From main
 
   // Types (Consolidated)
   export type User = typeof users.$inferSelect;
@@ -399,14 +438,17 @@
   export type UserNotificationSetting = typeof userNotificationSettings.$inferSelect; // From HEAD
   export type InsertUserNotificationSetting = z.infer<typeof insertUserNotificationSettingsSchema>; // From HEAD
 
-  export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect; // From main (if present)
-  export type InsertNewsletterSubscriber = z.infer<typeof insertNewsletterSubscriberSchema>; // From main (if present)
+  export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect; // From main
+  export type InsertNewsletterSubscriber = z.infer<typeof insertNewsletterSubscriberSchema>; // From main
 
-  export type LmsCredential = typeof lmsCredentials.$inferSelect; // From main (if present)
-  export type InsertLmsCredential = z.infer<typeof insertLmsCredentialsSchema>; // From main (if present)
+  export type LmsCredential = typeof lmsCredentials.$inferSelect; // From main
+  export type InsertLmsCredential = z.infer<typeof insertLmsCredentialsSchema>; // From main
 
-  export type LmsSyncJob = typeof lmsSyncJobs.$inferSelect; // From main (if present)
-  export type InsertLmsSyncJob = z.infer<typeof insertLmsSyncJobSchema>; // From main (if present)
+  export type LmsSyncJob = typeof lmsSyncJobs.$inferSelect; // From main
+  export type InsertLmsSyncJob = z.infer<typeof insertLmsSyncJobSchema>; // From main
 
-  export type LmsCourseMapping = typeof lmsCourseMappings.$inferSelect; // From main (if present)
-  export type InsertLmsCourseMapping = z.infer<typeof insertLmsCourseMappingSchema>; // From main (if present)
+  export type LmsCourseMapping = typeof lmsCourseMappings.$inferSelect; // From main
+  export type InsertLmsCourseMapping = z.infer<typeof insertLmsCourseMappingSchema>; // From main
+
+  // Exporting new interfaces from HEAD
+  export type { LmsSettings, StorageSettings, SecuritySettings };

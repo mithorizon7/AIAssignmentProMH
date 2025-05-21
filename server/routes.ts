@@ -20,6 +20,7 @@ import { v4 as uuidv4 } from "uuid";
 import { defaultRateLimiter, submissionRateLimiter } from "./middleware/rate-limiter";
 import adminRoutes from "./routes/admin";
 import instructorRoutes from "./routes/instructor";
+import { queueSecurityAudit } from "./queue/security-audit";
 import { determineContentType, isFileTypeAllowed, ContentType } from "./utils/file-type-settings";
 import { processFileForMultimodal } from "./utils/multimodal-processor";
 import { asyncHandler } from "./lib/error-handler";
@@ -72,7 +73,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).json({ status: 'ok' });
   });
 
-  // Newsletter subscription
+  // System settings endpoints (from HEAD)
+  app.get('/api/admin/system-settings', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const settings = await storage.listSystemSettings();
+    const result: Record<string, any> = {};
+    settings.forEach(s => { result[s.key] = { value: s.value, lms: s.lms, storage: s.storage, security: s.security }; });
+    res.json(result);
+  }));
+
+  app.put('/api/admin/system-settings', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const updates = req.body as Record<string, any>;
+    if (!updates || typeof updates !== 'object') {
+      return res.status(400).json({ message: 'Invalid request body' });
+    }
+    const user = req.user as User;
+    const result: Record<string, any> = {};
+    for (const key of Object.keys(updates)) {
+      const value = updates[key];
+      const settingPayload: any = { key, value: value.value ?? value, updatedBy: user.id };
+      if (value.lms !== undefined) settingPayload.lms = value.lms;
+      if (value.storage !== undefined) settingPayload.storage = value.storage;
+      if (value.security !== undefined) settingPayload.security = value.security;
+
+      const setting = await storage.upsertSystemSetting(settingPayload);
+      result[setting.key] = { value: setting.value, lms: setting.lms, storage: setting.storage, security: setting.security };
+    }
+    res.json(result);
+  }));
+
+  app.post('/api/admin/security-audit', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const user = req.user as User;
+    await queueSecurityAudit(user.id); // Ensure queueSecurityAudit is imported if it's a new function from HEAD
+    res.json({ message: 'Security audit queued' });
+  }));
+
+  // Newsletter subscription (from main)
   app.post('/api/newsletter/subscribe', asyncHandler(async (req: Request, res: Response) => {
     const schema = z.object({ email: z.string().email() });
     const result = schema.safeParse(req.body);
@@ -95,7 +130,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ message: 'Failed to subscribe' });
     }
   }));
-
   // Authentication endpoints handled in auth.ts
 
   // ===== RESOLVED ROUTE CONFLICT (Keeping both sets of routes) =====
