@@ -292,15 +292,18 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
           contentType = 'video';
         }
         
-        // For document type files, we need to create a temporary file
-        // because directly passing the buffer can cause issues with binary data
-        if (contentType === 'document') {
+        // For binary files (documents and images over 4MB), create a temporary file
+        // This ensures proper handling through the Files API
+        const needsTempFile = contentType === 'document' || 
+                             (contentType === 'image' && params.fileBuffer.length > 4 * 1024 * 1024);
+        
+        if (needsTempFile) {
           const crypto = require('crypto');
           const os = require('os');
           const path = require('path');
           const fs = require('fs').promises;
           
-          console.log(`[AIService] Document file detected, creating temporary file for processing`);
+          console.log(`[AIService] Binary file detected (${contentType}), creating temporary file for processing`);
           
           try {
             // Create a temporary file
@@ -311,7 +314,7 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
             
             // Write the buffer to the temporary file
             await fs.writeFile(tempPath, params.fileBuffer);
-            console.log(`[AIService] Created temporary file at ${tempPath}`);
+            console.log(`[AIService] Created temporary file at ${tempPath} (${params.fileBuffer.length} bytes)`);
             
             // Process using our file handling utility
             processedFile = await processFileForMultimodal(
@@ -327,10 +330,37 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
           } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             console.error(`[AIService] Error creating temporary file: ${errorMessage}`);
-            throw new Error(`Failed to process document file: ${errorMessage}`);
+            throw new Error(`Failed to process ${contentType} file: ${errorMessage}`);
+          }
+        } else if (contentType === 'image' && params.fileBuffer.length < 4 * 1024 * 1024) {
+          // For small images (under 4MB), use data URI for more efficient processing
+          try {
+            // Convert buffer to base64 data URI
+            const base64 = params.fileBuffer.toString('base64');
+            const dataUri = `data:${params.mimeType};base64,${base64}`;
+            
+            console.log(`[AIService] Small image detected (${params.fileBuffer.length} bytes), using data URI`);
+            
+            processedFile = {
+              content: dataUri,
+              contentType,
+              mimeType: params.mimeType,
+              textContent: params.textContent
+            };
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(`[AIService] Error creating data URI: ${errorMessage}`);
+            
+            // Fall back to using the buffer directly if data URI conversion fails
+            processedFile = {
+              content: params.fileBuffer,
+              contentType,
+              mimeType: params.mimeType,
+              textContent: params.textContent
+            };
           }
         } else {
-          // For other file types (like images, text), we can use the buffer directly
+          // For text files and other content, use the buffer directly
           processedFile = {
             content: params.fileBuffer,
             contentType,
