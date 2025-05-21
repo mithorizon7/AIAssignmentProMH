@@ -8,7 +8,7 @@ import { MITNavbar } from "@/components/layout/mit-navbar";
 import { MITFooter } from "@/components/layout/mit-footer";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import NotFound from "@/pages/not-found";
-import Login from "@/pages/login-fixed";
+import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import Assignments from "@/pages/assignments";
 import SubmissionDetail from "@/pages/submission-detail";
