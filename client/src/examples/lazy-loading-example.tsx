@@ -14,7 +14,7 @@ import { queryClient } from "@/lib/queryClient";
 
 // Eagerly loaded components (used on initial render)
 import NotFound from "@/pages/not-found";
-import Login from "@/pages/login-fixed";
+import Login from "@/pages/login";
 
 // Lazily loaded components (code split by route)
 const Dashboard = lazyLoad(() => import("@/pages/dashboard"));
