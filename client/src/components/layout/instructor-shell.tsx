@@ -219,7 +219,7 @@ export function InstructorShell({ children }: { children: ReactNode }) {
             </div>
           </aside>
           <main className="flex-1 md:pl-80">
-            <div className="container mx-auto px-6 py-5">{children}</div>
+            <div className="container mx-auto px-7 py-6">{children}</div>
           </main>
         </div>
       )}
