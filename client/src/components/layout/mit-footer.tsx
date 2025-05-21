@@ -66,23 +66,23 @@ export function MITFooter() {
             <h3 className="text-base font-semibold text-gray-900 mb-4">Resources</h3>
             <ul className="space-y-3">
               <li>
-                <Link href="/help">
-                  <a className="text-sm text-gray-600 hover:text-mit-red">Help Center</a>
+                <Link href="/help" className="text-sm text-gray-600 hover:text-mit-red">
+                  Help Center
                 </Link>
               </li>
               <li>
-                <Link href="/documentation">
-                  <a className="text-sm text-gray-600 hover:text-mit-red">Documentation</a>
+                <Link href="/documentation" className="text-sm text-gray-600 hover:text-mit-red">
+                  Documentation
                 </Link>
               </li>
               <li>
-                <Link href="/rubric-guidelines">
-                  <a className="text-sm text-gray-600 hover:text-mit-red">Rubric Guidelines</a>
+                <Link href="/rubric-guidelines" className="text-sm text-gray-600 hover:text-mit-red">
+                  Rubric Guidelines
                 </Link>
               </li>
               <li>
-                <Link href="/api-reference">
-                  <a className="text-sm text-gray-600 hover:text-mit-red">API Reference</a>
+                <Link href="/api-reference" className="text-sm text-gray-600 hover:text-mit-red">
+                  API Reference
                 </Link>
               </li>
             </ul>
@@ -93,23 +93,23 @@ export function MITFooter() {
             <h3 className="text-base font-semibold text-gray-900 mb-4">Community</h3>
             <ul className="space-y-3">
               <li>
-                <Link href="/blog">
-                  <a className="text-sm text-gray-600 hover:text-mit-red">Blog</a>
+                <Link href="/blog" className="text-sm text-gray-600 hover:text-mit-red">
+                  Blog
                 </Link>
               </li>
               <li>
-                <Link href="/forums">
-                  <a className="text-sm text-gray-600 hover:text-mit-red">Forums</a>
+                <Link href="/forums" className="text-sm text-gray-600 hover:text-mit-red">
+                  Forums
                 </Link>
               </li>
               <li>
-                <Link href="/events">
-                  <a className="text-sm text-gray-600 hover:text-mit-red">Events</a>
+                <Link href="/events" className="text-sm text-gray-600 hover:text-mit-red">
+                  Events
                 </Link>
               </li>
               <li>
-                <Link href="/showcase">
-                  <a className="text-sm text-gray-600 hover:text-mit-red">Showcase</a>
+                <Link href="/showcase" className="text-sm text-gray-600 hover:text-mit-red">
+                  Showcase
                 </Link>
               </li>
             </ul>
