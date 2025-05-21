@@ -168,6 +168,16 @@ export default function SettingsPage() {
     },
   });
 
+  // Load existing notification settings
+  useEffect(() => {
+    if (user) {
+      apiRequest("GET", "/api/user/notifications")
+        .then(res => res.json())
+        .then(data => notificationForm.reset(data))
+        .catch(err => console.error("Failed to load notification settings", err));
+    }
+  }, [user]);
+
   // Update AI settings mutation
   const updateAiSettingsMutation = useMutation({
     mutationFn: async (data: z.infer<typeof aiSettingsFormSchema>) => {

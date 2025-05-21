@@ -13,7 +13,7 @@ import { OpenAIAdapter } from "./adapters/openai-adapter";
 import { z } from "zod";
 import { eq, count } from "drizzle-orm";
 import { db } from "./db";
-import { submissions, feedback, users, type User } from "@shared/schema";
+import { submissions, feedback, users, userNotificationSettings, type User } from "@shared/schema";
 import { v4 as uuidv4 } from "uuid";
 import { defaultRateLimiter, submissionRateLimiter } from "./middleware/rate-limiter";
 import adminRoutes from "./routes/admin";
@@ -62,6 +62,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Authentication endpoints handled in auth.ts
+
+  // User notification settings
+  app.get('/api/user/notifications', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+    const user = req.user as User;
+    const settings = await storage.getUserNotificationSettings(user.id);
+    if (!settings) {
+      return res.json({
+        emailNotifications: true,
+        assignmentNotifications: true,
+        feedbackNotifications: true,
+        systemNotifications: false
+      });
+    }
+    res.json(settings);
+  }));
+
+  app.put('/api/user/notifications', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+    const user = req.user as User;
+    const schema = z.object({
+      emailNotifications: z.boolean(),
+      assignmentNotifications: z.boolean(),
+      feedbackNotifications: z.boolean(),
+      systemNotifications: z.boolean(),
+    });
+
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ message: 'Invalid settings', errors: result.error.flatten() });
+    }
+
+    const settings = await storage.upsertUserNotificationSettings({
+      userId: user.id,
+      ...result.data,
+    });
+
+    res.json(settings);
+  }));
 
   // Assignment endpoints
   app.get('/api/assignments', requireAuth, asyncHandler(async (req: Request, res: Response) => {

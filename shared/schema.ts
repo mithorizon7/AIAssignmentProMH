@@ -288,7 +288,22 @@ export const fileTypeSettings = pgTable("file_type_settings", {
     // Composite index for efficient lookup by context and type
     contextTypeIdx: index("idx_file_type_settings_context_type").on(table.context, table.contentType),
     // Composite index for efficient lookup by context ID and type
-    contextIdTypeIdx: index("idx_file_type_settings_context_id_type").on(table.contextId, table.contentType)
+  contextIdTypeIdx: index("idx_file_type_settings_context_id_type").on(table.contextId, table.contentType)
+  };
+});
+
+// User Notification Settings
+export const userNotificationSettings = pgTable("user_notification_settings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull().unique(),
+  emailNotifications: boolean("email_notifications").notNull().default(true),
+  assignmentNotifications: boolean("assignment_notifications").notNull().default(true),
+  feedbackNotifications: boolean("feedback_notifications").notNull().default(true),
+  systemNotifications: boolean("system_notifications").notNull().default(false),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    userIdx: index("idx_user_notification_settings_user").on(table.userId)
   };
 });
 
@@ -301,6 +316,7 @@ export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id:
 export const insertFeedbackSchema = createInsertSchema(feedback).omit({ id: true, createdAt: true });
 export const insertSystemSettingsSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true });
 export const insertFileTypeSettingsSchema = createInsertSchema(fileTypeSettings).omit({ id: true, updatedAt: true });
+export const insertUserNotificationSettingsSchema = createInsertSchema(userNotificationSettings).omit({ id: true, updatedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -326,3 +342,6 @@ export type InsertSystemSetting = z.infer<typeof insertSystemSettingsSchema>;
 
 export type FileTypeSetting = typeof fileTypeSettings.$inferSelect;
 export type InsertFileTypeSetting = z.infer<typeof insertFileTypeSettingsSchema>;
+
+export type UserNotificationSetting = typeof userNotificationSettings.$inferSelect;
+export type InsertUserNotificationSetting = z.infer<typeof insertUserNotificationSettingsSchema>;
