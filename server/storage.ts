@@ -7,6 +7,7 @@ import {
   enrollments,
   systemSettings,
   fileTypeSettings,
+  userNotificationSettings,
   contentTypeEnum,
   type User, 
   type InsertUser, 
@@ -24,6 +25,8 @@ import {
   type InsertSystemSetting,
   type FileTypeSetting,
   type InsertFileTypeSetting,
+  type UserNotificationSetting,
+  type InsertUserNotificationSetting,
 } from "@shared/schema";
 
 // Define type for the content type enum values
@@ -91,6 +94,10 @@ export interface IStorage {
   getFileTypeSettings(contentType: string, context?: string, contextId?: number): Promise<FileTypeSetting[]>;
   upsertFileTypeSetting(setting: InsertFileTypeSetting): Promise<FileTypeSetting>;
   checkFileTypeEnabled(contentType: string, extension: string, mimeType: string): Promise<boolean>;
+
+  // User Notification Settings operations
+  getUserNotificationSettings(userId: number): Promise<UserNotificationSetting | undefined>;
+  upsertUserNotificationSettings(setting: InsertUserNotificationSetting): Promise<UserNotificationSetting>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1019,6 +1026,32 @@ export class DatabaseStorage implements IStorage {
       console.error('Error checking file type enablement:', error);
       return false; // Default to disallowed in case of error
     }
+  }
+
+  // User Notification Settings operations
+  async getUserNotificationSettings(userId: number): Promise<UserNotificationSetting | undefined> {
+    const [settings] = await db.select().from(userNotificationSettings).where(eq(userNotificationSettings.userId, userId));
+    return settings;
+  }
+
+  async upsertUserNotificationSettings(setting: InsertUserNotificationSetting): Promise<UserNotificationSetting> {
+    const existing = await this.getUserNotificationSettings(setting.userId);
+    if (existing) {
+      const [updated] = await db.update(userNotificationSettings)
+        .set({
+          emailNotifications: setting.emailNotifications,
+          assignmentNotifications: setting.assignmentNotifications,
+          feedbackNotifications: setting.feedbackNotifications,
+          systemNotifications: setting.systemNotifications,
+          updatedAt: new Date()
+        })
+        .where(eq(userNotificationSettings.userId, setting.userId))
+        .returning();
+      return updated;
+    }
+
+    const [inserted] = await db.insert(userNotificationSettings).values(setting).returning();
+    return inserted;
   }
 }
 

@@ -37,13 +37,6 @@
    * InstructorContext represents private information provided by instructors
    * that is only shared with the AI for evaluation purposes and never shown to students.
    * It typically contains HTML content created with a rich text editor (QuillJS).
-   *
-   * Common use cases:
-   * - Sample solutions
-   * - Evaluation guidelines
-   * - Common pitfalls to watch for
-   * - Specific feedback patterns to provide
-   * - Grading emphasis details
    */
   export interface InstructorContext {
     content: string;        // HTML content from rich text editor
@@ -64,12 +57,12 @@
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
     username: text("username").notNull().unique(),
-    password: text("password"), // No notNull() - Password is nullable for Auth0 users and MIT Horizon users
+    password: text("password"), 
     email: text("email").notNull().unique(),
     role: userRoleEnum("role").notNull().default('student'),
-    auth0Sub: text("auth0_sub").unique(), // Auth0 subject identifier for our Auth0 tenant - nullable by default
-    mitHorizonSub: text("mit_horizon_sub").unique(), // MIT Horizon Auth0 subject identifier - nullable by default
-    emailVerified: boolean("email_verified").default(false).notNull(), // Email verification status
+    auth0Sub: text("auth0_sub").unique(), 
+    mitHorizonSub: text("mit_horizon_sub").unique(), 
+    emailVerified: boolean("email_verified").default(false).notNull(), 
     mfaEnabled: boolean("mfa_enabled").default(false).notNull(),
     mfaSecret: text("mfa_secret"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -78,8 +71,8 @@
       usernameIdx: index("idx_users_username").on(table.username),
       emailIdx: index("idx_users_email").on(table.email),
       roleIdx: index("idx_users_role").on(table.role),
-      auth0SubIdx: index("idx_users_auth0_sub").on(table.auth0Sub), // Index for our Auth0 tenant subject lookups
-      mitHorizonSubIdx: index("idx_users_mit_horizon_sub").on(table.mitHorizonSub) // Index for MIT Horizon Auth0 subject lookups
+      auth0SubIdx: index("idx_users_auth0_sub").on(table.auth0Sub), 
+      mitHorizonSubIdx: index("idx_users_mit_horizon_sub").on(table.mitHorizonSub) 
     };
   });
 
@@ -106,7 +99,6 @@
     return {
       userIdIdx: index("idx_enrollments_user_id").on(table.userId),
       courseIdIdx: index("idx_enrollments_course_id").on(table.courseId),
-      // Composite index for looking up enrollments by both userId and courseId
       userCourseIdx: index("idx_enrollments_user_course").on(table.userId, table.courseId)
     };
   });
@@ -121,7 +113,7 @@
     status: assignmentStatusEnum("status").notNull().default('upcoming'),
     shareableCode: text("shareable_code"),
     rubric: json("rubric").$type<Rubric>(),
-    instructorContext: json("instructor_context").$type<InstructorContext>(), // Hidden information for AI evaluation only
+    instructorContext: json("instructor_context").$type<InstructorContext>(), 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   }, (table) => {
@@ -140,9 +132,9 @@
     userId: integer("user_id").references(() => users.id).notNull(),
     fileUrl: text("file_url"),
     fileName: text("file_name"),
-    mimeType: text("mime_type"), // Added to store MIME type information
-    fileSize: integer("file_size"), // Added to store file size in bytes
-    contentType: contentTypeEnum("content_type"), // Added to store the content type category
+    mimeType: text("mime_type"), 
+    fileSize: integer("file_size"), 
+    contentType: contentTypeEnum("content_type"), 
     content: text("content"),
     notes: text("notes"),
     status: submissionStatusEnum("status").notNull().default('pending'),
@@ -155,11 +147,8 @@
       statusIdx: index("idx_submissions_status").on(table.status),
       contentTypeIdx: index("idx_submissions_content_type").on(table.contentType),
       createdAtIdx: index("idx_submissions_created_at").on(table.createdAt),
-      // Composite index for efficiently finding submissions by user and assignment
       userAssignmentIdx: index("idx_submissions_user_assignment").on(table.userId, table.assignmentId),
-      // Composite index for efficiently finding all submissions for an assignment with a specific status
       assignmentStatusIdx: index("idx_submissions_assignment_status").on(table.assignmentId, table.status),
-      // Composite index for finding submissions by content type and status
       contentTypeStatusIdx: index("idx_submissions_content_type_status").on(table.contentType, table.status)
     };
   });
@@ -174,26 +163,9 @@
     summary: text("summary"),
     score: smallint("score"),
     criteriaScores: json("criteria_scores").$type<CriteriaScore[]>(),
-    processingTime: integer("processing_time").notNull(), // in milliseconds
-    /**
-     * rawResponse: Stores the complete raw response from the AI model.
-     * Structure varies by model and version of model API.
-     * For Gemini models, response structure can change between API versions.
-     */
+    processingTime: integer("processing_time").notNull(), 
     rawResponse: json("raw_response").$type<Record<string, unknown>>(),
-
-    /**
-     * modelName: The specific AI model used for generating feedback
-     */
     modelName: text("model_name"),
-
-    /**
-     * tokenCount: Number of tokens used in this AI operation.
-     * For Gemini models, this may be an estimate derived from:
-     * 1. API usage metadata (when available)
-     * 2. Response length approximation (when usage metadata is unavailable)
-     * Different versions of the Gemini API provide token usage in different formats.
-     */
     tokenCount: integer("token_count"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   }, (table) => {
@@ -202,6 +174,126 @@
       scoreIdx: index("idx_feedback_score").on(table.score),
       processingTimeIdx: index("idx_feedback_processing_time").on(table.processingTime),
       createdAtIdx: index("idx_feedback_created_at").on(table.createdAt)
+    };
+  });
+
+  // System Settings
+  export const systemSettings = pgTable("system_settings", {
+    id: serial("id").primaryKey(),
+    key: text("key").notNull().unique(),
+    value: json("value").$type<Record<string, unknown>>().notNull(),
+    description: text("description"),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedBy: integer("updated_by").references(() => users.id),
+  }, (table) => {
+    return {
+      keyIdx: index("idx_system_settings_key").on(table.key)
+    };
+  });
+
+  // File Type Settings (from HEAD branch)
+  export const fileTypeSettings = pgTable("file_type_settings", {
+    id: serial("id").primaryKey(),
+    context: text("context").notNull(), 
+    contextId: integer("context_id"), 
+    contentType: contentTypeEnum("content_type").notNull(),
+    enabled: boolean("enabled").notNull().default(false),
+    extensions: json("extensions").$type<string[]>().notNull(),
+    mimeTypes: json("mime_types").$type<string[]>().notNull(),
+    maxSize: integer("max_size").notNull(), 
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedBy: integer("updated_by").references(() => users.id),
+  }, (table) => {
+    return {
+      contextTypeIdx: index("idx_file_type_settings_context_type").on(table.context, table.contentType),
+      contextIdTypeIdx: index("idx_file_type_settings_context_id_type").on(table.contextId, table.contentType)
+    };
+  });
+
+  // User Notification Settings (from HEAD branch)
+  export const userNotificationSettings = pgTable("user_notification_settings", {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id).notNull().unique(),
+    emailNotifications: boolean("email_notifications").notNull().default(true),
+    assignmentNotifications: boolean("assignment_notifications").notNull().default(true),
+    feedbackNotifications: boolean("feedback_notifications").notNull().default(true),
+    systemNotifications: boolean("system_notifications").notNull().default(false),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  }, (table) => {
+    return {
+      userIdx: index("idx_user_notification_settings_user").on(table.userId)
+    };
+  });
+
+  // Newsletter Subscribers (from main branch, if present)
+  export const newsletterSubscribers = pgTable("newsletter_subscribers", {
+    id: serial("id").primaryKey(),
+    email: text("email").notNull().unique(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  }, (table) => {
+    return {
+      emailIdx: index("idx_newsletter_email").on(table.email)
+    };
+  });
+
+  // LMS Integration - Credentials (from main branch, if present)
+  export const lmsCredentials = pgTable("lms_credentials", {
+    id: serial("id").primaryKey(),
+    provider: lmsProviderEnum("provider").notNull(),
+    name: text("name").notNull(), 
+    baseUrl: text("base_url").notNull(), 
+    clientId: text("client_id").notNull(),
+    clientSecret: text("client_secret").notNull(),
+    callbackUrl: text("callback_url").notNull(),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdBy: integer("created_by").references(() => users.id),
+  }, (table) => {
+    return {
+      providerIdx: index("idx_lms_credentials_provider").on(table.provider),
+      activeIdx: index("idx_lms_credentials_active").on(table.active),
+    };
+  });
+
+  // LMS Sync Jobs (from main branch, if present)
+  export const lmsSyncJobs = pgTable("lms_sync_jobs", {
+    id: serial("id").primaryKey(),
+    credentialId: integer("credential_id").references(() => lmsCredentials.id).notNull(),
+    syncType: text("sync_type").notNull(), 
+    status: syncStatusEnum("status").notNull().default('pending'),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
+    errorMessage: text("error_message"),
+    syncData: json("sync_data").$type<Record<string, unknown>>(), 
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdBy: integer("created_by").references(() => users.id),
+  }, (table) => {
+    return {
+      credentialIdIdx: index("idx_lms_sync_jobs_credential_id").on(table.credentialId),
+      statusIdx: index("idx_lms_sync_jobs_status").on(table.status),
+      syncTypeIdx: index("idx_lms_sync_jobs_sync_type").on(table.syncType),
+      createdAtIdx: index("idx_lms_sync_jobs_created_at").on(table.createdAt),
+    };
+  });
+
+  // LMS Course Mappings (from main branch, if present)
+  export const lmsCourseMappings = pgTable("lms_course_mappings", {
+    id: serial("id").primaryKey(),
+    courseId: integer("course_id").references(() => courses.id).notNull(),
+    credentialId: integer("credential_id").references(() => lmsCredentials.id).notNull(),
+    lmsCourseId: text("lms_course_id").notNull(), 
+    lmsCourseName: text("lms_course_name"), 
+    lastSynced: timestamp("last_synced"),
+    syncEnabled: boolean("sync_enabled").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  }, (table) => {
+    return {
+      courseIdIdx: index("idx_lms_course_mappings_course_id").on(table.courseId),
+      credentialIdIdx: index("idx_lms_course_mappings_credential_id").on(table.credentialId),
+      courseCredentialIdx: index("idx_lms_course_mappings_course_credential").on(table.courseId, table.credentialId),
+      lmsCourseIdIdx: index("idx_lms_course_mappings_lms_course_id").on(table.lmsCourseId),
     };
   });
 
@@ -228,6 +320,7 @@
     }),
   };
 
+  // Added from main branch
   export const assignmentsRelations = {
     // @ts-ignore - Correctly typed at runtime by Drizzle
     submissions: (assignments) => ({
@@ -239,6 +332,7 @@
     }),
   };
 
+  // Added from main branch
   export const submissionsRelations = {
     // @ts-ignore - Correctly typed at runtime by Drizzle
     feedback: (submissions) => ({
@@ -261,115 +355,8 @@
     }),
   };
 
-  // System Settings
-  export const systemSettings = pgTable("system_settings", {
-    id: serial("id").primaryKey(),
-    key: text("key").notNull().unique(),
-    value: json("value").$type<Record<string, unknown>>().notNull(),
-    description: text("description"),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    updatedBy: integer("updated_by").references(() => users.id),
-  }, (table) => {
-    return {
-      keyIdx: index("idx_system_settings_key").on(table.key)
-    };
-  });
-
-  // File Type Settings
-  export const fileTypeSettings = pgTable("file_type_settings", {
-    id: serial("id").primaryKey(),
-    context: text("context").notNull(), // 'system', 'course', or 'user'
-    contextId: integer("context_id"), // ID of the course or user, null for system
-    contentType: contentTypeEnum("content_type").notNull(),
-    enabled: boolean("enabled").notNull().default(false),
-    extensions: json("extensions").$type<string[]>().notNull(),
-    mimeTypes: json("mime_types").$type<string[]>().notNull(),
-    maxSize: integer("max_size").notNull(), // in bytes
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    updatedBy: integer("updated_by").references(() => users.id),
-  }, (table) => {
-    return {
-      // Composite index for efficient lookup by context and type
-      contextTypeIdx: index("idx_file_type_settings_context_type").on(table.context, table.contentType),
-      // Composite index for efficient lookup by context ID and type
-      contextIdTypeIdx: index("idx_file_type_settings_context_id_type").on(table.contextId, table.contentType)
-    };
-  });
-
-  // Newsletter Subscribers
-  export const newsletterSubscribers = pgTable("newsletter_subscribers", {
-    id: serial("id").primaryKey(),
-    email: text("email").notNull().unique(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  }, (table) => {
-    return {
-      emailIdx: index("idx_newsletter_email").on(table.email)
-    };
-  });
-
-  // LMS Integration - Credentials
-  export const lmsCredentials = pgTable("lms_credentials", {
-    id: serial("id").primaryKey(),
-    provider: lmsProviderEnum("provider").notNull(),
-    name: text("name").notNull(), // Friendly name for the integration
-    baseUrl: text("base_url").notNull(), // e.g., https://canvas.example.edu
-    clientId: text("client_id").notNull(),
-    clientSecret: text("client_secret").notNull(),
-    callbackUrl: text("callback_url").notNull(),
-    active: boolean("active").notNull().default(true),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    createdBy: integer("created_by").references(() => users.id),
-  }, (table) => {
-    return {
-      providerIdx: index("idx_lms_credentials_provider").on(table.provider),
-      activeIdx: index("idx_lms_credentials_active").on(table.active),
-    };
-  });
-
-  // LMS Sync Jobs
-  export const lmsSyncJobs = pgTable("lms_sync_jobs", {
-    id: serial("id").primaryKey(),
-    credentialId: integer("credential_id").references(() => lmsCredentials.id).notNull(),
-    syncType: text("sync_type").notNull(), // 'grades', 'roster', 'assignments', etc.
-    status: syncStatusEnum("status").notNull().default('pending'),
-    startedAt: timestamp("started_at"),
-    completedAt: timestamp("completed_at"),
-    errorMessage: text("error_message"),
-    syncData: json("sync_data").$type<Record<string, unknown>>(), // Metadata about the sync
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    createdBy: integer("created_by").references(() => users.id),
-  }, (table) => {
-    return {
-      credentialIdIdx: index("idx_lms_sync_jobs_credential_id").on(table.credentialId),
-      statusIdx: index("idx_lms_sync_jobs_status").on(table.status),
-      syncTypeIdx: index("idx_lms_sync_jobs_sync_type").on(table.syncType),
-      createdAtIdx: index("idx_lms_sync_jobs_created_at").on(table.createdAt),
-    };
-  });
-
-  // LMS Course Mappings - Maps courses in our system to courses in the LMS
-  export const lmsCourseMappings = pgTable("lms_course_mappings", {
-    id: serial("id").primaryKey(),
-    courseId: integer("course_id").references(() => courses.id).notNull(),
-    credentialId: integer("credential_id").references(() => lmsCredentials.id).notNull(),
-    lmsCourseId: text("lms_course_id").notNull(), // The course ID in the LMS system
-    lmsCourseName: text("lms_course_name"), // The course name in the LMS
-    lastSynced: timestamp("last_synced"),
-    syncEnabled: boolean("sync_enabled").notNull().default(true),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  }, (table) => {
-    return {
-      courseIdIdx: index("idx_lms_course_mappings_course_id").on(table.courseId),
-      credentialIdIdx: index("idx_lms_course_mappings_credential_id").on(table.credentialId),
-      // Composite index for finding mappings by course and credential
-      courseCredentialIdx: index("idx_lms_course_mappings_course_credential").on(table.courseId, table.credentialId),
-      lmsCourseIdIdx: index("idx_lms_course_mappings_lms_course_id").on(table.lmsCourseId),
-    };
-  });
-
-  // Insert Schemas
+  // Insert Schemas (Consolidated)
+  // Using main's version for insertUserSchema assuming mfaEnabled/mfaSecret are from main
   export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, mfaEnabled: true, mfaSecret: true });
   export const insertCourseSchema = createInsertSchema(courses).omit({ id: true, createdAt: true });
   export const insertEnrollmentSchema = createInsertSchema(enrollments).omit({ id: true, createdAt: true });
@@ -377,13 +364,14 @@
   export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true, createdAt: true, updatedAt: true });
   export const insertFeedbackSchema = createInsertSchema(feedback).omit({ id: true, createdAt: true });
   export const insertSystemSettingsSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true });
-  export const insertFileTypeSettingsSchema = createInsertSchema(fileTypeSettings).omit({ id: true, updatedAt: true });
-  export const insertNewsletterSubscriberSchema = createInsertSchema(newsletterSubscribers).omit({ id: true, createdAt: true });
-  export const insertLmsCredentialsSchema = createInsertSchema(lmsCredentials).omit({ id: true, createdAt: true, updatedAt: true });
-  export const insertLmsSyncJobSchema = createInsertSchema(lmsSyncJobs).omit({ id: true, createdAt: true });
-  export const insertLmsCourseMappingSchema = createInsertSchema(lmsCourseMappings).omit({ id: true, createdAt: true, updatedAt: true });
+  export const insertFileTypeSettingsSchema = createInsertSchema(fileTypeSettings).omit({ id: true, updatedAt: true }); // From HEAD
+  export const insertUserNotificationSettingsSchema = createInsertSchema(userNotificationSettings).omit({ id: true, updatedAt: true }); // From HEAD
+  export const insertNewsletterSubscriberSchema = createInsertSchema(newsletterSubscribers).omit({ id: true, createdAt: true }); // From main (if present)
+  export const insertLmsCredentialsSchema = createInsertSchema(lmsCredentials).omit({ id: true, createdAt: true, updatedAt: true }); // From main (if present)
+  export const insertLmsSyncJobSchema = createInsertSchema(lmsSyncJobs).omit({ id: true, createdAt: true }); // From main (if present)
+  export const insertLmsCourseMappingSchema = createInsertSchema(lmsCourseMappings).omit({ id: true, createdAt: true, updatedAt: true }); // From main (if present)
 
-  // Types
+  // Types (Consolidated)
   export type User = typeof users.$inferSelect;
   export type InsertUser = z.infer<typeof insertUserSchema>;
 
@@ -405,17 +393,20 @@
   export type SystemSetting = typeof systemSettings.$inferSelect;
   export type InsertSystemSetting = z.infer<typeof insertSystemSettingsSchema>;
 
-  export type FileTypeSetting = typeof fileTypeSettings.$inferSelect;
-  export type InsertFileTypeSetting = z.infer<typeof insertFileTypeSettingsSchema>;
+  export type FileTypeSetting = typeof fileTypeSettings.$inferSelect; // From HEAD
+  export type InsertFileTypeSetting = z.infer<typeof insertFileTypeSettingsSchema>; // From HEAD
 
-  export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect;
-  export type InsertNewsletterSubscriber = z.infer<typeof insertNewsletterSubscriberSchema>;
+  export type UserNotificationSetting = typeof userNotificationSettings.$inferSelect; // From HEAD
+  export type InsertUserNotificationSetting = z.infer<typeof insertUserNotificationSettingsSchema>; // From HEAD
 
-  export type LmsCredential = typeof lmsCredentials.$inferSelect;
-  export type InsertLmsCredential = z.infer<typeof insertLmsCredentialsSchema>;
+  export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect; // From main (if present)
+  export type InsertNewsletterSubscriber = z.infer<typeof insertNewsletterSubscriberSchema>; // From main (if present)
 
-  export type LmsSyncJob = typeof lmsSyncJobs.$inferSelect;
-  export type InsertLmsSyncJob = z.infer<typeof insertLmsSyncJobSchema>;
+  export type LmsCredential = typeof lmsCredentials.$inferSelect; // From main (if present)
+  export type InsertLmsCredential = z.infer<typeof insertLmsCredentialsSchema>; // From main (if present)
 
-  export type LmsCourseMapping = typeof lmsCourseMappings.$inferSelect;
-  export type InsertLmsCourseMapping = z.infer<typeof insertLmsCourseMappingSchema>;
+  export type LmsSyncJob = typeof lmsSyncJobs.$inferSelect; // From main (if present)
+  export type InsertLmsSyncJob = z.infer<typeof insertLmsSyncJobSchema>; // From main (if present)
+
+  export type LmsCourseMapping = typeof lmsCourseMappings.$inferSelect; // From main (if present)
+  export type InsertLmsCourseMapping = z.infer<typeof insertLmsCourseMappingSchema>; // From main (if present)
