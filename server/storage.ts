@@ -43,6 +43,9 @@ export interface IStorage {
   updateUserMitHorizonSub(userId: number, mitHorizonSub: string): Promise<User | undefined>;
   updateUserEmailVerifiedStatus(userId: number, isVerified: boolean): Promise<User | undefined>;
   updateUserRole(userId: number, newRole: string): Promise<User | undefined>;
+  listUsers(): Promise<User[]>;
+  updateUser(userId: number, updates: Partial<InsertUser>): Promise<User | undefined>;
+  deleteUser(userId: number): Promise<void>;
   
   // Course operations
   getCourse(id: number): Promise<Course | undefined>;
@@ -150,6 +153,23 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return updated;
+  }
+
+  async listUsers(): Promise<User[]> {
+    return db.select().from(users);
+  }
+
+  async updateUser(userId: number, updates: Partial<InsertUser>): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .set(updates as any)
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  async deleteUser(userId: number): Promise<void> {
+    await db.delete(users).where(eq(users.id, userId));
   }
 
   // Course operations

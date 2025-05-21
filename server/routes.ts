@@ -63,6 +63,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Authentication endpoints handled in auth.ts
 
+  // Admin user management
+  app.get('/api/admin/users', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const usersList = await storage.listUsers();
+    res.json(usersList);
+  }));
+
+  app.post('/api/admin/users', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const userSchema = z.object({
+      name: z.string().min(1),
+      username: z.string().min(3),
+      email: z.string().email(),
+      password: z.string().min(6).optional(),
+      role: z.enum(['student', 'instructor', 'admin']).default('student'),
+    });
+
+    const result = userSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ message: 'Invalid user data', errors: result.error.format() });
+    }
+
+    const { password, ...data } = result.data;
+    const newUser = await storage.createUser({ ...data, password: password ?? null });
+    res.status(201).json(newUser);
+  }));
+
+  app.put('/api/admin/users/:id', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    const updateSchema = z.object({
+      name: z.string().optional(),
+      username: z.string().optional(),
+      email: z.string().email().optional(),
+      password: z.string().min(6).optional(),
+      role: z.enum(['student', 'instructor', 'admin']).optional(),
+    });
+
+    const result = updateSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ message: 'Invalid user data', errors: result.error.format() });
+    }
+
+    const updated = await storage.updateUser(userId, result.data);
+    if (!updated) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json(updated);
+  }));
+
+  app.delete('/api/admin/users/:id', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    await storage.deleteUser(userId);
+    res.status(204).end();
+  }));
+
   // Assignment endpoints
   app.get('/api/assignments', requireAuth, asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as any;
