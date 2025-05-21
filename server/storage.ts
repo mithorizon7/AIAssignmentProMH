@@ -178,6 +178,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return updated;
+  }
     
   async updateUserMfa(userId: number, enabled: boolean, secret: string | null): Promise<User | undefined> {
     const [updated] = await db.update(users)
@@ -185,14 +186,6 @@ export class DatabaseStorage implements IStorage {
         mfaEnabled: enabled,
         mfaSecret: secret
       })
-      .where(eq(users.id, userId))
-      .returning();
-    return updated;
-  }
-
-  async updateUserMfa(userId: number, enabled: boolean, secret?: string | null): Promise<User | undefined> { // from origin/main
-    const [updated] = await db.update(users)
-      .set({ mfaEnabled: enabled, mfaSecret: secret ?? null })
       .where(eq(users.id, userId))
       .returning();
     return updated;
