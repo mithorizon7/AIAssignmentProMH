@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { submissionQueue } from '../queue/worker';
 import { db } from '../db';
+import { storage } from '../storage';
 import { submissions, users, courses, assignments, feedback } from '@shared/schema';
 import { eq, count, avg, gt, lt, between, and, desc } from 'drizzle-orm';
 import { metricsService } from '../services/metrics-service';
@@ -128,6 +129,24 @@ router.post('/retry-failed', requireAdmin, asyncHandler(async (req: Request, res
 router.get('/queue-stats', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
   const stats = await submissionQueue.getStats();
   res.json(stats);
+}));
+
+// MFA configuration
+router.get('/security/mfa', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const setting = await storage.getSystemSetting('mfaRequired');
+  res.json({ enabled: setting ? (setting.value as any).enabled === true : false });
+}));
+
+router.post('/security/mfa', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const { enabled } = req.body;
+  const user = req.user as any;
+  const setting = await storage.upsertSystemSetting({
+    key: 'mfaRequired',
+    value: { enabled: !!enabled },
+    description: 'Require MFA for login',
+    updatedBy: user.id
+  });
+  res.json(setting);
 }));
 
 export default router;

@@ -46,6 +46,7 @@ export interface IStorage {
   updateUserMitHorizonSub(userId: number, mitHorizonSub: string): Promise<User | undefined>;
   updateUserEmailVerifiedStatus(userId: number, isVerified: boolean): Promise<User | undefined>;
   updateUserRole(userId: number, newRole: string): Promise<User | undefined>;
+  updateUserMfa(userId: number, enabled: boolean, secret?: string | null): Promise<User | undefined>;
   
   // Course operations
   getCourse(id: number): Promise<Course | undefined>;
@@ -58,6 +59,10 @@ export interface IStorage {
   createEnrollment(enrollment: InsertEnrollment): Promise<Enrollment>;
   listUserEnrollments(userId: number): Promise<Course[]>;
   listCourseEnrollments(courseId: number): Promise<User[]>;
+  /**
+   * List all users with the student role
+   */
+  listStudents(): Promise<User[]>;
 
   // Assignment operations
   getAssignment(id: number): Promise<Assignment | undefined>;
@@ -159,6 +164,14 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async updateUserMfa(userId: number, enabled: boolean, secret?: string | null): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ mfaEnabled: enabled, mfaSecret: secret ?? null })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
   // Course operations
   async getCourse(id: number): Promise<Course | undefined> {
     const [course] = await db.select().from(courses).where(eq(courses.id, id));
@@ -223,6 +236,15 @@ export class DatabaseStorage implements IStorage {
       return result.map((r: { user: User }) => r.user);
     } catch (error) {
       console.error(`Error retrieving enrollments for course ${courseId}:`, error);
+      return [];
+    }
+  }
+
+  async listStudents(): Promise<User[]> {
+    try {
+      return await db.select().from(users).where(eq(users.role, 'student'));
+    } catch (error) {
+      console.error('Error retrieving students:', error);
       return [];
     }
   }
