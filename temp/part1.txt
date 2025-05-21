@@ -1,0 +1,75 @@
+import type { Express, Request, Response, NextFunction } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+import { configureAuth } from "./auth";
+import { submissionQueue } from "./queue/worker";
+import multer from "multer";
+import path from "path";
+import * as fs from 'fs';
+import { StorageService } from "./services/storage-service";
+import { AIService } from "./services/ai-service";
+import { GeminiAdapter, SUPPORTED_MIME_TYPES } from "./adapters/gemini-adapter";
+import { OpenAIAdapter } from "./adapters/openai-adapter";
+import { z } from "zod";
+import { eq, count } from "drizzle-orm";
+import { db } from "./db";
+import { submissions, feedback, users, userNotificationSettings, newsletterSubscribers, type User } from "@shared/schema";
+import { v4 as uuidv4 } from "uuid";
+import { defaultRateLimiter, submissionRateLimiter } from "./middleware/rate-limiter";
+import adminRoutes from "./routes/admin";
+import instructorRoutes from "./routes/instructor";
+import { queueSecurityAudit } from "./queue/security-audit";
+import { determineContentType, isFileTypeAllowed, ContentType } from "./utils/file-type-settings";
+import { processFileForMultimodal } from "./utils/multimodal-processor";
+import { asyncHandler } from "./lib/error-handler";
+import { generateSecret, verifyTotp, generateOtpAuthUrl } from "./utils/totp";
+
+// Helper function to generate a unique shareable code for assignments
+function generateShareableCode(length = 8): string {
+  // Generate a random UUID
+  const uuid = uuidv4();
+
+  // Convert to alphanumeric characters by removing dashes and taking first 'length' characters
+  // Always use uppercase for consistency in storage
+  const code = uuid.replace(/-/g, '').substring(0, length).toUpperCase();
+
+  console.log(`Generated shareable code: ${code}`);
+  return code;
+}
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Set up authentication
+  const { requireAuth, requireRole } = configureAuth(app);
+
+  const requireInstructor = (req: Request, res: Response, next: NextFunction) => {
+    const role = (req.user as any)?.role;
+    if (role !== 'instructor' && role !== 'admin') {
+      return res.status(403).json({ message: 'Instructor access required' });
+    }
+    next();
+  };
+
+  // Initialize services
+  const storageService = new StorageService();
+
+  // Mount admin routes
+  app.use('/api/admin', require('./routes/admin/index').default);
+
+  // Mount instructor routes
+  app.use('/api/instructor', instructorRoutes);
+
+  // Define API routes
+  app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+  });
+
+  // System settings endpoints
+  app.get('/api/admin/system-settings', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
