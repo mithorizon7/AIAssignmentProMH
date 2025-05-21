@@ -1,17 +1,17 @@
-import { 
-  users, 
-  courses, 
-  assignments, 
-  submissions, 
+import {
+  users,
+  courses,
+  assignments,
+  submissions,
   feedback,
   enrollments,
   systemSettings,
   fileTypeSettings,
   userNotificationSettings,
   contentTypeEnum,
-  type User, 
-  type InsertUser, 
-  type Course, 
+  type User,
+  type InsertUser,
+  type Course,
   type InsertCourse,
   type Assignment,
   type InsertAssignment,
@@ -46,14 +46,17 @@ export interface IStorage {
   updateUserMitHorizonSub(userId: number, mitHorizonSub: string): Promise<User | undefined>;
   updateUserEmailVerifiedStatus(userId: number, isVerified: boolean): Promise<User | undefined>;
   updateUserRole(userId: number, newRole: string): Promise<User | undefined>;
-  updateUserMfa(userId: number, enabled: boolean, secret?: string | null): Promise<User | undefined>;
-  
+  listUsers(): Promise<User[]>; // from HEAD
+  updateUser(userId: number, updates: Partial<InsertUser>): Promise<User | undefined>; // from HEAD
+  deleteUser(userId: number): Promise<void>; // from HEAD
+  updateUserMfa(userId: number, enabled: boolean, secret?: string | null): Promise<User | undefined>; // from origin/main
+
   // Course operations
   getCourse(id: number): Promise<Course | undefined>;
   getCourseByCode(code: string): Promise<Course | undefined>;
   createCourse(course: InsertCourse): Promise<Course>;
   listCourses(): Promise<Course[]>;
-  
+
   // Enrollment operations
   getEnrollment(userId: number, courseId: number): Promise<Enrollment | undefined>;
   createEnrollment(enrollment: InsertEnrollment): Promise<Enrollment>;
@@ -89,7 +92,7 @@ export interface IStorage {
   getSystemSetting(key: string): Promise<SystemSetting | undefined>;
   upsertSystemSetting(setting: InsertSystemSetting): Promise<SystemSetting>;
   listSystemSettings(): Promise<SystemSetting[]>;
-  
+
   // File Type Settings operations
   getFileTypeSettings(contentType: string, context?: string, contextId?: number): Promise<FileTypeSetting[]>;
   upsertFileTypeSetting(setting: InsertFileTypeSetting): Promise<FileTypeSetting>;
@@ -116,12 +119,12 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
   }
-  
+
   async getUserByAuth0Sub(auth0Sub: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.auth0Sub, auth0Sub));
     return user;
   }
-  
+
   async getUserByMitHorizonSub(mitHorizonSub: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.mitHorizonSub, mitHorizonSub));
     return user;
@@ -131,7 +134,7 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
-  
+
   async updateUserAuth0Sub(userId: number, auth0Sub: string): Promise<User | undefined> {
     const [updated] = await db.update(users)
       .set({ auth0Sub })
@@ -139,7 +142,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updated;
   }
-  
+
   async updateUserMitHorizonSub(userId: number, mitHorizonSub: string): Promise<User | undefined> {
     const [updated] = await db.update(users)
       .set({ mitHorizonSub })
@@ -147,7 +150,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updated;
   }
-  
+
   async updateUserEmailVerifiedStatus(userId: number, isVerified: boolean): Promise<User | undefined> {
     const [updated] = await db.update(users)
       .set({ emailVerified: isVerified })
@@ -155,7 +158,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updated;
   }
-  
+
   async updateUserRole(userId: number, newRole: string): Promise<User | undefined> {
     const [updated] = await db.update(users)
       .set({ role: newRole as any }) // Cast to any for enum conversion
@@ -164,12 +167,29 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async updateUserMfa(userId: number, enabled: boolean, secret?: string | null): Promise<User | undefined> {
+  async listUsers(): Promise<User[]> { // from HEAD
+    return db.select().from(users);
+  }
+
+  async updateUser(userId: number, updates: Partial<InsertUser>): Promise<User | undefined> { // from HEAD
+    const [updated] = await db.update(users)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .set(updates as any)
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  async updateUserMfa(userId: number, enabled: boolean, secret?: string | null): Promise<User | undefined> { // from origin/main
     const [updated] = await db.update(users)
       .set({ mfaEnabled: enabled, mfaSecret: secret ?? null })
       .where(eq(users.id, userId))
       .returning();
     return updated;
+  }
+
+  async deleteUser(userId: number): Promise<void> { // from HEAD
+    await db.delete(users).where(eq(users.id, userId));
   }
 
   // Course operations
@@ -214,7 +234,7 @@ export class DatabaseStorage implements IStorage {
     .from(enrollments)
     .innerJoin(courses, eq(enrollments.courseId, courses.id))
     .where(eq(enrollments.userId, userId));
-    
+
     return result.map((r: { course: Course }) => r.course);
   }
 
@@ -224,7 +244,7 @@ export class DatabaseStorage implements IStorage {
       console.warn(`listCourseEnrollments called with invalid courseId: ${courseId}, type: ${typeof courseId}`);
       return [];
     }
-    
+
     try {
       const result = await db.select({
         user: users
@@ -232,7 +252,7 @@ export class DatabaseStorage implements IStorage {
       .from(enrollments)
       .innerJoin(users, eq(enrollments.userId, users.id))
       .where(eq(enrollments.courseId, courseId));
-      
+
       return result.map((r: { user: User }) => r.user);
     } catch (error) {
       console.error(`Error retrieving enrollments for course ${courseId}:`, error);
@@ -256,11 +276,11 @@ export class DatabaseStorage implements IStorage {
       console.warn(`getAssignment called with invalid id: ${id}`);
       return undefined;
     }
-    
+
     // Convert id to a valid number to avoid SQL parameter issues
     const numericId = Math.floor(Number(id));
-    console.log(`Fetching assignment with validated id: ${numericId}`);
-    
+    console.log(`Workspaceing assignment with validated id: ${numericId}`);
+
     try {
       const result = await db.select().from(assignments).where(eq(assignments.id, numericId));
       if (result && result.length > 0) {
@@ -279,22 +299,22 @@ export class DatabaseStorage implements IStorage {
     try {
       // Extract the basic fields first
       const { rubric, instructorContext, ...basicFields } = insertAssignment;
-      
+
       // Create a properly formatted assignment object that matches the schema's expected types
       const assignmentData = {
         ...basicFields,
         // Handle rubric correctly - store as native JSON for Drizzle to handle
         rubric: rubric ? (typeof rubric === 'string' ? JSON.parse(rubric) : rubric) : null,
         // Handle instructorContext correctly - store as native JSON for Drizzle to handle
-        instructorContext: instructorContext 
-          ? (typeof instructorContext === 'string' ? JSON.parse(instructorContext) : instructorContext) 
+        instructorContext: instructorContext
+          ? (typeof instructorContext === 'string' ? JSON.parse(instructorContext) : instructorContext)
           : null
       };
-      
+
       // Use fully parameterized SQL to avoid type issues and prevent SQL injection
-      const sql = `
+      const sqlQuery = `
         INSERT INTO assignments (
-          title, description, course_id, due_date, status, 
+          title, description, course_id, due_date, status,
           shareable_code, rubric, instructor_context
         )
         VALUES (
@@ -302,7 +322,7 @@ export class DatabaseStorage implements IStorage {
         )
         RETURNING *;
       `;
-      
+
       const params = [
         assignmentData.title,
         assignmentData.description || null,
@@ -313,9 +333,9 @@ export class DatabaseStorage implements IStorage {
         assignmentData.rubric ? JSON.stringify(assignmentData.rubric) : null,
         assignmentData.instructorContext ? JSON.stringify(assignmentData.instructorContext) : null
       ];
-      
-      const result = await db.execute(sql, params);
-      return result.rows[0];
+
+      const result = await db.execute(sqlQuery, params);
+      return result.rows[0] as Assignment; // Added type assertion
     } catch (error) {
       console.error("[ERROR] Error creating assignment:", error);
       throw error;
@@ -347,7 +367,7 @@ export class DatabaseStorage implements IStorage {
     .innerJoin(assignments, eq(enrollments.courseId, assignments.courseId))
     .where(eq(enrollments.userId, userId))
     .orderBy(desc(assignments.dueDate));
-    
+
     return result.map((r: { assignment: Assignment }) => r.assignment);
   }
 
@@ -358,7 +378,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return assignment;
   }
-  
+
   async updateAssignmentShareableCode(id: number, shareableCode: string): Promise<Assignment> {
     const [assignment] = await db.update(assignments)
       .set({ shareableCode })
@@ -377,15 +397,15 @@ export class DatabaseStorage implements IStorage {
     try {
       // Check if the columns we need exist first
       const columnsQuery = `
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'submissions' 
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'submissions'
         AND column_name IN ('mime_type', 'file_size', 'content_type');
       `;
-      
-      const result = await db.execute(columnsQuery);
-      const existingColumns = result.rows.map((row: { column_name: string }) => row.column_name);
-      
+
+      const resultCols = await db.execute(columnsQuery); // Renamed 'result' to 'resultCols'
+      const existingColumns = resultCols.rows.map((row: { column_name: string }) => row.column_name);
+
       // Create a new submissions insert object with required fields
       const submissionData: InsertSubmission = {
         assignmentId: insertSubmission.assignmentId,
@@ -399,13 +419,13 @@ export class DatabaseStorage implements IStorage {
         fileSize: existingColumns.includes('file_size') ? (insertSubmission.fileSize || null) : null,
         contentType: existingColumns.includes('content_type') ? (insertSubmission.contentType || null) : null
       };
-      
+
       const [submission] = await db.insert(submissions).values([submissionData]).returning();
       console.log(`[INFO] Submission created successfully: ${submission.id}`);
       return submission;
     } catch (error) {
       console.error("[ERROR] Error creating submission:", error);
-      
+
       // Fallback approach if there's a schema issue - using parameterized query
       try {
         // Define the parameterized SQL query
@@ -414,10 +434,10 @@ export class DatabaseStorage implements IStorage {
           VALUES ($1, $2, $3, $4, $5, $6, $7)
           RETURNING *;
         `;
-        
+
         // Define parameters with proper types
         const params = [
-          insertSubmission.assignmentId, 
+          insertSubmission.assignmentId,
           insertSubmission.userId,
           insertSubmission.fileUrl || null,
           insertSubmission.fileName || null,
@@ -425,7 +445,7 @@ export class DatabaseStorage implements IStorage {
           insertSubmission.notes || null,
           insertSubmission.status || 'pending'
         ];
-        
+
         console.log("[INFO] Using fallback parameterized SQL for submission creation");
         const result = await db.execute(parameterizedSql, params);
         const submission = result.rows[0] as Submission;
@@ -433,8 +453,8 @@ export class DatabaseStorage implements IStorage {
         return submission;
       } catch (fallbackError) {
         console.error("[ERROR] Fallback submission creation also failed:", fallbackError);
-        const errorMessage = fallbackError instanceof Error 
-          ? fallbackError.message 
+        const errorMessage = fallbackError instanceof Error
+          ? fallbackError.message
           : String(fallbackError);
         throw new Error(`Failed to create submission: ${errorMessage}`);
       }
@@ -464,7 +484,7 @@ export class DatabaseStorage implements IStorage {
       console.warn(`listSubmissionsForAssignment called with invalid assignmentId: ${assignmentId}, type: ${typeof assignmentId}`);
       return [];
     }
-    
+
     try {
       return db.select()
         .from(submissions)
@@ -472,19 +492,19 @@ export class DatabaseStorage implements IStorage {
         .orderBy(desc(submissions.createdAt));
     } catch (error) {
       console.error(`Error listing submissions for assignment ${assignmentId}:`, error);
-      
+
       // Fallback approach with parameterized SQL if there's a schema issue
       try {
         const parameterizedSql = `
-          SELECT * FROM submissions 
+          SELECT * FROM submissions
           WHERE assignment_id = $1
           ORDER BY created_at DESC;
         `;
-        
+
         const result = await db.execute(parameterizedSql, [assignmentId]);
         return result.rows as Submission[];
       } catch (innerError) {
-        console.error("Fallback query also failed:", 
+        console.error("Fallback query also failed:",
           innerError instanceof Error ? innerError.message : String(innerError));
         return [];
       }
@@ -498,36 +518,36 @@ export class DatabaseStorage implements IStorage {
       if (!existingSubmission) {
         throw new Error(`Submission with ID ${id} not found`);
       }
-      
+
       // Update with proper error handling
       const [submission] = await db.update(submissions)
-        .set({ 
+        .set({
           status: status as any,
           updatedAt: new Date()
         })
         .where(eq(submissions.id, id))
         .returning();
-        
+
       console.log(`[INFO] Updated submission ${id} status to ${status}`);
       return submission;
     } catch (error) {
       console.error(`[ERROR] Error updating submission ${id} status to ${status}:`, error);
-      
+
       // Fallback approach with raw SQL if there's a schema issue
       try {
         console.log(`[INFO] Using fallback SQL approach for submission ${id} status update`);
         const safeSql = `
-          UPDATE submissions 
-          SET status = $1, updated_at = NOW() 
+          UPDATE submissions
+          SET status = $1, updated_at = NOW()
           WHERE id = $2
           RETURNING *;
         `;
-        
+
         const result = await db.execute(safeSql, [status, id]);
         if (result.rows.length === 0) {
           throw new Error(`Submission with ID ${id} not found`);
         }
-        
+
         console.log(`[INFO] Successfully updated submission ${id} status with fallback approach`);
         return result.rows[0] as Submission;
       } catch (innerError: any) {
@@ -547,24 +567,24 @@ export class DatabaseStorage implements IStorage {
         ))
         .orderBy(desc(submissions.createdAt))
         .limit(1);
-      
+
       return submission;
     } catch (error) {
       console.error("Error getting latest submission:", error);
-      
+
       // Fallback approach with parameterized SQL for security
       try {
         const parameterizedSql = `
-          SELECT * FROM submissions 
+          SELECT * FROM submissions
           WHERE user_id = $1 AND assignment_id = $2
           ORDER BY created_at DESC
           LIMIT 1;
         `;
-        
+
         const result = await db.execute(parameterizedSql, [userId, assignmentId]);
         return result.rows[0] as Submission;
       } catch (innerError) {
-        console.error("Fallback query for latest submission also failed:", 
+        console.error("Fallback query for latest submission also failed:",
           innerError instanceof Error ? innerError.message : String(innerError));
         return undefined;
       }
@@ -601,18 +621,18 @@ export class DatabaseStorage implements IStorage {
         }
         return [];
       };
-      
+
       // Helper function for ensuring correct JSON format
-      const ensureJsonField = (field: any): string | null => {
+      const ensureJsonField = (field: any): string | null => { // Not used in current logic but good to have
         if (!field) return null;
         if (typeof field === 'string') return field;
         return JSON.stringify(field);
       };
 
       console.log('[INFO] Creating feedback with validated data structure');
-      
+
       // Use raw SQL to avoid type issues
-      const sql = `
+      const sqlQuery = `
         INSERT INTO feedback (
           submission_id, strengths, improvements, suggestions,
           summary, score, criteria_scores, processing_time,
@@ -623,7 +643,7 @@ export class DatabaseStorage implements IStorage {
         )
         RETURNING *;
       `;
-      
+
       const params = [
         insertFeedback.submissionId,
         JSON.stringify(ensureArray(insertFeedback.strengths)),
@@ -637,17 +657,17 @@ export class DatabaseStorage implements IStorage {
         insertFeedback.tokenCount || null,
         insertFeedback.modelName || null
       ];
-      
-      const result = await db.execute(sql, params);
-      return result.rows[0];
+
+      const result = await db.execute(sqlQuery, params); // Renamed 'sql' to 'sqlQuery'
+      return result.rows[0] as Feedback; // Added type assertion
     } catch (initialError: unknown) {
       console.error('[ERROR] Error creating feedback:', initialError);
       const initialErrorMessage = initialError instanceof Error ? initialError.message : String(initialError);
-      
+
       // Try a fallback approach with direct SQL if needed
       try {
         console.log('[INFO] Attempting fallback SQL for feedback creation');
-        
+
         // Convert arrays to JSON strings for SQL insertion
         const strengths = JSON.stringify(
           Array.isArray(insertFeedback.strengths) ? insertFeedback.strengths : []
@@ -658,10 +678,10 @@ export class DatabaseStorage implements IStorage {
         const suggestions = JSON.stringify(
           Array.isArray(insertFeedback.suggestions) ? insertFeedback.suggestions : []
         );
-        
-        const sql = `
+
+        const fallbackSqlQuery = `
           INSERT INTO feedback (
-            submission_id, strengths, improvements, suggestions, 
+            submission_id, strengths, improvements, suggestions,
             summary, score, criteria_scores, processing_time,
             raw_response, token_count, model_name, created_at
           )
@@ -670,8 +690,8 @@ export class DatabaseStorage implements IStorage {
           )
           RETURNING *;
         `;
-        
-        const params = [
+
+        const fallbackParams = [ // Renamed 'params' to 'fallbackParams'
           insertFeedback.submissionId,
           strengths,
           improvements,
@@ -684,12 +704,12 @@ export class DatabaseStorage implements IStorage {
           insertFeedback.tokenCount || null,
           insertFeedback.modelName || null
         ];
-        
-        const result = await db.execute(sql, params);
+
+        const result = await db.execute(fallbackSqlQuery, fallbackParams); // Renamed 'sql' to 'fallbackSqlQuery'
         if (result.rows.length === 0) {
           throw new Error('Failed to create feedback with fallback SQL');
         }
-        
+
         return result.rows[0] as Feedback;
       } catch (fallbackError: unknown) {
         console.error('[ERROR] Fallback feedback creation also failed:', fallbackError);
@@ -709,7 +729,7 @@ export class DatabaseStorage implements IStorage {
   async upsertSystemSetting(setting: InsertSystemSetting): Promise<SystemSetting> {
     // Check if setting exists
     const existingSetting = await this.getSystemSetting(setting.key);
-    
+
     if (existingSetting) {
       // Update existing setting
       const result = await db.update(systemSettings)
@@ -732,7 +752,7 @@ export class DatabaseStorage implements IStorage {
   async listSystemSettings(): Promise<SystemSetting[]> {
     return await db.select().from(systemSettings);
   }
-  
+
   // File Type Settings operations
   async getFileTypeSettings(
     contentType: string,
@@ -741,18 +761,18 @@ export class DatabaseStorage implements IStorage {
   ): Promise<FileTypeSetting[]> {
     // Create base query
     const query = db.select().from(fileTypeSettings);
-    
+
     // Build the query with direct string comparison
     const conditions = [];
     conditions.push(sql`${fileTypeSettings.contentType}::text = ${contentType}`);
     conditions.push(sql`${fileTypeSettings.context} = ${context}`);
-    
+
     if (contextId !== undefined) {
       conditions.push(sql`${fileTypeSettings.contextId} = ${contextId}`);
     } else {
       conditions.push(sql`${fileTypeSettings.contextId} IS NULL`);
     }
-    
+
     return await query.where(and(...conditions));
   }
 
@@ -775,31 +795,31 @@ export class DatabaseStorage implements IStorage {
         }
         return [];
       };
-      
+
       // Try to find existing setting with proper filtering
       const filters = [];
       filters.push(eq(fileTypeSettings.contentType, setting.contentType));
       filters.push(eq(fileTypeSettings.context, setting.context));
-      
+
       if (setting.contextId) {
         filters.push(eq(fileTypeSettings.contextId, setting.contextId));
       } else {
         filters.push(sql`${fileTypeSettings.contextId} IS NULL`);
       }
-      
-      const result = await db.select()
+
+      const resultExisting = await db.select() // Renamed 'result' to 'resultExisting'
         .from(fileTypeSettings)
         .where(and(...filters));
-      
-      const existingSetting = result[0];
-      
+
+      const existingSetting = resultExisting[0];
+
       // Ensure arrays are properly formatted
       const validatedSetting = {
         ...setting,
         extensions: ensureArray(setting.extensions),
         mimeTypes: ensureArray(setting.mimeTypes),
       };
-      
+
       if (existingSetting) {
         // Update existing setting
         console.log('[INFO] Updating existing file type setting');
@@ -825,51 +845,51 @@ export class DatabaseStorage implements IStorage {
       }
     } catch (error: any) {
       console.error('[ERROR] Error upserting file type setting:', error);
-      
+
       // Fallback approach with raw SQL if needed
       try {
         console.log('[INFO] Attempting fallback SQL for file type setting upsert');
-        
+
         // First check if the setting exists using parameterized query
         let checkSql;
         let checkParams = [];
-        
+
         if (setting.contextId) {
           checkSql = `
-            SELECT id FROM file_type_settings 
-            WHERE content_type = $1 
+            SELECT id FROM file_type_settings
+            WHERE content_type = $1
             AND context = $2
             AND context_id = $3;
           `;
           checkParams = [setting.contentType, setting.context, setting.contextId];
         } else {
           checkSql = `
-            SELECT id FROM file_type_settings 
-            WHERE content_type = $1 
+            SELECT id FROM file_type_settings
+            WHERE content_type = $1
             AND context = $2
             AND context_id IS NULL;
           `;
           checkParams = [setting.contentType, setting.context];
         }
-        
+
         const checkResult = await db.execute(checkSql, checkParams);
         const existingId = checkResult.rows[0]?.id;
-        
+
         const extensions = JSON.stringify(
           Array.isArray(setting.extensions) ? setting.extensions : []
         );
-        
+
         const mimeTypes = JSON.stringify(
           Array.isArray(setting.mimeTypes) ? setting.mimeTypes : []
         );
-        
-        let sql;
-        let params = [];
+
+        let sqlQuery; // Renamed 'sql' to 'sqlQuery'
+        let sqlParams = []; // Renamed 'params' to 'sqlParams'
         if (existingId) {
           // Update using parameterized query
-          sql = `
+          sqlQuery = `
             UPDATE file_type_settings
-            SET 
+            SET
               enabled = $1,
               extensions = $2,
               mime_types = $3,
@@ -879,8 +899,8 @@ export class DatabaseStorage implements IStorage {
             WHERE id = $6
             RETURNING *;
           `;
-          
-          params = [
+
+          sqlParams = [
             setting.enabled || false,
             extensions,
             mimeTypes,
@@ -890,7 +910,7 @@ export class DatabaseStorage implements IStorage {
           ];
         } else {
           // Insert using parameterized query
-          sql = `
+          sqlQuery = `
             INSERT INTO file_type_settings (
               content_type, context, context_id, enabled, extensions,
               mime_types, max_size, updated_at, updated_by
@@ -900,8 +920,8 @@ export class DatabaseStorage implements IStorage {
             )
             RETURNING *;
           `;
-          
-          params = [
+
+          sqlParams = [
             setting.contentType,
             setting.context,
             setting.contextId || null,
@@ -912,12 +932,12 @@ export class DatabaseStorage implements IStorage {
             setting.updatedBy || null
           ];
         }
-        
-        const result = await db.execute(sql, params);
+
+        const result = await db.execute(sqlQuery, sqlParams);
         if (result.rows.length === 0) {
           throw new Error('Failed to upsert file type setting with fallback SQL');
         }
-        
+
         return result.rows[0] as FileTypeSetting;
       } catch (fallbackError: any) {
         console.error('[ERROR] Fallback file type setting upsert also failed:', fallbackError);
@@ -940,87 +960,87 @@ export class DatabaseStorage implements IStorage {
 
       // Use the contentType as a valid ContentType
       const normalizedContentType = contentType as ContentType;
-      
+
       console.log(`Checking file enablement: Content type=${normalizedContentType}, Extension=${extension}, MIME=${mimeType}`);
-      
+
       // Get system settings for this content type - using SQL template
       const contentTypeFilter = sql`${fileTypeSettings.contentType}::text = ${normalizedContentType}`;
       const contextFilter = sql`${fileTypeSettings.context} = ${'system'}`;
       const enabledFilter = sql`${fileTypeSettings.enabled} = ${true}`;
-      
+
       const query = db.select().from(fileTypeSettings)
         .where(and(contentTypeFilter, contextFilter, enabledFilter));
-      
+
       const settings = await query;
-      
+
       if (settings.length === 0) {
         console.log(`Content type ${normalizedContentType} not enabled at system level`);
         return false; // Content type not enabled at system level
       }
-      
+
       // First, prioritize content type validation
       // If the content type category is enabled, we're more flexible with extensions/MIME types
       console.log(`Content type ${normalizedContentType} is enabled at system level`);
-      
+
       const systemSetting = settings[0];
-      
+
       // Check if the extension and MIME type are allowed
-      const allowedExtensions = systemSetting.extensions as string[];
-      const allowedMimeTypes = systemSetting.mimeTypes as string[];
-      
+      const allowedExtensions = systemSetting.extensions as string[] | null; // Can be null
+      const allowedMimeTypes = systemSetting.mimeTypes as string[] | null; // Can be null
+
       // If extensions or mimeTypes lists are empty or null, use a more permissive approach
       // based on content type category rather than specific extension/MIME matching
-      if (!allowedExtensions?.length && !allowedMimeTypes?.length) {
+      if ((!allowedExtensions || allowedExtensions.length === 0) && (!allowedMimeTypes || allowedMimeTypes.length === 0)) {
         console.log(`No extension or MIME type restrictions for content type ${normalizedContentType} - allowing file`);
         return true;
       }
-      
+
       // Clean and normalize the extension for comparison
       const normalizedExtension = extension.toLowerCase().replace(/^\./, '');
       const normalizedMimeType = mimeType.toLowerCase();
-      
+
       // If we have a list of extensions but it's empty, don't require extension matching
-      const shouldCheckExtension = allowedExtensions?.length > 0;
+      const shouldCheckExtension = allowedExtensions && allowedExtensions.length > 0;
       // If we have a list of MIME types but it's empty, don't require MIME type matching
-      const shouldCheckMimeType = allowedMimeTypes?.length > 0;
-      
+      const shouldCheckMimeType = allowedMimeTypes && allowedMimeTypes.length > 0;
+
       // Match extension if needed
       let extMatch = !shouldCheckExtension; // Default to true if we don't need to check
-      if (shouldCheckExtension) {
-        extMatch = allowedExtensions.some(ext => 
+      if (shouldCheckExtension && allowedExtensions) { // Added null check for allowedExtensions
+        extMatch = allowedExtensions.some(ext =>
           ext.toLowerCase() === normalizedExtension
         );
       }
-      
+
       // Match MIME type if needed
       let mimeMatch = !shouldCheckMimeType; // Default to true if we don't need to check
-      if (shouldCheckMimeType) {
+      if (shouldCheckMimeType && allowedMimeTypes) { // Added null check for allowedMimeTypes
         // Check for exact MIME type match
-        const exactMimeMatch = allowedMimeTypes.some(mime => 
+        const exactMimeMatch = allowedMimeTypes.some(mime =>
           mime.toLowerCase() === normalizedMimeType
         );
-        
+
         // Check for MIME type category match (e.g., 'image/*')
         const mimeTypeCategory = normalizedMimeType.split('/')[0];
-        const wildcardMatch = allowedMimeTypes.some(mime => 
+        const wildcardMatch = allowedMimeTypes.some(mime =>
           mime === `${mimeTypeCategory}/*` || mime === '*/*'
         );
-        
+
         mimeMatch = exactMimeMatch || wildcardMatch;
       }
-      
+
       // Allow file if it matches either extension OR MIME type requirements
       // This is more permissive and avoids false rejections
       if (extMatch || mimeMatch) {
         console.log(`File type approved - Extension match: ${extMatch}, MIME match: ${mimeMatch}`);
         return true;
       }
-      
+
       // If we get this far, the file type isn't allowed
       console.log(`File type check failed - Extension: ${normalizedExtension}, MIME: ${normalizedMimeType}, Content Type: ${normalizedContentType}`);
       console.log(`Allowed extensions: ${allowedExtensions?.join(', ') || 'None'}`);
       console.log(`Allowed MIME types: ${allowedMimeTypes?.join(', ') || 'None'}`);
-      
+
       return false;
     } catch (error) {
       console.error('Error checking file type enablement:', error);

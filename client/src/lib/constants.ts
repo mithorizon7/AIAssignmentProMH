@@ -8,11 +8,10 @@
     STUDENTS: '/api/students',
     EXPORT_CSV: '/api/export/grades',
     COURSES: '/api/courses',
-    // ===== RESOLVED CONFLICT: Added from both branches =====
+    ADMIN_USERS: '/api/admin/users',
     SYSTEM_SETTINGS: '/api/admin/system-settings',
     SECURITY_AUDIT: '/api/admin/security-audit',
     NEWSLETTER_SUBSCRIBE: '/api/newsletter/subscribe',
-    // ======================================================
   };
 
   export const APP_ROUTES = {
@@ -35,7 +34,7 @@
     ADMIN_DASHBOARD: '/admin/dashboard',
     ADMIN_USERS: '/admin/users',
     ADMIN_SYSTEM_CONFIG: '/admin/system-config',
-    ADMIN_SETTINGS: '/admin/system-config',
+    ADMIN_SETTINGS: '/admin/system-config', // Note: Same as ADMIN_SYSTEM_CONFIG, verify if intended
     ADMIN_LOGS: '/admin/logs',
   };
 

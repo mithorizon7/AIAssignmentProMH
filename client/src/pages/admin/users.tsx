@@ -46,6 +46,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { API_ROUTES, USER_ROLES } from "@/lib/constants";
+import { apiRequest } from "@/lib/queryClient";
 import { User } from "@shared/schema";
 import { MoreHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
 
@@ -55,73 +56,38 @@ export default function UsersPage() {
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [newUser, setNewUser] = useState({
+    name: "",
+    email: "",
+    role: USER_ROLES.STUDENT,
+    password: "",
+  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Fetch users
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: ["/api/admin/users"],
+  const { data: users = [], isLoading } = useQuery<User[]>({
+    queryKey: [API_ROUTES.ADMIN_USERS],
     queryFn: async () => {
-      // In a real implementation, this would fetch from an API
-      return [
-        {
-          id: 1,
-          name: "Jane Cooper",
-          email: "jane.cooper@example.com",
-          role: "admin",
-          createdAt: "2023-01-23T00:00:00.000Z",
-          lastLogin: "2023-05-04T14:53:00.000Z",
-          status: "active",
-        },
-        {
-          id: 2,
-          name: "Wade Warren",
-          email: "wade.warren@example.com",
-          role: "instructor",
-          createdAt: "2023-02-15T00:00:00.000Z",
-          lastLogin: "2023-05-03T09:12:00.000Z",
-          status: "active",
-        },
-        {
-          id: 3,
-          name: "Esther Howard",
-          email: "esther.howard@example.com",
-          role: "instructor",
-          createdAt: "2023-03-10T00:00:00.000Z",
-          lastLogin: "2023-05-01T16:32:00.000Z",
-          status: "active",
-        },
-        {
-          id: 4,
-          name: "Cameron Williamson",
-          email: "cameron.williamson@example.com",
-          role: "student",
-          createdAt: "2023-03-22T00:00:00.000Z",
-          lastLogin: "2023-05-02T11:23:00.000Z",
-          status: "active",
-        },
-        {
-          id: 5,
-          name: "Brooklyn Simmons",
-          email: "brooklyn.simmons@example.com",
-          role: "student",
-          createdAt: "2023-04-06T00:00:00.000Z",
-          lastLogin: "2023-05-01T08:45:00.000Z",
-          status: "inactive",
-        },
-      ];
+      const res = await apiRequest('GET', API_ROUTES.ADMIN_USERS);
+      if (!res.ok) {
+        throw new Error('Failed to fetch users');
+      }
+      return res.json();
     },
   });
 
   // Update user role mutation
   const updateUserRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: number; role: string }) => {
-      // This would be a real API call in production
-      console.log(`Updating user ${userId} role to ${role}`);
-      return { userId, role };
+      const res = await apiRequest('PUT', `${API_ROUTES.ADMIN_USERS}/${userId}`, { role });
+      if (!res.ok) {
+        throw new Error('Failed to update user');
+      }
+      return res.json();
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [API_ROUTES.ADMIN_USERS] });
       toast({
         title: "Role updated",
         description: "User role has been updated successfully",
@@ -136,15 +102,36 @@ export default function UsersPage() {
     },
   });
 
+  const createUserMutation = useMutation({
+    mutationFn: async (data: { name: string; email: string; role: string; password?: string }) => {
+      const res = await apiRequest('POST', API_ROUTES.ADMIN_USERS, data);
+      if (!res.ok) {
+        throw new Error('Failed to create user');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [API_ROUTES.ADMIN_USERS] });
+      toast({ title: 'User created', description: 'The user has been created successfully' });
+      setIsAddUserOpen(false);
+      setNewUser({ name: '', email: '', role: USER_ROLES.STUDENT, password: '' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to create user', variant: 'destructive' });
+    },
+  });
+
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: number) => {
-      // This would be a real API call in production
-      console.log(`Deleting user ${userId}`);
+      const res = await apiRequest('DELETE', `${API_ROUTES.ADMIN_USERS}/${userId}`);
+      if (!res.ok) {
+        throw new Error('Failed to delete user');
+      }
       return userId;
     },
-    onSuccess: (userId) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [API_ROUTES.ADMIN_USERS] });
       toast({
         title: "User deleted",
         description: "User has been deleted successfully",
@@ -341,6 +328,8 @@ export default function UsersPage() {
                   id="name"
                   className="col-span-3"
                   placeholder="Enter user's full name"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -352,13 +341,18 @@ export default function UsersPage() {
                   type="email"
                   className="col-span-3"
                   placeholder="Enter user's email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label htmlFor="role" className="text-right text-sm">
                   Role
                 </label>
-                <Select>
+                <Select
+                  value={newUser.role}
+                  onValueChange={(value) => setNewUser({ ...newUser, role: value })}
+                >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
@@ -378,6 +372,8 @@ export default function UsersPage() {
                   type="password"
                   className="col-span-3"
                   placeholder="Create temporary password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                 />
               </div>
             </div>
@@ -389,15 +385,10 @@ export default function UsersPage() {
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  toast({
-                    title: "User created",
-                    description: "The user has been created successfully",
-                  });
-                  setIsAddUserOpen(false);
-                }}
+                onClick={() => createUserMutation.mutate(newUser)}
+                disabled={createUserMutation.isPending}
               >
-                Create User
+                {createUserMutation.isPending ? 'Creating...' : 'Create User'}
               </Button>
             </DialogFooter>
           </DialogContent>

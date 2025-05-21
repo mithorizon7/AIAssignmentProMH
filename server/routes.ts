@@ -13,9 +13,7 @@ import { OpenAIAdapter } from "./adapters/openai-adapter";
 import { z } from "zod";
 import { eq, count } from "drizzle-orm";
 import { db } from "./db";
-// ===== RESOLVED IMPORT CONFLICT =====
 import { submissions, feedback, users, userNotificationSettings, newsletterSubscribers, type User } from "@shared/schema";
-// ====================================
 import { v4 as uuidv4 } from "uuid";
 import { defaultRateLimiter, submissionRateLimiter } from "./middleware/rate-limiter";
 import adminRoutes from "./routes/admin";
@@ -73,7 +71,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).json({ status: 'ok' });
   });
 
-  // System settings endpoints (from HEAD)
+  // System settings endpoints
   app.get('/api/admin/system-settings', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
     const settings = await storage.listSystemSettings();
     const result: Record<string, any> = {};
@@ -103,11 +101,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/security-audit', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as User;
-    await queueSecurityAudit(user.id); // Ensure queueSecurityAudit is imported if it's a new function from HEAD
+    await queueSecurityAudit(user.id);
     res.json({ message: 'Security audit queued' });
   }));
 
-  // Newsletter subscription (from main)
+  // Newsletter subscription
   app.post('/api/newsletter/subscribe', asyncHandler(async (req: Request, res: Response) => {
     const schema = z.object({ email: z.string().email() });
     const result = schema.safeParse(req.body);
@@ -132,8 +130,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
   // Authentication endpoints handled in auth.ts
 
-  // ===== RESOLVED ROUTE CONFLICT (Keeping both sets of routes) =====
-  // User notification settings
+  // Admin user management (from codex/add-admin-user-routes-and-connect-to-storage branch)
+  app.get('/api/admin/users', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const usersList = await storage.listUsers();
+    res.json(usersList);
+  }));
+
+  app.post('/api/admin/users', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const userSchema = z.object({
+      name: z.string().min(1),
+      username: z.string().min(3),
+      email: z.string().email(),
+      password: z.string().min(6).optional(),
+      role: z.enum(['student', 'instructor', 'admin']).default('student'),
+    });
+
+    const result = userSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ message: 'Invalid user data', errors: result.error.format() });
+    }
+
+    const { password, ...data } = result.data;
+    const newUser = await storage.createUser({ ...data, password: password ?? null });
+    res.status(201).json(newUser);
+  }));
+
+  app.put('/api/admin/users/:id', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    const updateSchema = z.object({
+      name: z.string().optional(),
+      username: z.string().optional(),
+      email: z.string().email().optional(),
+      password: z.string().min(6).optional(),
+      role: z.enum(['student', 'instructor', 'admin']).optional(),
+    });
+
+    const result = updateSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ message: 'Invalid user data', errors: result.error.format() });
+    }
+
+    const updated = await storage.updateUser(userId, result.data);
+    if (!updated) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json(updated);
+  }));
+
+  app.delete('/api/admin/users/:id', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    await storage.deleteUser(userId);
+    res.status(204).end();
+  }));
+
+  // User notification settings (from origin/main branch)
   app.get('/api/user/notifications', requireAuth, asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as User;
     const settings = await storage.getUserNotificationSettings(user.id);
@@ -170,12 +229,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(settings);
   }));
 
-  // MFA endpoints
+  // MFA endpoints (from origin/main branch)
   app.get('/api/mfa/setup', requireAuth, asyncHandler(async (req: Request, res: Response) => {
-    const user = req.user as any;
+    const user = req.user as any; // Assuming user object has id and username
     const secret = generateSecret();
-    const url = generateOtpAuthUrl(secret, user.username);
-    await storage.updateUserMfa(user.id, false, secret);
+    const url = generateOtpAuthUrl(secret, user.username); // Ensure user.username exists
+    await storage.updateUserMfa(user.id, false, secret); // Make sure storage.updateUserMfa handles these params
     res.json({ secret, url });
   }));
 
@@ -195,16 +254,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/mfa/disable', requireAuth, asyncHandler(async (req: Request, res: Response) => {
     const { token } = req.body;
     const user = await storage.getUser((req.user as any).id);
-    if (!user || !user.mfaSecret) {
+    if (!user || !user.mfaSecret) { // Should check if MFA is enabled rather than just secret exists
       return res.status(400).json({ message: 'MFA not enabled' });
     }
     if (!token || !verifyTotp(String(token), user.mfaSecret)) {
       return res.status(401).json({ message: 'Invalid MFA token' });
     }
-    await storage.updateUserMfa(user.id, false, null);
+    await storage.updateUserMfa(user.id, false, null); // Setting secret to null on disable
     res.json({ enabled: false });
   }));
-  // ===============================================================
 
   // Assignment endpoints
   app.get('/api/assignments', requireAuth, asyncHandler(async (req: Request, res: Response) => {
@@ -335,9 +393,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignment = await storage.createAssignment({
         title,
         description,
-        courseId: courseIdNum, 
-        dueDate: new Date(dueDate), 
-        status: 'active', 
+        courseId: courseIdNum,
+        dueDate: new Date(dueDate),
+        status: 'active',
         shareableCode,
         rubric: rubric ? JSON.stringify(rubric) as any : null,
       });
@@ -499,8 +557,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       courseName: course.name,
       dueDate: assignment.dueDate,
       shareableCode: shareableCode || `TEMP-${assignment.id}`,
-      requiresAuth: true, 
-      isAuthenticated: isAuthenticated 
+      requiresAuth: true,
+      isAuthenticated: isAuthenticated
     });
   }));
 
@@ -666,7 +724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const isAllowed = await storage.checkFileTypeEnabled(contentType, fileExtension, mimeType);
         if (!isAllowed) {
           return res.status(400).json({
-            message: `File type <span class="math-inline">\{fileExtension\} \(</span>{mimeType}) is not allowed`,
+            message: `File type .${fileExtension} (${mimeType}) is not allowed`,
             details: 'This file type is currently not supported for AI evaluation'
           });
         }
@@ -1135,25 +1193,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Students enrolled in course ${courseId}: ${totalStudents}`);
       } else {
         try {
-          const studentCount = await db.select({ count: countFn() })
+          const studentCountResult = await db.select({ count: countFn() })
             .from(users)
             .where(eq(users.role, 'student'));
 
-          console.log("Raw student count result:", studentCount);
+          console.log("Raw student count result:", studentCountResult);
 
-          if (studentCount && studentCount.length > 0) {
-            if (typeof studentCount[0].count === 'number') {
-              totalStudents = studentCount[0].count;
-            } else if (typeof studentCount[0].count === 'string') {
-              const parsedCount = parseInt(studentCount[0].count, 10);
+          if (studentCountResult && studentCountResult.length > 0) {
+            const countValue = studentCountResult[0].count;
+            if (typeof countValue === 'number') {
+              totalStudents = countValue;
+            } else if (typeof countValue === 'string') {
+              const parsedCount = parseInt(countValue, 10);
               totalStudents = !isNaN(parsedCount) ? parsedCount : 0;
-            } else if (studentCount[0].count !== null && studentCount[0].count !== undefined) {
-              totalStudents = Number(studentCount[0].count) || 0;
+            } else if (countValue !== null && countValue !== undefined) {
+               totalStudents = Number(countValue) || 0;
             }
           }
-
           if (isNaN(totalStudents)) totalStudents = 0;
-
           console.log(`Total students in system: ${totalStudents}`);
         } catch (error) {
           console.error("Error counting students:", error);
@@ -1177,7 +1234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const submissionRate = totalStudents > 0 ? Math.round((submittedCount / totalStudents) * 100) : 0;
 
       const pendingReviews = submissionsQuery.filter(
-        (s: { status: string }) => s.status === 'completed'
+        (s: { status: string }) => s.status === 'completed' // This might mean "graded", "pending review" could be different logic
       ).length;
 
       let feedbackItems = await db.select().from(feedback);
@@ -1203,8 +1260,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const sum = scores.reduce((a, b) => {
             if (typeof a !== 'number' || typeof b !== 'number' || isNaN(a) || isNaN(b)) {
-              console.warn(`Invalid values in score reduction: a=<span class="math-inline">\{a\}, b\=</span>{b}`);
-              return 0; 
+              console.warn(`Invalid values in score reduction: a=${a}, b=${b}`);
+              return 0; // Or handle error appropriately
             }
             return a + b;
           }, 0);
@@ -1260,7 +1317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const submissionsIncrease = submissionsPreviousWeek > 0
         ? Math.round((submissionsLastWeek - submissionsPreviousWeek) / submissionsPreviousWeek * 100)
-        : 0;
+        : (submissionsLastWeek > 0 ? 100 : 0); // If prev week was 0, any submission is an "infinite" or 100% increase
 
       res.json({
         totalStudents,
@@ -1274,13 +1331,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         feedbackViewed,
         feedbackViewRate,
         submissionsIncrease,
-        scoreDistribution, 
+        scoreDistribution,
         submittedPercentage: submissionRate,
         notStartedPercentage: totalStudents > 0 ? Math.round((notStartedCount / totalStudents) * 100) : 0,
         feedbackViewPercentage: feedbackViewRate
       });
       } catch (error) {
         console.error("Error in /api/assignments/stats:", error);
+        // Return a default stats object in case of any unhandled error in the try block
         return res.json({
           totalStudents: 0,
           submittedCount: 0,
@@ -1294,8 +1352,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           feedbackViewRate: 0,
           submissionsIncrease: 0,
           scoreDistribution: { high: 0, medium: 0, low: 0 },
-          feedbackViewLast30Days: Array(30).fill(0),
-          submissionsLast30Days: Array(30).fill(0),
+          feedbackViewLast30Days: Array(30).fill(0), // These fields were in original, keeping for consistency
+          submissionsLast30Days: Array(30).fill(0), // These fields were in original, keeping for consistency
           notStartedPercentage: 0,
           submittedPercentage: 0,
           feedbackViewPercentage: 0
@@ -1383,7 +1441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validFeedback = feedbackItems.filter(f => f !== undefined) as any[];
 
       const avgFeedbackTime = validFeedback.length > 0
-        ? Math.round(validFeedback.reduce((sum, f) => sum + f.processingTime, 0) / validFeedback.length / 1000)
+        ? Math.round(validFeedback.reduce((sum, f) => sum + (f.processingTime || 0), 0) / validFeedback.length / 1000) // Added fallback for processingTime
         : 0;
 
       const submissionsByStudent = submissions.reduce((acc, sub) => {
@@ -1399,7 +1457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? revisionsPerStudent.reduce((sum, count) => sum + count, 0) / revisionsPerStudent.length
         : 0;
 
-      const avgImprovementPercentage = 18;
+      const avgImprovementPercentage = 18; // This seems like a placeholder
 
       res.json({
         assignmentStats: {
@@ -1427,7 +1485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Content or file is required' });
       }
 
-      const aiService = new AIService(new GeminiAdapter());
+      const aiService = new AIService(new GeminiAdapter()); // Consider making AI adapter configurable
 
       try {
         let feedback;
@@ -1435,26 +1493,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (file) {
           const isImage = file.mimetype.startsWith('image/');
           const isDocument = file.mimetype.includes('pdf') ||
-                               file.mimetype.includes('word') ||
-                               file.mimetype.includes('doc');
+                               file.mimetype.includes('word') || // More specific mimetypes are better
+                               file.mimetype.includes('doc'); // 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
           if (isImage) {
-            console.log(`Processing image file: <span class="math-inline">\{file\.originalname\} \(</span>{file.mimetype}), buffer size: ${file.buffer.length} bytes`);
+            console.log(`Processing image file: ${file.originalname} (${file.mimetype}), buffer size: ${file.buffer.length} bytes`);
 
             try {
-              const isSmallImage = file.buffer.length < 5 * 1024 * 1024;
+              const isSmallImage = file.buffer.length < 5 * 1024 * 1024; // Configurable limit?
               const imageDataUri = isSmallImage
-                ? `data:<span class="math-inline">\{file\.mimetype\};base64,</span>{file.buffer.toString('base64')}`
+                ? `data:${file.mimetype};base64,${file.buffer.toString('base64')}`
                 : undefined;
 
               console.log(`Using ${isSmallImage ? 'data URI' : 'buffer'} for image processing`);
 
               feedback = await aiService.analyzeMultimodalSubmission({
                 fileBuffer: file.buffer,
-                fileDataUri: imageDataUri, 
+                fileDataUri: imageDataUri,
                 fileName: file.originalname,
                 mimeType: file.mimetype,
-                assignmentTitle: "Image Analysis",
+                assignmentTitle: "Image Analysis", // Generic title
                 assignmentDescription: assignmentContext || "Please analyze this image submission."
               });
             } catch (error: any) {
@@ -1462,6 +1520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               return res.status(500).json({
                 error: "Failed to analyze image",
                 message: error.message || 'Unknown error',
+                // Providing structured feedback on error might be helpful
                 strengths: ["We encountered an error analyzing your image."],
                 improvements: ["Please try a different image or a text submission."],
                 suggestions: ["Make sure your image is a standard format (JPEG, PNG, etc)."],
@@ -1469,14 +1528,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             }
           } else if (isDocument) {
-            console.log(`Processing document file: <span class="math-inline">\{file\.originalname\} \(</span>{file.mimetype}), buffer size: ${file.buffer.length} bytes`);
+            console.log(`Processing document file: ${file.originalname} (${file.mimetype}), buffer size: ${file.buffer.length} bytes`);
 
             try {
               feedback = await aiService.analyzeMultimodalSubmission({
-                fileBuffer: file.buffer, 
+                fileBuffer: file.buffer,
                 fileName: file.originalname,
                 mimeType: file.mimetype,
-                assignmentTitle: "Document Analysis",
+                assignmentTitle: "Document Analysis", // Generic title
                 assignmentDescription: assignmentContext || "Please analyze this document submission."
               });
             } catch (error: any) {
@@ -1490,26 +1549,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 summary: "There was an error processing your document. For best results, try using a standard document format like PDF or DOCX under 5MB."
               });
             }
-          } else {
-            if (!content) {
-              content = fs.readFileSync(file.path, 'utf8');
+          } else { // Fallback for other file types or if content needs to be extracted
+            if (!content && file.path) { // multer might save to disk if memoryStorage isn't used or if it's large
+              content = fs.readFileSync(file.path, 'utf8'); // This assumes file.path is set, memoryStorage usually doesn't
+            } else if (!content && file.buffer) {
+                content = file.buffer.toString('utf8'); // If it's a text-based file in buffer
             }
 
+
             feedback = await aiService.analyzeProgrammingAssignment({
-              content,
+              content: content || "", // Ensure content is not undefined
               assignmentContext
             });
           }
-        } else {
+        } else { // Only text content provided
           feedback = await aiService.analyzeProgrammingAssignment({
-            content,
+            content: content || "", // Ensure content is not undefined
             assignmentContext
           });
         }
 
         console.log("AI feedback generated successfully:", JSON.stringify(feedback).slice(0, 200) + "...");
 
-        if (file && file.path) {
+        if (file && file.path && fs.existsSync(file.path)) { // Check if path exists before unlinking
           fs.unlink(file.path, (err: NodeJS.ErrnoException | null) => {
             if (err) console.error("Error removing temporary file:", err);
           });
@@ -1525,7 +1587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error("Error generating AI feedback:", error);
 
-        if (file && file.path) {
+        if (file && file.path && fs.existsSync(file.path)) { // Check if path exists
           fs.unlink(file.path, (err: NodeJS.ErrnoException | null) => {
             if (err) console.error("Error removing temporary file:", err);
           });
@@ -1539,10 +1601,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   app.get('/api/export/grades', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
-      const assignmentId = parseInt(req.query.assignmentId as string);
-
-      if (!assignmentId) {
+      const assignmentIdStr = req.query.assignmentId as string;
+      if (!assignmentIdStr) {
         return res.status(400).json({ message: 'Assignment ID is required' });
+      }
+      const assignmentId = parseInt(assignmentIdStr);
+
+
+      if (isNaN(assignmentId)) {
+        return res.status(400).json({ message: 'Invalid Assignment ID format' });
       }
 
       const assignment = await storage.getAssignment(assignmentId);
@@ -1552,7 +1619,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const course = await storage.getCourse(assignment.courseId);
       if (!course) {
-        return res.status(404).json({ message: 'Course not found' });
+        return res.status(404).json({ message: 'Course not found for this assignment' });
       }
 
       const students = await storage.listCourseEnrollments(assignment.courseId);
@@ -1569,7 +1636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const feedbackBySubmission = new Map();
       allFeedback.filter(Boolean).forEach(f => {
-        if (f) {
+        if (f) { // Ensure f is not null or undefined
           feedbackBySubmission.set(f.submissionId, f);
         }
       });
@@ -1594,22 +1661,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (latestSubmission) {
           status = latestSubmission.status === 'completed' ? 'Completed' :
                    latestSubmission.status === 'processing' ? 'Processing' :
-                   latestSubmission.status === 'pending' ? 'Pending' : 'Failed';
+                   latestSubmission.status === 'pending' ? 'Pending' : 'Failed'; // Consider other statuses
 
           submissionDate = new Date(latestSubmission.createdAt).toLocaleString();
 
           const feedbackForLatest = feedbackBySubmission.get(latestSubmission.id);
           if (feedbackForLatest) {
             score = feedbackForLatest.score !== null ? feedbackForLatest.score.toString() : '';
-            feedbackSummary = feedbackForLatest.summary.replace(/"/g, '""'); 
+            feedbackSummary = feedbackForLatest.summary ? feedbackForLatest.summary.replace(/"/g, '""') : ''; // Handle null summary
           }
         }
 
-        csv += `<span class="math-inline">\{student\.id\},"</span>{student.name}","<span class="math-inline">\{student\.email\}","</span>{status}","<span class="math-inline">\{submissionDate\}","</span>{score}","<span class="math-inline">\{attempts\}","</span>{feedbackSummary}"\n`;
+        csv += `${student.id},"${student.name}","${student.email}","${status}","${submissionDate}","${score}","${attempts}","${feedbackSummary}"\n`;
       }
 
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="<span class="math-inline">\{course\.code\}\_</span>{assignment.title.replace(/\s+/g, '_')}_grades.csv"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${course.code}_${assignment.title.replace(/\s+/g, '_')}_grades.csv"`);
 
       res.send(csv);
   }));
