@@ -1485,42 +1485,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Content or file is required' });
       }
 
+      console.log(`[TEST-RUBRIC] Processing rubric test with ${file ? 'file upload' : 'text content'}`);
+      if (file) {
+        console.log(`[TEST-RUBRIC] File details: name=${file.originalname}, type=${file.mimetype}, size=${file.size} bytes`);
+      }
+
       const aiService = new AIService(new GeminiAdapter()); // Consider making AI adapter configurable
 
       try {
         let feedback;
 
         if (file) {
+          // Ensure we have a valid buffer to work with
+          if (!file.buffer || file.buffer.length === 0) {
+            console.error(`[TEST-RUBRIC] File buffer is empty or undefined`);
+            return res.status(400).json({ 
+              error: "Invalid file upload",
+              message: "File upload failed - empty file",
+              strengths: ["We could not process your file."],
+              improvements: ["Please try uploading a different file."],
+              suggestions: ["Ensure your file is not empty and is a supported type."],
+              summary: "The uploaded file couldn't be processed. Please try again with a different file."
+            });
+          }
+
+          // Determine file type based on mime type
           const isImage = file.mimetype.startsWith('image/');
           const isDocument = file.mimetype.includes('pdf') ||
-                               file.mimetype.includes('word') || // More specific mimetypes are better
-                               file.mimetype.includes('doc'); // 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                             file.mimetype.includes('word') || 
+                             file.mimetype.includes('doc') ||
+                             file.mimetype.includes('vnd.openxmlformats');
 
           if (isImage) {
-            console.log(`Processing image file: ${file.originalname} (${file.mimetype}), buffer size: ${file.buffer.length} bytes`);
+            console.log(`[TEST-RUBRIC] Processing image file: ${file.originalname} (${file.mimetype}), size: ${file.buffer.length} bytes`);
 
             try {
-              const isSmallImage = file.buffer.length < 5 * 1024 * 1024; // Configurable limit?
+              // Use a more conservative size limit for inline images
+              const MAX_INLINE_SIZE = 4 * 1024 * 1024; // 4MB
+              const isSmallImage = file.buffer.length < MAX_INLINE_SIZE;
+              
+              // For small images, use a data URI for more reliable processing
               const imageDataUri = isSmallImage
                 ? `data:${file.mimetype};base64,${file.buffer.toString('base64')}`
                 : undefined;
 
-              console.log(`Using ${isSmallImage ? 'data URI' : 'buffer'} for image processing`);
+              console.log(`[TEST-RUBRIC] Using ${isSmallImage ? 'data URI' : 'Files API'} for image processing`);
 
               feedback = await aiService.analyzeMultimodalSubmission({
                 fileBuffer: file.buffer,
                 fileDataUri: imageDataUri,
                 fileName: file.originalname,
                 mimeType: file.mimetype,
-                assignmentTitle: "Image Analysis", // Generic title
+                assignmentTitle: "Image Analysis",
                 assignmentDescription: assignmentContext || "Please analyze this image submission."
               });
             } catch (error: any) {
-              console.error(`Error analyzing image: ${error.message || 'Unknown error'}`, error);
+              console.error(`[TEST-RUBRIC] Error analyzing image: ${error.message || 'Unknown error'}`, error);
               return res.status(500).json({
                 error: "Failed to analyze image",
                 message: error.message || 'Unknown error',
-                // Providing structured feedback on error might be helpful
                 strengths: ["We encountered an error analyzing your image."],
                 improvements: ["Please try a different image or a text submission."],
                 suggestions: ["Make sure your image is a standard format (JPEG, PNG, etc)."],
@@ -1528,18 +1551,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             }
           } else if (isDocument) {
-            console.log(`Processing document file: ${file.originalname} (${file.mimetype}), buffer size: ${file.buffer.length} bytes`);
+            console.log(`[TEST-RUBRIC] Processing document file: ${file.originalname} (${file.mimetype}), size: ${file.buffer.length} bytes`);
 
             try {
+              // For documents, always use the fileBuffer approach
+              // The AIService will handle uploading to Files API internally
               feedback = await aiService.analyzeMultimodalSubmission({
                 fileBuffer: file.buffer,
                 fileName: file.originalname,
-                mimeType: file.mimetype,
-                assignmentTitle: "Document Analysis", // Generic title
+                mimeType: file.mimetype || 'application/octet-stream', // Fallback mime type if none provided
+                assignmentTitle: "Document Analysis",
                 assignmentDescription: assignmentContext || "Please analyze this document submission."
               });
+              
+              console.log(`[TEST-RUBRIC] Document analysis completed successfully`);
             } catch (error: any) {
-              console.error(`Error analyzing document: ${error.message || 'Unknown error'}`, error);
+              console.error(`[TEST-RUBRIC] Error analyzing document: ${error.message || 'Unknown error'}`, error);
               return res.status(500).json({
                 error: "Failed to analyze document",
                 message: error.message || 'Unknown error',
@@ -1549,16 +1576,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 summary: "There was an error processing your document. For best results, try using a standard document format like PDF or DOCX under 5MB."
               });
             }
-          } else { // Fallback for other file types or if content needs to be extracted
-            if (!content && file.path) { // multer might save to disk if memoryStorage isn't used or if it's large
-              content = fs.readFileSync(file.path, 'utf8'); // This assumes file.path is set, memoryStorage usually doesn't
-            } else if (!content && file.buffer) {
-                content = file.buffer.toString('utf8'); // If it's a text-based file in buffer
+          } else { 
+            // Handle text-based files or code files
+            console.log(`[TEST-RUBRIC] Processing text/code file: ${file.originalname} (${file.mimetype})`);
+            
+            // Extract content from file if not already provided
+            if (!content) {
+              if (file.path && fs.existsSync(file.path)) {
+                // For disk storage
+                content = fs.readFileSync(file.path, 'utf8');
+              } else if (file.buffer) {
+                // For memory storage
+                content = file.buffer.toString('utf8');
+              }
+            }
+            
+            if (!content || content.trim() === '') {
+              console.error(`[TEST-RUBRIC] Could not extract text content from file`);
+              return res.status(400).json({
+                error: "Empty file content",
+                message: "Could not extract text content from file",
+                strengths: ["We couldn't extract any text from your file."],
+                improvements: ["Please try uploading a text file or entering code directly."],
+                suggestions: ["Make sure your file contains readable text."],
+                summary: "The uploaded file didn't contain any readable text. Please try a different file or paste the content directly."
+              });
             }
 
-
             feedback = await aiService.analyzeProgrammingAssignment({
-              content: content || "", // Ensure content is not undefined
+              content: content,
               assignmentContext
             });
           }

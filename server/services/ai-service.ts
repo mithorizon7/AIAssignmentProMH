@@ -268,7 +268,7 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
         };
       } else if (params.fileBuffer) {
         console.log(`[AIService] Processing file from buffer (${params.fileBuffer.length} bytes)`);
-        // If we have a buffer (from multer memory storage), process it directly
+        // If we have a buffer (from multer memory storage), we need special handling
         
         // Determine content type based on MIME type
         let contentType: ContentType = 'image';
@@ -283,7 +283,8 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
                   params.mimeType.includes('word') || 
                   params.mimeType.includes('excel') || 
                   params.mimeType.includes('powerpoint') || 
-                  params.mimeType.includes('document')) {
+                  params.mimeType.includes('document') ||
+                  params.mimeType.includes('openxmlformats')) {
           contentType = 'document';
         } else if (params.mimeType.startsWith('audio/')) {
           contentType = 'audio';
@@ -291,12 +292,51 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
           contentType = 'video';
         }
         
-        processedFile = {
-          content: params.fileBuffer,
-          contentType,
-          mimeType: params.mimeType,
-          textContent: params.textContent
-        };
+        // For document type files, we need to create a temporary file
+        // because directly passing the buffer can cause issues with binary data
+        if (contentType === 'document') {
+          const crypto = require('crypto');
+          const os = require('os');
+          const path = require('path');
+          const fs = require('fs').promises;
+          
+          console.log(`[AIService] Document file detected, creating temporary file for processing`);
+          
+          try {
+            // Create a temporary file
+            const tempDir = os.tmpdir();
+            const randomName = crypto.randomBytes(16).toString('hex');
+            const extension = params.fileName?.split('.').pop() || 'tmp';
+            const tempPath = path.join(tempDir, `${randomName}.${extension}`);
+            
+            // Write the buffer to the temporary file
+            await fs.writeFile(tempPath, params.fileBuffer);
+            console.log(`[AIService] Created temporary file at ${tempPath}`);
+            
+            // Process using our file handling utility
+            processedFile = await processFileForMultimodal(
+              tempPath,
+              params.fileName || `file.${extension}`,
+              params.mimeType
+            );
+            
+            // Clean up the temporary file (we'll do this asynchronously)
+            fs.unlink(tempPath).catch(error => {
+              console.warn(`[AIService] Failed to clean up temporary file: ${error.message}`);
+            });
+          } catch (error) {
+            console.error(`[AIService] Error creating temporary file: ${error.message}`);
+            throw new Error(`Failed to process document file: ${error.message}`);
+          }
+        } else {
+          // For other file types (like images, text), we can use the buffer directly
+          processedFile = {
+            content: params.fileBuffer,
+            contentType,
+            mimeType: params.mimeType,
+            textContent: params.textContent
+          };
+        }
       } else if (params.filePath) {
         // Process the file from a path
         // This automatically handles both local paths and remote URLs (S3, HTTP)
