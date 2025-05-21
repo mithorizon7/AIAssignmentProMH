@@ -53,69 +53,58 @@ export function RubricTester({ rubric, assignmentTitle, assignmentDescription }:
       'image/png': ['.png'],
     },
     maxSize: 10 * 1024 * 1024, // 10MB
-    multiple: true,
+    multiple: false, // Changed to false to avoid confusion
     onDrop: (acceptedFiles) => {
       if (acceptedFiles && acceptedFiles.length > 0) {
-        // Set the first file for displaying in the UI
-        setFile(acceptedFiles[0]);
+        const uploadedFile = acceptedFiles[0];
+        setFile(uploadedFile);
         
-        // Read content of all files
-        const allFiles: File[] = [];
-        let textContents: string[] = [];
-        let filesProcessed = 0;
+        // Check if this is a binary file - we don't want to read binary files as text
+        const isBinaryFile = 
+          uploadedFile.type.includes('pdf') || 
+          uploadedFile.type.includes('word') || 
+          uploadedFile.type.includes('doc') ||
+          uploadedFile.type.includes('image/') ||
+          uploadedFile.type.includes('application/') ||
+          !['.txt', '.py', '.java', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.json', '.md']
+            .some(ext => uploadedFile.name.toLowerCase().endsWith(ext));
         
-        acceptedFiles.forEach(file => {
-          allFiles.push(file);
-          
-          // Only read text files directly - binary files will be handled by the backend
-          const isTextFile = file.type.startsWith('text/') || 
-                             ['.py', '.java', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.json', '.md']
-                             .some(ext => file.name.toLowerCase().endsWith(ext));
-          
-          if (isTextFile) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              if (e.target?.result) {
-                textContents.push(`File: ${file.name}\n\n${e.target.result as string}\n\n`);
-              }
-              
-              filesProcessed++;
-              if (filesProcessed === acceptedFiles.length) {
-                // Only join text contents
-                if (textContents.length > 0) {
-                  setCodeContent(textContents.join('----------\n\n'));
-                } else {
-                  setCodeContent(`Processing ${allFiles.length} files (including non-text files)`);
-                }
-              }
-            };
-            reader.readAsText(file);
-          } else {
-            // For non-text files, just note that they will be processed by the backend
-            textContents.push(`File: ${file.name}\n\n[Binary file - will be processed directly]\n\n`);
-            filesProcessed++;
-            
-            if (filesProcessed === acceptedFiles.length) {
-              setCodeContent(textContents.join('----------\n\n'));
+        if (isBinaryFile) {
+          // For binary files, just show metadata - don't try to read the content as text
+          setCodeContent(`File: ${uploadedFile.name} (${(uploadedFile.size / 1024).toFixed(2)} KB)\n\n[Binary file - will be processed properly on submission]`);
+        } else {
+          // Only try to read text from text files
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            if (e.target?.result) {
+              const content = e.target.result as string;
+              // Limit displayed content for very large text files
+              const truncatedContent = content.length > 50000 
+                ? content.substring(0, 50000) + "...\n[Content truncated for display only - full content will be submitted]" 
+                : content;
+              setCodeContent(`File: ${uploadedFile.name}\n\n${truncatedContent}`);
             }
-          }
-        });
+          };
+          reader.readAsText(uploadedFile);
+        }
       }
     },
     onDropRejected: (rejections) => {
-      const rejection = rejections[0];
-      if (rejection.errors[0].code === 'file-too-large') {
-        toast({
-          variant: "destructive",
-          title: "File too large",
-          description: "Maximum file size is 10MB.",
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Invalid file",
-          description: "Please upload a valid file type.",
-        });
+      if (rejections.length > 0) {
+        const rejection = rejections[0];
+        if (rejection.errors.length > 0 && rejection.errors[0].code === 'file-too-large') {
+          toast({
+            variant: "destructive",
+            title: "File too large",
+            description: "Maximum file size is 10MB.",
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Invalid file",
+            description: "Please upload a valid file type.",
+          });
+        }
       }
     }
   });
@@ -140,8 +129,8 @@ export function RubricTester({ rubric, assignmentTitle, assignmentDescription }:
       setIsSubmitting(true);
 
       // Prepare rubric context for AI
-      const rubricContext = rubric.criteria.map(c => 
-        `${c.name} (${c.type}, Max Score: ${c.maxScore}, Weight: ${c.weight}): ${c.description}`
+      const rubricContext = rubric.criteria.map(criterion => 
+        `${criterion.name} (${criterion.type}, Max Score: ${criterion.maxScore}, Weight: ${criterion.weight}): ${criterion.description}`
       ).join("\n");
 
       // Prepare assignment context
@@ -166,11 +155,6 @@ Please evaluate this submission according to the above rubric criteria.
         const formData = new FormData();
         formData.append('file', file);
         formData.append('assignmentContext', assignmentContext);
-        
-        // For text files that we've already read, include the content
-        if (codeContent) {
-          formData.append('content', codeContent);
-        }
         
         // Include file metadata to help the server identify the file type correctly
         formData.append('fileName', file.name);
