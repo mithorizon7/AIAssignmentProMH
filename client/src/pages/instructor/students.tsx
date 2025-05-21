@@ -39,52 +39,41 @@ export default function StudentsPage() {
     },
   });
 
-  // Fetch all students (this is a simplified version - in reality, you'd have pagination)
+  // Fetch all students
   const { data: students = [], isLoading: studentsLoading } = useQuery({
     queryKey: ["students", selectedCourse],
     queryFn: async () => {
-      // This is a placeholder - the actual API would return students based on the selected course
-      const url = selectedCourse !== "all" 
+      const url = selectedCourse !== "all"
         ? `${API_ROUTES.COURSES}/${selectedCourse}/students`
-        : "/api/students"; // This endpoint needs to be implemented
-        
+        : "/api/students";
+
       const response = await fetch(url);
       if (!response.ok) {
-        // If we get a 404, it means the endpoint isn't implemented yet
-        // Return mock data for demo purposes
-        return [
-          { id: 1, name: "Alex Johnson", email: "alex@example.com", enrolledCourses: 3, progress: 0.75 },
-          { id: 2, name: "Jamie Smith", email: "jamie@example.com", enrolledCourses: 2, progress: 0.45 },
-          { id: 3, name: "Taylor Williams", email: "taylor@example.com", enrolledCourses: 1, progress: 0.90 },
-          { id: 4, name: "Morgan Brown", email: "morgan@example.com", enrolledCourses: 3, progress: 0.35 },
-          { id: 5, name: "Casey Davis", email: "casey@example.com", enrolledCourses: 2, progress: 0.65 },
-        ];
+        throw new Error("Failed to fetch students");
       }
       return response.json();
     },
-    // This query will always succeed with mock data
-    retry: false,
   });
 
   // Define student type
-  interface Student {
-    id: number;
-    name: string;
-    email: string;
-    enrolledCourses: number;
-    progress: number;
-  }
+interface Student {
+  id: number;
+  name: string;
+  email: string;
+  enrolledCourses?: number;
+  progress?: number;
+}
 
   // Filter students based on search query
   const filteredStudents = students.filter((student: Student) => {
-    const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         student.email.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    // Match based on active tab (all, active, inactive)
-    const matchesTab = activeTab === "all" || 
-                      (activeTab === "active" && student.progress > 0.4) ||
-                      (activeTab === "inactive" && student.progress <= 0.4);
-    
+
+    const progress = student.progress ?? 0;
+    const matchesTab = activeTab === "all" ||
+                      (activeTab === "active" && progress > 0.4) ||
+                      (activeTab === "inactive" && progress <= 0.4);
+
     return matchesSearch && matchesTab;
   });
 
@@ -213,16 +202,16 @@ function StudentsTable({ students, isLoading }: StudentsTableProps) {
               <TableRow key={student.id}>
                 <TableCell className="font-medium">{student.name}</TableCell>
                 <TableCell>{student.email}</TableCell>
-                <TableCell className="hidden md:table-cell">{student.enrolledCourses}</TableCell>
+                <TableCell className="hidden md:table-cell">{student.enrolledCourses ?? '-'}</TableCell>
                 <TableCell className="hidden md:table-cell">
                   <div className="flex items-center gap-2">
                     <div className="h-2 w-full rounded-full bg-gray-200">
-                      <div 
-                        className="h-full rounded-full bg-maroon-600" 
-                        style={{ width: `${student.progress * 100}%` }}
+                      <div
+                        className="h-full rounded-full bg-maroon-600"
+                        style={{ width: `${(student.progress ?? 0) * 100}%` }}
                       />
                     </div>
-                    <span className="text-xs">{Math.round(student.progress * 100)}%</span>
+                    <span className="text-xs">{Math.round((student.progress ?? 0) * 100)}%</span>
                   </div>
                 </TableCell>
                 <TableCell className="text-right">

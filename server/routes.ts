@@ -46,6 +46,14 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
   const { requireAuth, requireRole } = configureAuth(app);
+
+  const requireInstructor = (req: Request, res: Response, next: NextFunction) => {
+    const role = (req.user as any)?.role;
+    if (role !== 'instructor' && role !== 'admin') {
+      return res.status(403).json({ message: 'Instructor access required' });
+    }
+    next();
+  };
   
   // Initialize services
   const storageService = new StorageService();
@@ -816,6 +824,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(201).json(course);
+  }));
+
+  // List students enrolled in a specific course
+  app.get('/api/courses/:courseId/students', requireAuth, requireInstructor, asyncHandler(async (req: Request, res: Response) => {
+      const courseId = parseInt(req.params.courseId);
+      if (isNaN(courseId)) {
+        return res.status(400).json({ message: 'Invalid course ID' });
+      }
+
+      const students = await storage.listCourseEnrollments(courseId);
+      res.json(students);
+  }));
+
+  // List all students
+  app.get('/api/students', requireAuth, requireInstructor, asyncHandler(async (req: Request, res: Response) => {
+      const students = await storage.listStudents();
+      res.json(students);
   }));
 
   // Student progress data for instructors
