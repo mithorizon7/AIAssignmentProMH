@@ -30,8 +30,8 @@ const SidebarLink = ({ href, icon, label, active }: SidebarLinkProps) => (
             : "text-neutral-700 hover:bg-neutral-100 dark:text-sidebar-foreground/80 dark:hover:bg-sidebar-accent dark:hover:text-sidebar-accent-foreground"
         }`}
       >
-        <div className="mr-4 text-mit-red" aria-hidden="true">{icon}</div>
-        <span className="text-base font-medium">{label}</span>
+        <div className="mr-3 text-[#8a1a2c]" aria-hidden="true">{icon}</div>
+        <span className="text-sm font-medium">{label}</span>
       </a>
     </Link>
   </li>
@@ -47,10 +47,15 @@ export function Sidebar() {
   const isInstructor = user.role === USER_ROLES.INSTRUCTOR;
   
   return (
-    <aside className="hidden md:flex flex-col w-72 bg-white border-r border-neutral-200 dark:bg-sidebar dark:border-sidebar-border overflow-y-auto">
+    <aside className="hidden md:flex flex-col w-64 bg-white border-r border-neutral-200 dark:bg-sidebar dark:border-sidebar-border overflow-y-auto">
       <div className="p-4 border-b border-neutral-200 dark:border-sidebar-border">
-        <h1 className="text-xl font-medium text-primary">AI Assignment Feedback</h1>
-        <p className="text-sm text-neutral-600 dark:text-sidebar-foreground/70">University Portal</p>
+        <div className="flex items-center">
+          <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-8 mr-2" />
+          <div>
+            <h1 className="text-xl font-medium text-primary">AI Grader</h1>
+            <p className="text-xs text-neutral-600 dark:text-sidebar-foreground/70">University Portal</p>
+          </div>
+        </div>
       </div>
       
       {/* User Profile Section */}

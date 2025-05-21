@@ -304,7 +304,7 @@ export default function InstructorDashboard() {
 
   return (
     <InstructorShell>
-      <div className="space-y-8 max-w-7xl mx-auto">
+      <div className="space-y-6 max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">

@@ -167,7 +167,14 @@ function MobileNav() {
             <span className="sr-only">Toggle menu</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="flex w-80 flex-col p-0">
+        <SheetContent side="left" className="flex w-72 flex-col p-0">
+          <div className="p-4 flex items-center border-b">
+            <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-8 mr-3" />
+            <div className="flex flex-col">
+              <span className="text-base font-semibold">Instructor Portal</span>
+              <span className="text-xs text-muted-foreground">AI Grader</span>
+            </div>
+          </div>
           <div className="p-4">
             <UserMenu />
           </div>
@@ -177,7 +184,10 @@ function MobileNav() {
           </div>
         </SheetContent>
       </Sheet>
-      <div className="ml-4 text-xl font-semibold">Instructor Dashboard</div>
+      <div className="ml-4 flex items-center">
+        <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-8 mr-2" />
+        <span className="text-lg font-semibold">Instructor Dashboard</span>
+      </div>
     </div>
   );
 }
@@ -191,8 +201,14 @@ export function InstructorShell({ children }: { children: ReactNode }) {
         <MobileNav />
       ) : (
         <div className="flex flex-1">
-          <aside className="fixed inset-y-0 left-0 z-20 hidden w-80 flex-col border-r bg-background md:flex">
-            <div className="p-6 text-xl font-semibold">Instructor Dashboard</div>
+          <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r bg-background md:flex">
+            <div className="p-4 flex items-center">
+              <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-9 mr-3" />
+              <div className="flex flex-col">
+                <span className="text-lg font-semibold">Instructor Portal</span>
+                <span className="text-xs text-muted-foreground">AI Grader</span>
+              </div>
+            </div>
             <Separator />
             <div className="flex-1 overflow-auto p-4">
               <NavLinks />
