@@ -202,11 +202,11 @@ export function SubmissionHistory({ submissions, loading = false, showAssignment
                   
                   {/* Processing visualization */}
                   <div className="mt-3 flex items-center gap-2 text-xs text-blue-800">
-                    <div className="flex-1 bg-blue-100 h-1.5 rounded-full overflow-hidden relative">
-                      <div className="absolute inset-0 flex items-center gap-1">
-                        <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce" style={{animationDelay: "0ms"}}></div>
-                        <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce" style={{animationDelay: "300ms"}}></div>
-                        <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce" style={{animationDelay: "600ms"}}></div>
+                    <div className="flex-1 bg-blue-100 h-3 rounded-full relative overflow-hidden indeterminate-bar">
+                      <div className="absolute inset-0 flex items-end justify-center gap-1 pb-0.5">
+                        <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce [animation-delay:0ms]"></div>
+                        <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce [animation-delay:150ms]"></div>
+                        <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce [animation-delay:300ms]"></div>
                       </div>
                     </div>
                     <span className="whitespace-nowrap">Analyzing submission...</span>
