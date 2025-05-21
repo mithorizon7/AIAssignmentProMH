@@ -45,11 +45,11 @@ function NavLink({ href, icon, label, isActive, onClick }: NavLinkProps) {
   return (
     <Button
       variant={isActive ? "secondary" : "ghost"}
-      className="w-full justify-start"
+      className="w-full justify-start px-4 py-3 h-auto"
       onClick={handleClick}
     >
-      <span className="mr-2">{icon}</span>
-      {label}
+      <span className="mr-3 text-[#8a1a2c]">{icon}</span>
+      <span className="text-base font-medium">{label}</span>
     </Button>
   );
 }
@@ -201,12 +201,12 @@ export function InstructorShell({ children }: { children: ReactNode }) {
         <MobileNav />
       ) : (
         <div className="flex flex-1">
-          <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r bg-background md:flex">
-            <div className="p-4 flex items-center">
-              <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-9 mr-3" />
+          <aside className="fixed inset-y-0 left-0 z-20 hidden w-80 flex-col border-r bg-background md:flex">
+            <div className="p-5 flex items-center">
+              <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-10 mr-3" />
               <div className="flex flex-col">
-                <span className="text-lg font-semibold">Instructor Portal</span>
-                <span className="text-xs text-muted-foreground">AI Grader</span>
+                <span className="text-xl font-semibold">Instructor Portal</span>
+                <span className="text-sm text-muted-foreground">AI Grader</span>
               </div>
             </div>
             <Separator />
@@ -219,7 +219,7 @@ export function InstructorShell({ children }: { children: ReactNode }) {
             </div>
           </aside>
           <main className="flex-1 md:pl-80">
-            <div className="container mx-auto p-6">{children}</div>
+            <div className="container mx-auto px-6 py-5">{children}</div>
           </main>
         </div>
       )}
