@@ -61,7 +61,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const storageService = new StorageService();
 
   // Mount admin routes
-  app.use('/api/admin', require('./routes/admin/index').default);
+  import adminRoutesDefault from './routes/admin/index.js';
+  app.use('/api/admin', adminRoutesDefault);
 
   // Mount instructor routes
   app.use('/api/instructor', instructorRoutes);
