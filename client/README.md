@@ -57,6 +57,13 @@ The application has different interfaces for different user roles:
 - **Instructor Interface**: Create assignments, review submissions, view analytics
 - **Admin Interface**: Manage users, monitor system health, configure settings
 
+## Navigation Layout
+
+Unauthenticated pages (such as the login screen or public submission links)
+display the `MITNavbar` at the top. Once a user is signed in, the interface
+switches to a dashboard layout that provides a sidebar and compact header for
+navigation. The top navbar is hidden in this mode to avoid duplicate menus.
+
 ## Important Directories
 
 ### Components

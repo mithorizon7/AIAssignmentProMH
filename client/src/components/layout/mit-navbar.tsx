@@ -18,6 +18,12 @@ export function MITNavbar() {
   const { user, isAuthenticated, logout } = useAuth();
   const [location] = useLocation();
 
+  // Authenticated pages use their own dashboard layout with a sidebar
+  // and header. Hide this top navigation bar to prevent redundancy.
+  if (isAuthenticated) {
+    return null;
+  }
+
   // Navigation links based on user role
   const getNavLinks = () => {
     if (!isAuthenticated || !user) {
