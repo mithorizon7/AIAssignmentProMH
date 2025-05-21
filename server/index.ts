@@ -6,7 +6,7 @@ import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { errorHandler, notFoundHandler, logger } from "./lib/error-handler";
-import { runMigrations } from "./migrations/add-missing-columns";
+import { runMigrations } from "./migrations/run-migrations";
 
 const app = express();
 // Increase JSON payload limit to 10MB for handling large content like AI prompts
