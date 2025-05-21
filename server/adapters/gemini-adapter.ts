@@ -27,7 +27,7 @@ interface GeminiFilePart {
 const BASE_MAX_TOKENS = 1200;   // first attempt
 const RETRY_MAX_TOKENS = 1600;  // if finishReason !== "STOP"
 
-// The newest Gemini model is "gemini-2.5-flash-preview-04-17" which was released April 17, 2025
+// The newest Gemini model is "gemini-2.5-flash-preview-05-20" which was released May 20, 2025
 import { ContentType } from '../utils/file-type-settings';
 import { AIAdapter, AIAdapterResponse, MultimodalPromptPart } from './interfaces';
 import { CriteriaScore } from '@shared/schema';
@@ -262,7 +262,7 @@ export class GeminiAdapter implements AIAdapter {
     this.genAI = new GoogleGenAI({ apiKey });
     
     // Make model name configurable with environment variable or use default
-    this.modelName = process.env.GEMINI_MODEL_NAME ?? "gemini-2.5-flash-preview-04-17";
+    this.modelName = process.env.GEMINI_MODEL_NAME ?? "gemini-2.5-flash-preview-05-20";
     
     console.log(`[GEMINI] Initializing with model: ${this.modelName}`);
     

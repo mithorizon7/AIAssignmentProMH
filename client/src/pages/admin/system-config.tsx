@@ -42,7 +42,7 @@ export default function SystemConfigPage() {
   const [aiSettings, setAiSettings] = useState({
     provider: "gemini",
     apiKey: "gem_••••••••••••••••••••••••",
-    model: "models/gemini-2.5-flash-preview-04-17", // Updated to use the newest Gemini model
+    model: "models/gemini-2.5-flash-preview-05-20", // Updated to use the newest Gemini model
     maxTokens: 4096,
     temperature: 0.7,
     enableContentFiltering: true,
@@ -425,7 +425,7 @@ export default function SystemConfigPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {/* Gemini models */}
-                          <SelectItem value="models/gemini-2.5-flash-preview-04-17">Gemini 2.5 Flash (Preview)</SelectItem>
+                          <SelectItem value="models/gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash (Preview)</SelectItem>
                           <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
                           {/* OpenAI models */}
                           <SelectItem value="gpt-4.1-mini-2025-04-14">GPT-4.1 Mini</SelectItem>
@@ -501,7 +501,7 @@ export default function SystemConfigPage() {
                     onClick={() => setAiSettings({
                       provider: "gemini", 
                       apiKey: "gem_••••••••••••••••••••••••",
-                      model: "models/gemini-2.5-flash-preview-04-17",
+                      model: "models/gemini-2.5-flash-preview-05-20",
                       maxTokens: 4096,
                       temperature: 0.7,
                       enableContentFiltering: true,

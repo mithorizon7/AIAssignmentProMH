@@ -8,7 +8,7 @@ This document outlines the AI models used in the AI Feedback Platform and how to
 
 The platform is configured to prioritize Google Gemini over other AI providers. 
 
-- **Default Model**: `models/gemini-2.5-flash-preview-04-17`
+- **Default Model**: `models/gemini-2.5-flash-preview-05-20`
 - **Alternate Model**: `gemini-2.0-flash`
 
 ### OpenAI (Fallback Provider)
