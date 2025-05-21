@@ -68,6 +68,8 @@ export const users = pgTable("users", {
   auth0Sub: text("auth0_sub").unique(), // Auth0 subject identifier for our Auth0 tenant - nullable by default
   mitHorizonSub: text("mit_horizon_sub").unique(), // MIT Horizon Auth0 subject identifier - nullable by default
   emailVerified: boolean("email_verified").default(false).notNull(), // Email verification status
+  mfaEnabled: boolean("mfa_enabled").default(false).notNull(),
+  mfaSecret: text("mfa_secret"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => {
   return {
@@ -304,7 +306,7 @@ export const newsletterSubscribers = pgTable("newsletter_subscribers", {
 });
 
 // Insert Schemas
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, mfaEnabled: true, mfaSecret: true });
 export const insertCourseSchema = createInsertSchema(courses).omit({ id: true, createdAt: true });
 export const insertEnrollmentSchema = createInsertSchema(enrollments).omit({ id: true, createdAt: true });
 export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true, createdAt: true, updatedAt: true });

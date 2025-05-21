@@ -21,6 +21,7 @@ import instructorRoutes from "./routes/instructor";
 import { determineContentType, isFileTypeAllowed, ContentType } from "./utils/file-type-settings";
 import { processFileForMultimodal } from "./utils/multimodal-processor";
 import { asyncHandler } from "./lib/error-handler";
+import { generateSecret, verifyTotp, generateOtpAuthUrl } from "./utils/totp";
 
 // Helper function to generate a unique shareable code for assignments
 function generateShareableCode(length = 8): string {
@@ -94,6 +95,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Authentication endpoints handled in auth.ts
+
+  // MFA endpoints
+  app.get('/api/mfa/setup', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+    const user = req.user as any;
+    const secret = generateSecret();
+    const url = generateOtpAuthUrl(secret, user.username);
+    await storage.updateUserMfa(user.id, false, secret);
+    res.json({ secret, url });
+  }));
+
+  app.post('/api/mfa/enable', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+    const { token } = req.body;
+    const user = await storage.getUser((req.user as any).id);
+    if (!user || !user.mfaSecret) {
+      return res.status(400).json({ message: 'MFA not initialized' });
+    }
+    if (!token || !verifyTotp(String(token), user.mfaSecret)) {
+      return res.status(401).json({ message: 'Invalid MFA token' });
+    }
+    await storage.updateUserMfa(user.id, true, user.mfaSecret);
+    res.json({ enabled: true });
+  }));
+
+  app.post('/api/mfa/disable', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+    const { token } = req.body;
+    const user = await storage.getUser((req.user as any).id);
+    if (!user || !user.mfaSecret) {
+      return res.status(400).json({ message: 'MFA not enabled' });
+    }
+    if (!token || !verifyTotp(String(token), user.mfaSecret)) {
+      return res.status(401).json({ message: 'Invalid MFA token' });
+    }
+    await storage.updateUserMfa(user.id, false, null);
+    res.json({ enabled: false });
+  }));
 
   // Assignment endpoints
   app.get('/api/assignments', requireAuth, asyncHandler(async (req: Request, res: Response) => {
