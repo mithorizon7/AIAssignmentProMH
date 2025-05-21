@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -6,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MITNavbar } from "@/components/layout/mit-navbar";
 import { MITFooter } from "@/components/layout/mit-footer";
-import { ErrorBoundary } from "@/components/ui/error-boundary";
+import GlobalErrorBoundary from "@/components/layout/global-error-boundary";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
@@ -170,11 +169,7 @@ function Router() {
 }
 
 function App() {
-  // Function to log errors to monitoring service
-  const handleError = (error: Error, errorInfo: React.ErrorInfo): void => {
-    // In production, you would send this to an error monitoring service
-    console.error('Error caught by error boundary:', error, errorInfo);
-  };
+  // Function to log errors if needed. GlobalErrorBoundary will handle logging by default.
   
   // Auth0 logout redirect is handled in AuthProvider
   
@@ -186,9 +181,9 @@ function App() {
             <MITNavbar />
             <main className="flex-grow">
               <Toaster />
-              <ErrorBoundary onError={handleError}>
+              <GlobalErrorBoundary>
                 <Router />
-              </ErrorBoundary>
+              </GlobalErrorBoundary>
             </main>
             <MITFooter />
           </div>
