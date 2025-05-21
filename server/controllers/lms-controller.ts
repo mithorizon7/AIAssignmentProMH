@@ -70,7 +70,7 @@ export async function getLmsCredentials(req: Request, res: Response) {
     const credentials = await db.select().from(lmsCredentials);
     
     // Mask secrets
-    const maskedCredentials = credentials.map((cred) => ({
+    const maskedCredentials = credentials.map((cred: any) => ({
       ...cred,
       clientSecret: cred.clientSecret.replace(/./g, '•')
     }));

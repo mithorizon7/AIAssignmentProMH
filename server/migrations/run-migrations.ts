@@ -2,13 +2,13 @@
  * Run all migrations in sequence
  */
 
-import { addMissingColumns } from './add-missing-columns';
+import { runMigrations as runExistingMigrations } from './add-missing-columns';
 import { addLmsTables } from './add-lms-tables';
 
 export async function runMigrations() {
   try {
     // Run existing migrations
-    await addMissingColumns();
+    await runExistingMigrations();
     
     // Run new LMS migrations
     await addLmsTables();
