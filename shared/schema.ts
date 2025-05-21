@@ -292,6 +292,17 @@ export const fileTypeSettings = pgTable("file_type_settings", {
   };
 });
 
+// Newsletter Subscribers
+export const newsletterSubscribers = pgTable("newsletter_subscribers", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    emailIdx: index("idx_newsletter_email").on(table.email)
+  };
+});
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertCourseSchema = createInsertSchema(courses).omit({ id: true, createdAt: true });
@@ -301,6 +312,7 @@ export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id:
 export const insertFeedbackSchema = createInsertSchema(feedback).omit({ id: true, createdAt: true });
 export const insertSystemSettingsSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true });
 export const insertFileTypeSettingsSchema = createInsertSchema(fileTypeSettings).omit({ id: true, updatedAt: true });
+export const insertNewsletterSubscriberSchema = createInsertSchema(newsletterSubscribers).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -326,3 +338,6 @@ export type InsertSystemSetting = z.infer<typeof insertSystemSettingsSchema>;
 
 export type FileTypeSetting = typeof fileTypeSettings.$inferSelect;
 export type InsertFileTypeSetting = z.infer<typeof insertFileTypeSettingsSchema>;
+
+export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect;
+export type InsertNewsletterSubscriber = z.infer<typeof insertNewsletterSubscriberSchema>;

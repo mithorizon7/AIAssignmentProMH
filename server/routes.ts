@@ -13,7 +13,7 @@ import { OpenAIAdapter } from "./adapters/openai-adapter";
 import { z } from "zod";
 import { eq, count } from "drizzle-orm";
 import { db } from "./db";
-import { submissions, feedback, users, type User } from "@shared/schema";
+import { submissions, feedback, users, newsletterSubscribers, type User } from "@shared/schema";
 import { v4 as uuidv4 } from "uuid";
 import { defaultRateLimiter, submissionRateLimiter } from "./middleware/rate-limiter";
 import adminRoutes from "./routes/admin";
@@ -60,6 +60,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
   });
+
+  // Newsletter subscription
+  app.post('/api/newsletter/subscribe', asyncHandler(async (req: Request, res: Response) => {
+    const schema = z.object({ email: z.string().email() });
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ message: 'Invalid email address' });
+    }
+
+    const { email } = result.data;
+
+    try {
+      const existing = await db.select().from(newsletterSubscribers).where(eq(newsletterSubscribers.email, email));
+      if (existing.length > 0) {
+        return res.status(200).json({ message: 'Already subscribed' });
+      }
+
+      await db.insert(newsletterSubscribers).values({ email }).returning();
+      return res.status(201).json({ message: 'Subscribed' });
+    } catch (error) {
+      console.error('Failed to subscribe to newsletter:', error);
+      return res.status(500).json({ message: 'Failed to subscribe' });
+    }
+  }));
 
   // Authentication endpoints handled in auth.ts
 

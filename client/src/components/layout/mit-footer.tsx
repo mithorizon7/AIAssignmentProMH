@@ -1,8 +1,35 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "wouter";
 import { Github, Twitter, Linkedin, Mail } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { API_ROUTES } from "@/lib/constants";
 
 export function MITFooter() {
+  const [email, setEmail] = useState("");
+  const { toast } = useToast();
+
+  const handleSubscribe = async () => {
+    try {
+      const res = await apiRequest('POST', API_ROUTES.NEWSLETTER_SUBSCRIBE, { email });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      toast({
+        title: "Subscribed",
+        description: "You've been added to the newsletter",
+      });
+      setEmail("");
+    } catch (error) {
+      console.error('Newsletter subscription failed:', error);
+      toast({
+        title: "Subscription failed",
+        description: "Unable to subscribe. Please try again later.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <footer className="bg-mit-light-gray border-t border-mit-silver-gray/20">
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
@@ -116,10 +143,13 @@ export function MITFooter() {
               <input
                 type="email"
                 placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="min-w-0 flex-1 bg-white border border-gray-300 rounded-l-md py-2 px-3 text-sm"
               />
               <button
                 type="button"
+                onClick={handleSubscribe}
                 className="bg-mit-red text-white rounded-r-md px-4 py-2 text-sm font-medium hover:bg-[#5A0010] transition-colors duration-200"
               >
                 Subscribe
