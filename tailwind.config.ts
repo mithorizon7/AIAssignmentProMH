@@ -120,6 +120,8 @@ export default {
       boxShadow: {
         'soft': '0 2px 10px rgba(0, 0, 0, 0.05)',
         'card': '0 4px 12px rgba(0, 0, 0, 0.05)',
+        'soft-dark': '0 2px 8px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0,0,0,0.2)',
+        'card-dark': '0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0,0,0,0.3)',
       },
     },
   },

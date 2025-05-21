@@ -49,25 +49,45 @@
 }
 
 .dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --primary: 347 100% 23%;          /* MIT Red preserved in dark mode */
-  --primary-foreground: 0 0% 100%;  /* White */
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 357 100% 54%;      /* MIT Bright Red */
-  --destructive-foreground: 0 0% 100%;
-  --ring: 240 4.9% 83.9%;
+  --background: 240 10% 3.9%;              /* Main background - very dark blue/gray */
+  --foreground: 0 0% 98%;                  /* Text color - almost white, high contrast */
+
+  --card: 240 10% 5.9%;                    /* Card background - slightly lighter than main bg */
+  --card-foreground: 0 0% 98%;             /* Card text color */
+
+  --popover: 240 10% 7.9%;                 /* Popover background - slightly lighter than card */
+  --popover-foreground: 0 0% 98%;          /* Popover text color */
+
+  --muted: 240 5% 25%;                     /* Muted elements - subtle gray, lighter than before */
+  --muted-foreground: 240 5% 64.9%;        /* Muted text - good contrast on muted & main bg */
+  
+  --border: 240 4% 20%;                    /* Borders - slightly lighter for better visibility */
+  --input: 240 5% 9%;                      /* Input fields - distinct from background and card */
+
+  --primary: 347 100% 23%;                 /* MIT Red - preserved */
+  --primary-foreground: 0 0% 100%;         /* White - for text on MIT Red */
+
+  --secondary: 240 4% 25%;                 /* Secondary elements - more distinct gray */
+  --secondary-foreground: 0 0% 98%;        /* Secondary text */
+
+  --accent: 240 5% 30%;                    /* Accent elements - even lighter gray/blue */
+  --accent-foreground: 0 0% 98%;           /* Accent text */
+
+  --primary-text-dark: 347 100% 65%;       /* Lighter MIT Red for text on dark backgrounds */
+  --destructive: 357 100% 45%;             /* Darker Bright Red for better contrast with white text */
+  --destructive-foreground: 0 0% 100%;     /* White - for text on destructive red */
+
+  --ring: 210 90% 60%;                     /* Focus ring - distinct blue for visibility */
+
+  /* Sidebar Specific Variables */
+  --sidebar-background: 240 10% 4.9%;        /* Sidebar bg - between main bg and card */
+  --sidebar-foreground: 0 0% 98%;            /* Sidebar text */
+  --sidebar-primary: 347 100% 23%;           /* MIT Red for primary items in sidebar */
+  --sidebar-primary-foreground: 0 0% 100%;   /* White text on primary */
+  --sidebar-accent: 240 5% 28%;              /* Accent for sidebar items (e.g. hover) */
+  --sidebar-accent-foreground: 0 0% 98%;     /* Text on sidebar accent */
+  --sidebar-border: 240 4% 18%;              /* Sidebar border, slightly darker for subtlety */
+  --sidebar-ring: 210 90% 55%;               /* Focus ring in sidebar, slightly darker blue */
 }
 
 @layer base {
@@ -225,30 +245,32 @@
   
   /* Dark theme for QuillJS */
   .quill-dark-theme {
-    @apply bg-gray-800 border-gray-700;
+    background-color: hsl(var(--card));
+    border-color: hsl(var(--border));
   }
   
   .quill-dark-theme .ql-toolbar {
-    @apply border-gray-700 bg-gray-900;
+    background-color: hsl(var(--popover)); /* Or --input or a slightly darker/lighter card variant */
+    border-color: hsl(var(--border));
   }
   
   .quill-dark-theme .ql-container {
-    @apply text-white;
+    color: hsl(var(--foreground));
   }
   
   .quill-dark-theme .ql-snow .ql-stroke {
-    @apply stroke-gray-400;
+    stroke: hsl(var(--muted-foreground));
   }
   
   .quill-dark-theme .ql-snow .ql-fill {
-    @apply fill-gray-400;
+    fill: hsl(var(--muted-foreground));
   }
   
   .quill-dark-theme .ql-snow .ql-picker {
-    @apply text-gray-400;
+    color: hsl(var(--muted-foreground));
   }
   
   .quill-dark-theme .ql-editor.ql-blank::before {
-    @apply text-gray-500;
+    color: hsl(var(--muted-foreground));
   }
 }
