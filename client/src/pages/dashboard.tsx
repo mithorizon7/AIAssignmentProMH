@@ -11,6 +11,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ClipboardList, BookOpen } from "lucide-react";
+import { QuickStartDialog } from "@/components/student/quick-start-dialog";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -36,9 +37,12 @@ export default function Dashboard() {
   return (
     <AppShell>
       <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-neutral-800">Dashboard</h1>
-          <p className="text-neutral-600">Welcome back, {user.name}</p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-neutral-800">Dashboard</h1>
+            <p className="text-neutral-600">Welcome back, {user.name}</p>
+          </div>
+          <QuickStartDialog />
         </div>
         
         <div className="mb-8">
@@ -109,7 +113,10 @@ export default function Dashboard() {
                 </div>
                 
                 <div className="border-t border-neutral-200 pt-5 text-sm text-neutral-500">
-                  <p>Need help? Check out our <span className="text-primary hover:underline cursor-pointer">quick start guide</span> or <span className="text-primary hover:underline cursor-pointer">contact support</span>.</p>
+                  <p>
+                    Need help? <QuickStartDialog /> or{' '}
+                    <span className="text-primary hover:underline cursor-pointer">contact support</span>.
+                  </p>
                 </div>
               </div>
             </div>
