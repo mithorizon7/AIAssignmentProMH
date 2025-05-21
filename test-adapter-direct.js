@@ -18,7 +18,7 @@ async function main() {
     const fs = require('fs');
     
     // Check if the adapter file exists
-    const adapterPath = path.resolve('./server/adapters/gemini-adapter-new.ts');
+    const adapterPath = path.resolve('./server/adapters/gemini-adapter.ts');
     if (!fs.existsSync(adapterPath)) {
       console.error(`ERROR: Adapter file not found at ${adapterPath}`);
       return false;
@@ -30,7 +30,7 @@ async function main() {
     // Create a temporary wrapper that just imports and instantiates the adapter
     const tempFile = path.resolve('./temp-adapter-wrapper.js');
     const wrapperCode = `
-    const { GeminiAdapter } = require('./server/adapters/gemini-adapter-new.ts');
+    const { GeminiAdapter } = require('./server/adapters/gemini-adapter.ts');
     
     async function testAdapter() {
       try {

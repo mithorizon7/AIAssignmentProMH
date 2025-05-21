@@ -15,7 +15,7 @@ const __dirname = dirname(__filename);
 dotenv.config();
 
 // Import the adapter directly
-import { GeminiAdapter } from './server/adapters/gemini-adapter-fixed.js';
+import { GeminiAdapter } from './server/adapters/gemini-adapter.ts';
 
 // Test text content
 const TEST_TEXT = `

@@ -66,7 +66,7 @@ function cleanupTestFiles() {
 async function importAdapter() {
   try {
     // Using dynamic import for ESM compatibility
-    const module = await import('./server/adapters/gemini-adapter-new.ts');
+    const module = await import('./server/adapters/gemini-adapter.ts');
     console.log("Successfully imported Gemini adapter module");
     return module.GeminiAdapter;
   } catch (error) {
