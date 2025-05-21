@@ -43,6 +43,7 @@ export interface IStorage {
   updateUserMitHorizonSub(userId: number, mitHorizonSub: string): Promise<User | undefined>;
   updateUserEmailVerifiedStatus(userId: number, isVerified: boolean): Promise<User | undefined>;
   updateUserRole(userId: number, newRole: string): Promise<User | undefined>;
+  updateUserMfa(userId: number, enabled: boolean, secret?: string | null): Promise<User | undefined>;
   
   // Course operations
   getCourse(id: number): Promise<Course | undefined>;
@@ -147,6 +148,14 @@ export class DatabaseStorage implements IStorage {
   async updateUserRole(userId: number, newRole: string): Promise<User | undefined> {
     const [updated] = await db.update(users)
       .set({ role: newRole as any }) // Cast to any for enum conversion
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  async updateUserMfa(userId: number, enabled: boolean, secret?: string | null): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ mfaEnabled: enabled, mfaSecret: secret ?? null })
       .where(eq(users.id, userId))
       .returning();
     return updated;
