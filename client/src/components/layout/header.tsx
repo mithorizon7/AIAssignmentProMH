@@ -3,17 +3,25 @@ import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
 import { getUserInitials } from "@/lib/utils/format";
-import { Menu, Bell, HelpCircle, Sun, Moon } from 'lucide-react';
+import { Menu, Bell, HelpCircle, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/components/ui/theme-provider";
 import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
+import { APP_ROUTES } from "@/lib/constants";
 
 export function Header() {
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  
+
   if (!user) return null;
-  
+
+  const getRootPath = () => {
+    if (user.role === 'admin') return APP_ROUTES.ADMIN_DASHBOARD;
+    if (user.role === 'instructor') return APP_ROUTES.INSTRUCTOR_DASHBOARD;
+    return APP_ROUTES.DASHBOARD;
+  };
+
   return (
     <header className="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 py-2 px-4 flex items-center justify-between">
       <div className="flex items-center">
@@ -28,9 +36,12 @@ export function Header() {
           </SheetContent>
         </Sheet>
         
-        <div className="md:hidden text-lg font-medium text-primary">Academus</div>
+        <Link href={getRootPath()} className="flex items-center">
+          <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-8 mr-2" />
+          <span className="text-lg font-medium text-primary hidden sm:block">Academus</span>
+        </Link>
       </div>
-      
+
       <div className="flex items-center space-x-2 sm:space-x-4">
         <Button
           variant="ghost"
