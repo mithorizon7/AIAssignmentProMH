@@ -41,7 +41,8 @@ export async function testLmsConnection(req: Request, res: Response) {
       id: 0, // Temporary ID
       active: true,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      createdBy: null // Set to null for temporary credential
     };
     
     // Create the appropriate service for this provider
@@ -69,7 +70,7 @@ export async function getLmsCredentials(req: Request, res: Response) {
     const credentials = await db.select().from(lmsCredentials);
     
     // Mask secrets
-    const maskedCredentials = credentials.map(cred => ({
+    const maskedCredentials = credentials.map((cred) => ({
       ...cred,
       clientSecret: cred.clientSecret.replace(/./g, '•')
     }));

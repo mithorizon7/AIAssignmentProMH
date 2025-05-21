@@ -133,12 +133,99 @@ export default function SystemConfigPage() {
     saveAiSettingsMutation.mutate(aiSettings);
   };
 
+  // Test LMS connection
+  const testLmsConnectionMutation = useMutation({
+    mutationFn: async (settings: any) => {
+      const response = await fetch('/api/admin/lms/test-connection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error testing connection: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast({
+          title: "Connection successful",
+          description: data.message || "Successfully connected to LMS",
+        });
+      } else {
+        toast({
+          title: "Connection failed",
+          description: data.message || "Failed to connect to LMS",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to test LMS connection",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Save LMS integration settings
+  const saveLmsSettingsMutation = useMutation({
+    mutationFn: async (settings: any) => {
+      const response = await fetch('/api/admin/lms/credentials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error saving settings: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Integration settings saved",
+        description: "LMS integration settings have been updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save LMS settings",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleIntegrationSettingsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Integration settings saved",
-      description: "LMS integration settings have been updated successfully",
-    });
+    
+    // Only submit if LMS integration is enabled
+    if (integrationSettings.enableLms) {
+      // Save LMS settings
+      saveLmsSettingsMutation.mutate({
+        name: `${integrationSettings.lmsProvider} Integration`,
+        provider: integrationSettings.lmsProvider,
+        baseUrl: integrationSettings.lmsUrl,
+        clientId: integrationSettings.clientId,
+        clientSecret: integrationSettings.clientSecret,
+        callbackUrl: integrationSettings.callbackUrl,
+      });
+    } else {
+      // Just show a toast if LMS integration is disabled
+      toast({
+        title: "Integration settings saved",
+        description: "LMS integration is now disabled",
+      });
+    }
   };
 
   const handleStorageSettingsSubmit = (e: React.FormEvent) => {
@@ -675,10 +762,25 @@ export default function SystemConfigPage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-between">
-                  <Button variant="outline" disabled={!integrationSettings.enableLms}>
-                    Test Connection
+                  <Button 
+                    variant="outline" 
+                    disabled={!integrationSettings.enableLms || testLmsConnectionMutation.isPending} 
+                    onClick={() => {
+                      testLmsConnectionMutation.mutate({
+                        name: `${integrationSettings.lmsProvider} Test`,
+                        provider: integrationSettings.lmsProvider,
+                        baseUrl: integrationSettings.lmsUrl,
+                        clientId: integrationSettings.clientId,
+                        clientSecret: integrationSettings.clientSecret,
+                        callbackUrl: integrationSettings.callbackUrl,
+                      });
+                    }}
+                  >
+                    {testLmsConnectionMutation.isPending ? "Testing..." : "Test Connection"}
                   </Button>
-                  <Button type="submit">Save Changes</Button>
+                  <Button type="submit" disabled={saveLmsSettingsMutation.isPending}>
+                    {saveLmsSettingsMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
                 </CardFooter>
               </form>
             </Card>
