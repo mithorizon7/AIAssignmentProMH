@@ -321,12 +321,13 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
             );
             
             // Clean up the temporary file (we'll do this asynchronously)
-            fs.unlink(tempPath).catch(error => {
+            fs.unlink(tempPath).catch((error: Error) => {
               console.warn(`[AIService] Failed to clean up temporary file: ${error.message}`);
             });
-          } catch (error) {
-            console.error(`[AIService] Error creating temporary file: ${error.message}`);
-            throw new Error(`Failed to process document file: ${error.message}`);
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(`[AIService] Error creating temporary file: ${errorMessage}`);
+            throw new Error(`Failed to process document file: ${errorMessage}`);
           }
         } else {
           // For other file types (like images, text), we can use the buffer directly

@@ -24,8 +24,8 @@ interface GeminiFilePart {
 }
 
 // Token budget constants for two-step approach
-const BASE_MAX_TOKENS = 1200;   // first attempt
-const RETRY_MAX_TOKENS = 1600;  // if finishReason !== "STOP"
+const BASE_MAX_TOKENS = 2000;   // first attempt - increased for better document handling
+const RETRY_MAX_TOKENS = 3000;  // if finishReason !== "STOP" - increased for complex documents
 
 // The newest Gemini model is "gemini-2.5-flash-preview-05-20" which was released May 20, 2025
 import { ContentType } from '../utils/file-type-settings';
