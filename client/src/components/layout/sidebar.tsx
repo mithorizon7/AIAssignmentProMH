@@ -24,10 +24,10 @@ const SidebarLink = ({ href, icon, label, active }: SidebarLinkProps) => (
   <li>
     <Link href={href}>
       <a
-        className={`flex items-center p-2 rounded-md ${
+        className={`flex items-center p-2 rounded-md transition-colors duration-150 ${
           active
-            ? "text-primary bg-blue-50 hover:bg-blue-100"
-            : "text-neutral-700 hover:bg-neutral-100"
+            ? "text-primary bg-blue-50 hover:bg-blue-100 dark:bg-sidebar-primary dark:text-sidebar-primary-foreground hover:dark:bg-primary/90"
+            : "text-neutral-700 hover:bg-neutral-100 dark:text-sidebar-foreground/80 dark:hover:bg-sidebar-accent dark:hover:text-sidebar-accent-foreground"
         }`}
       >
         <div className="mr-3" aria-hidden="true">{icon}</div>
@@ -47,21 +47,21 @@ export function Sidebar() {
   const isInstructor = user.role === USER_ROLES.INSTRUCTOR;
   
   return (
-    <aside className="hidden md:flex flex-col w-80 bg-white border-r border-neutral-200 overflow-y-auto">
-      <div className="p-4 border-b border-neutral-200">
+    <aside className="hidden md:flex flex-col w-80 bg-white border-r border-neutral-200 dark:bg-sidebar dark:border-sidebar-border overflow-y-auto">
+      <div className="p-4 border-b border-neutral-200 dark:border-sidebar-border">
         <h1 className="text-xl font-medium text-primary">AI Assignment Feedback</h1>
-        <p className="text-sm text-neutral-600">University Portal</p>
+        <p className="text-sm text-neutral-600 dark:text-sidebar-foreground/70">University Portal</p>
       </div>
       
       {/* User Profile Section */}
-      <div className="p-4 border-b border-neutral-200">
+      <div className="p-4 border-b border-neutral-200 dark:border-sidebar-border">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center">
             <span>{getUserInitials(user.name)}</span>
           </div>
           <div>
-            <p className="font-medium">{user.name}</p>
-            <p className="text-sm text-neutral-600 capitalize">{user.role}</p>
+            <p className="font-medium dark:text-sidebar-foreground">{user.name}</p>
+            <p className="text-sm text-neutral-600 dark:text-sidebar-foreground/70 capitalize">{user.role}</p>
           </div>
         </div>
       </div>
@@ -136,11 +136,11 @@ export function Sidebar() {
         </nav>
       )}
       
-      <Separator />
+      <Separator className="dark:bg-sidebar-border" />
       <div className="p-4">
         <button 
           onClick={() => logout()} 
-          className="flex items-center text-neutral-700 hover:text-neutral-900"
+          className="flex items-center text-neutral-700 hover:text-neutral-900 dark:text-sidebar-foreground/80 dark:hover:text-sidebar-foreground transition-colors duration-150"
         >
           <LogOut size={18} className="mr-2" />
           <span>Logout</span>
