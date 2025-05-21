@@ -8,6 +8,8 @@ export const API_ROUTES = {
   STUDENTS: '/api/students',
   EXPORT_CSV: '/api/export/grades',
   COURSES: '/api/courses',
+  SYSTEM_SETTINGS: '/api/admin/system-settings',
+  SECURITY_AUDIT: '/api/admin/security-audit',
 };
 
 export const APP_ROUTES = {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { AdminShell } from "@/components/layout/admin-shell";
 import {
@@ -79,12 +79,35 @@ export default function SystemConfigPage() {
     ipRestrictions: "",
   });
 
+  const { data: systemData } = useQuery({
+    queryKey: [API_ROUTES.SYSTEM_SETTINGS],
+    queryFn: async () => {
+      const res = await fetch(API_ROUTES.SYSTEM_SETTINGS);
+      if (!res.ok) throw new Error("Failed to load settings");
+      return res.json();
+    }
+  });
+
+  useEffect(() => {
+    if (systemData) {
+      setGeneralSettings(systemData.general?.value || generalSettings);
+      setAiSettings(systemData.ai?.value || aiSettings);
+      setIntegrationSettings(systemData.lms?.value || integrationSettings);
+      setStorageSettings(systemData.storage?.value || storageSettings);
+      setSecuritySettings(systemData.security?.value || securitySettings);
+    }
+  }, [systemData]);
+
   // Submit general settings
   const saveGeneralSettingsMutation = useMutation({
     mutationFn: async (settings: any) => {
-      // This would be a real API call in production
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      return settings;
+      const res = await fetch(API_ROUTES.SYSTEM_SETTINGS, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ general: { value: settings } }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
     },
     onSuccess: () => {
       toast({
@@ -104,9 +127,13 @@ export default function SystemConfigPage() {
   // Submit AI settings
   const saveAiSettingsMutation = useMutation({
     mutationFn: async (settings: any) => {
-      // This would be a real API call in production
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      return settings;
+      const res = await fetch(API_ROUTES.SYSTEM_SETTINGS, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ai: { value: settings } }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
     },
     onSuccess: () => {
       toast({
@@ -118,6 +145,81 @@ export default function SystemConfigPage() {
       toast({
         title: "Error",
         description: "Failed to save AI settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveIntegrationSettingsMutation = useMutation({
+    mutationFn: async (settings: any) => {
+      const res = await fetch(API_ROUTES.SYSTEM_SETTINGS, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lms: { value: settings } }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Integration settings saved",
+        description: "LMS integration settings have been updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save integration settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveStorageSettingsMutation = useMutation({
+    mutationFn: async (settings: any) => {
+      const res = await fetch(API_ROUTES.SYSTEM_SETTINGS, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storage: { value: settings } }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Storage settings saved",
+        description: "Storage configuration has been updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save storage settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveSecuritySettingsMutation = useMutation({
+    mutationFn: async (settings: any) => {
+      const res = await fetch(API_ROUTES.SYSTEM_SETTINGS, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ security: { value: settings } }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Security settings saved",
+        description: "Security settings have been updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save security settings",
         variant: "destructive",
       });
     },
@@ -135,26 +237,17 @@ export default function SystemConfigPage() {
 
   const handleIntegrationSettingsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Integration settings saved",
-      description: "LMS integration settings have been updated successfully",
-    });
+    saveIntegrationSettingsMutation.mutate(integrationSettings);
   };
 
   const handleStorageSettingsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Storage settings saved",
-      description: "Storage configuration has been updated successfully",
-    });
+    saveStorageSettingsMutation.mutate(storageSettings);
   };
 
   const handleSecuritySettingsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Security settings saved",
-      description: "Security settings have been updated successfully",
-    });
+    saveSecuritySettingsMutation.mutate(securitySettings);
   };
 
   return (
@@ -999,11 +1092,20 @@ export default function SystemConfigPage() {
                   <Button
                     variant="outline"
                     type="button"
-                    onClick={() => {
-                      toast({
-                        title: "Security audit initiated",
-                        description: "Security audit report will be available in your email shortly",
-                      });
+                    onClick={async () => {
+                      const res = await fetch(API_ROUTES.SECURITY_AUDIT, { method: "POST" });
+                      if (res.ok) {
+                        toast({
+                          title: "Security audit queued",
+                          description: "Results will be emailed shortly",
+                        });
+                      } else {
+                        toast({
+                          title: "Error",
+                          description: "Failed to start security audit",
+                          variant: "destructive",
+                        });
+                      }
                     }}
                   >
                     Run Security Audit

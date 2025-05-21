@@ -51,6 +51,38 @@ export interface InstructorContext {
   lastUpdated?: Date;     // Optional timestamp of last update
 }
 
+// Additional system configuration types
+export interface LmsSettings {
+  enableLms: boolean;
+  lmsProvider: string;
+  lmsUrl: string;
+  clientId: string;
+  clientSecret: string;
+  callbackUrl: string;
+  enableGradeSync: boolean;
+  enableRoster: boolean;
+}
+
+export interface StorageSettings {
+  storageProvider: string;
+  bucketName?: string;
+  region?: string;
+  accessKey?: string;
+  secretKey?: string;
+  retentionPolicy: string;
+  compressionEnabled: boolean;
+  encryptionEnabled: boolean;
+}
+
+export interface SecuritySettings {
+  sessionTimeout: number;
+  mfaEnabled: boolean;
+  passwordPolicy: string;
+  rateLimit: number;
+  allowedDomains: string;
+  ipRestrictions: string;
+}
+
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['student', 'instructor', 'admin']);
 export const assignmentStatusEnum = pgEnum('assignment_status', ['active', 'completed', 'upcoming']);
@@ -262,6 +294,9 @@ export const systemSettings = pgTable("system_settings", {
   id: serial("id").primaryKey(),
   key: text("key").notNull().unique(),
   value: json("value").$type<Record<string, unknown>>().notNull(),
+  lms: json("lms").$type<Record<string, unknown> | null>().default(null),
+  storage: json("storage").$type<Record<string, unknown> | null>().default(null),
+  security: json("security").$type<Record<string, unknown> | null>().default(null),
   description: text("description"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   updatedBy: integer("updated_by").references(() => users.id),
@@ -326,3 +361,5 @@ export type InsertSystemSetting = z.infer<typeof insertSystemSettingsSchema>;
 
 export type FileTypeSetting = typeof fileTypeSettings.$inferSelect;
 export type InsertFileTypeSetting = z.infer<typeof insertFileTypeSettingsSchema>;
+
+export type { LmsSettings, StorageSettings, SecuritySettings };
