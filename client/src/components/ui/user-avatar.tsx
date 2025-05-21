@@ -1,5 +1,5 @@
 import { getUserInitials } from "@/lib/utils/format";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface UserAvatarProps {
   name: string;
@@ -11,15 +11,22 @@ export function UserAvatar({ name, size = "md", className = "" }: UserAvatarProp
   const initials = getUserInitials(name);
   
   const sizeClasses = {
-    sm: "h-8 w-8 text-xs",
-    md: "h-10 w-10 text-sm",
-    lg: "h-12 w-12 text-base",
+    sm: "h-8 w-8",
+    md: "h-10 w-10",
+    lg: "h-12 w-12",
+  };
+  
+  const imgSizeClasses = {
+    sm: "h-6 w-6",
+    md: "h-8 w-8",
+    lg: "h-10 w-10",
   };
   
   return (
-    <Avatar className={`${sizeClasses[size]} bg-primary text-white ${className}`}>
-      <AvatarFallback className="bg-primary text-white">
-        {initials}
+    <Avatar className={`${sizeClasses[size]} bg-white border border-gray-200 ${className}`}>
+      <AvatarImage src="/AcademusLogo.webp" alt={name} />
+      <AvatarFallback className="bg-white p-1">
+        <img src="/AcademusLogo.webp" alt="Academus Logo" className={imgSizeClasses[size]} />
       </AvatarFallback>
     </Avatar>
   );

@@ -61,8 +61,8 @@ export function Sidebar() {
       {/* User Profile Section */}
       <div className="p-4 border-b border-neutral-200 dark:border-sidebar-border">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center">
-            <span>{getUserInitials(user.name)}</span>
+          <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center overflow-hidden">
+            <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-8 w-8" />
           </div>
           <div>
             <p className="font-medium dark:text-sidebar-foreground">{user.name}</p>

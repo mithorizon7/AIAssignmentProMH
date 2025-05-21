@@ -69,12 +69,10 @@ export default function ProfilePage() {
           <Card className="md:col-span-1">
             <CardContent className="pt-6">
               <div className="flex flex-col items-center text-center">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src="" alt={user?.name || ""} />
-                  <AvatarFallback className="text-xl">
-                    {user?.name
-                      ? user.name.split(' ').map(n => n[0]).join('')
-                      : user?.username?.substring(0, 2).toUpperCase() || "??"}
+                <Avatar className="h-24 w-24 bg-white border border-gray-200">
+                  <AvatarImage src="/AcademusLogo.webp" alt={user?.name || ""} />
+                  <AvatarFallback className="bg-white p-2">
+                    <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-20 w-20" />
                   </AvatarFallback>
                 </Avatar>
                 

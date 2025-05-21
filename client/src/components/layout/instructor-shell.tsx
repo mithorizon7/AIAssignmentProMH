@@ -118,9 +118,9 @@ function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-full justify-start gap-2 px-2 text-base">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src="" alt={user?.username || ""} />
-            <AvatarFallback>{userInitials}</AvatarFallback>
+          <Avatar className="h-8 w-8 bg-white">
+            <AvatarImage src="/AcademusLogo.webp" alt={user?.username || ""} />
+            <AvatarFallback><img src="/AcademusLogo.webp" alt="Academus Logo" className="h-7 w-7" /></AvatarFallback>
           </Avatar>
           <div className="flex flex-col items-start">
             <div className="flex items-center gap-1">
