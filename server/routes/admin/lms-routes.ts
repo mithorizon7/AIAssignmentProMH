@@ -8,7 +8,7 @@
  */
 
 import express from 'express';
-import { requireAdmin } from '../../middleware/auth';
+import { Router, Request, Response } from 'express';
 import {
   testLmsConnection,
   getLmsCredentials,
@@ -21,8 +21,7 @@ import {
 
 const router = express.Router();
 
-// All routes require admin authentication
-router.use(requireAdmin);
+// Note: Authentication is already handled by the parent admin router
 
 // LMS credential management
 router.get('/credentials', getLmsCredentials);
