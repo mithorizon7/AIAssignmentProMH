@@ -8,6 +8,7 @@ export const API_ROUTES = {
   STUDENTS: '/api/students',
   EXPORT_CSV: '/api/export/grades',
   COURSES: '/api/courses',
+  NEWSLETTER_SUBSCRIBE: '/api/newsletter/subscribe',
 };
 
 export const APP_ROUTES = {
