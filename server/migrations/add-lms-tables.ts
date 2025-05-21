@@ -14,17 +14,33 @@ export async function addLmsTables() {
   console.log('Starting migration: Adding LMS integration tables...');
   
   try {
-    // Create lms_provider enum
-    await db.execute(sql`
-      CREATE TYPE "lms_provider" AS ENUM ('canvas', 'blackboard', 'moodle', 'd2l');
-    `);
-    console.log('Created lms_provider enum');
+    // Create lms_provider enum if it doesn't exist
+    try {
+      await db.execute(sql`
+        CREATE TYPE "lms_provider" AS ENUM ('canvas', 'blackboard', 'moodle', 'd2l');
+      `);
+      console.log('Created lms_provider enum');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('already exists')) {
+        console.log('lms_provider enum already exists, skipping...');
+      } else {
+        throw error;
+      }
+    }
     
-    // Create sync_status enum
-    await db.execute(sql`
-      CREATE TYPE "sync_status" AS ENUM ('pending', 'in_progress', 'completed', 'failed');
-    `);
-    console.log('Created sync_status enum');
+    // Create sync_status enum if it doesn't exist
+    try {
+      await db.execute(sql`
+        CREATE TYPE "sync_status" AS ENUM ('pending', 'in_progress', 'completed', 'failed');
+      `);
+      console.log('Created sync_status enum');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('already exists')) {
+        console.log('sync_status enum already exists, skipping...');
+      } else {
+        throw error;
+      }
+    }
     
     // Create lms_credentials table
     await db.execute(sql`
