@@ -47,7 +47,7 @@ export function Sidebar() {
   const isInstructor = user.role === USER_ROLES.INSTRUCTOR;
   
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-white border-r border-neutral-200 dark:bg-sidebar dark:border-sidebar-border overflow-y-auto">
+    <aside className="hidden md:flex flex-col w-72 bg-white border-r border-neutral-200 dark:bg-sidebar dark:border-sidebar-border overflow-y-auto">
       <div className="p-4 border-b border-neutral-200 dark:border-sidebar-border">
         <h1 className="text-xl font-medium text-primary">AI Assignment Feedback</h1>
         <p className="text-sm text-neutral-600 dark:text-sidebar-foreground/70">University Portal</p>
