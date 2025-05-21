@@ -131,6 +131,17 @@ if (typeof part.content === 'string') {
 }
 ```
 
+### 6. Helper and Streaming Improvements
+
+- Created a shared `runImageRubric` helper to reduce code duplication between
+  `generateCompletion` and `generateMultimodalCompletion`.
+- Introduced a two-step token budget (`BASE_MAX_TOKENS = 1200` and
+  `RETRY_MAX_TOKENS = 1600`) for reliable retries when responses are truncated.
+- Removed all `STREAMING_CUTOFF` logic so streaming is used consistently and
+  finish reasons are tracked accurately.
+- Improved error messages and retry logic when streaming indicates incomplete
+  output.
+
 ## Testing
 
 A comprehensive test suite has been created to validate these improvements:
@@ -140,12 +151,39 @@ A comprehensive test suite has been created to validate these improvements:
 3. `test-document-handling.js` - Tests DOCX file handling via Files API
 4. `test-metadata-handling.js` - Tests usageMetadata capture from API responses
 
+Additional testing scenarios:
+
+1. Text-only submissions with various prompt sizes
+2. Image submissions that require the Files API
+3. Multimodal submissions combining text and images
+4. Verification that tokens are counted accurately without fallbacks
+5. Proper retry behavior when responses are truncated
+
 ## Additional Notes
 
 - The adapter now handles JSON response truncation better by repairing incomplete JSON responses
 - A two-step token approach is used (BASE_MAX_TOKENS = 1200, RETRY_MAX_TOKENS = 1600) to handle large responses
 - Error handling has been improved with more specific error messages
 - Console logging was enhanced to provide better debugging information
+
+## Future Enhancement Opportunities
+
+- Use the Gemini SDK helper `types.Part.fromFile()` (available in v0.15.0+)
+  to simplify file data conversion.
+- Improve TypeScript type definitions and interface implementations for complete
+  AIAdapter compliance.
+- Add more sophisticated error recovery strategies and implement backoff for
+  rate limiting or service unavailability.
+
+## Impact on Production
+
+These improvements lead to:
+
+- More reliable handling of large responses
+- Fewer failures due to token limitations
+- Consistent behavior across all request types
+- Better maintainability for future developers
+- More accurate token counting and billing information
 
 ## Conclusion
 

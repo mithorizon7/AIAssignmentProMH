@@ -1,4 +1,5 @@
 import { db } from '../db';
+import { addMfaColumns } from './add-mfa-columns';
 
 async function addMissingColumnsToSubmissions() {
   console.log('[Migration] Checking for missing columns in submissions table...');
@@ -184,6 +185,8 @@ export async function runMigrations() {
   try {
     console.log('[Migration] Starting database migrations...');
     await addMissingColumnsToSubmissions();
+
+    await addMfaColumns();
     
     // Import the createFileTypeSettingsTable function dynamically to avoid circular dependencies
     const { createFileTypeSettingsTable } = await import('./add-file-type-settings');

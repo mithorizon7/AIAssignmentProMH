@@ -26,6 +26,7 @@ import { Strategy as LocalStrategy } from 'passport-local';
 import { Strategy as Auth0Strategy } from 'passport-auth0';
 import { Strategy as OIDCStrategy } from 'passport-openidconnect';
 import { storage } from './storage';
+import { verifyTotp } from './utils/totp';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import connectPgSimple from 'connect-pg-simple';
@@ -890,7 +891,7 @@ export function configureAuth(app: any) {
         return res.status(400).json({ message: 'Validation failed', errors: result.error.errors });
       }
 
-      passport.authenticate('local', (err: any, user: any, info: any) => {
+      passport.authenticate('local', async (err: any, user: any, info: any) => {
         if (err) {
           console.error('[ERROR] Authentication error:', err);
           return next(err);
@@ -908,13 +909,22 @@ export function configureAuth(app: any) {
         }
         
         // Log before login
-        console.log('[DEBUG] Attempting to login user:', { 
-          userId: user.id, 
-          username: user.username, 
+        console.log('[DEBUG] Attempting to login user:', {
+          userId: user.id,
+          username: user.username,
           role: user.role,
           hasSession: !!req.session
         });
-        
+
+        const mfaSetting = await storage.getSystemSetting('mfaRequired');
+        const mfaRequired = mfaSetting ? (mfaSetting.value as any).enabled === true : false;
+        if (mfaRequired && user.mfaEnabled) {
+          const token = req.body.mfaToken;
+          if (!token || !verifyTotp(String(token), user.mfaSecret || '')) {
+            return res.status(401).json({ message: 'MFA token required', mfaRequired: true });
+          }
+        }
+
         req.login(user, (err) => {
           if (err) {
             console.error('[ERROR] Session login error:', err);

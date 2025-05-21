@@ -24,7 +24,7 @@ async function main() {
     console.log("Testing direct adapter implementation...");
     
     // Check if the adapter file exists
-    const adapterPath = path.resolve('./server/adapters/gemini-adapter-new.ts');
+    const adapterPath = path.resolve('./server/adapters/gemini-adapter.ts');
     if (!fs.existsSync(adapterPath)) {
       console.error(`ERROR: Adapter file not found at ${adapterPath}`);
       return false;

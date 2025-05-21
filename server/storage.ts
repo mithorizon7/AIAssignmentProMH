@@ -7,6 +7,7 @@ import {
   enrollments,
   systemSettings,
   fileTypeSettings,
+  userNotificationSettings,
   contentTypeEnum,
   type User, 
   type InsertUser, 
@@ -24,6 +25,8 @@ import {
   type InsertSystemSetting,
   type FileTypeSetting,
   type InsertFileTypeSetting,
+  type UserNotificationSetting,
+  type InsertUserNotificationSetting,
 } from "@shared/schema";
 
 // Define type for the content type enum values
@@ -43,6 +46,7 @@ export interface IStorage {
   updateUserMitHorizonSub(userId: number, mitHorizonSub: string): Promise<User | undefined>;
   updateUserEmailVerifiedStatus(userId: number, isVerified: boolean): Promise<User | undefined>;
   updateUserRole(userId: number, newRole: string): Promise<User | undefined>;
+  updateUserMfa(userId: number, enabled: boolean, secret?: string | null): Promise<User | undefined>;
   
   // Course operations
   getCourse(id: number): Promise<Course | undefined>;
@@ -55,6 +59,10 @@ export interface IStorage {
   createEnrollment(enrollment: InsertEnrollment): Promise<Enrollment>;
   listUserEnrollments(userId: number): Promise<Course[]>;
   listCourseEnrollments(courseId: number): Promise<User[]>;
+  /**
+   * List all users with the student role
+   */
+  listStudents(): Promise<User[]>;
 
   // Assignment operations
   getAssignment(id: number): Promise<Assignment | undefined>;
@@ -86,6 +94,10 @@ export interface IStorage {
   getFileTypeSettings(contentType: string, context?: string, contextId?: number): Promise<FileTypeSetting[]>;
   upsertFileTypeSetting(setting: InsertFileTypeSetting): Promise<FileTypeSetting>;
   checkFileTypeEnabled(contentType: string, extension: string, mimeType: string): Promise<boolean>;
+
+  // User Notification Settings operations
+  getUserNotificationSettings(userId: number): Promise<UserNotificationSetting | undefined>;
+  upsertUserNotificationSettings(setting: InsertUserNotificationSetting): Promise<UserNotificationSetting>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -147,6 +159,14 @@ export class DatabaseStorage implements IStorage {
   async updateUserRole(userId: number, newRole: string): Promise<User | undefined> {
     const [updated] = await db.update(users)
       .set({ role: newRole as any }) // Cast to any for enum conversion
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  async updateUserMfa(userId: number, enabled: boolean, secret?: string | null): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ mfaEnabled: enabled, mfaSecret: secret ?? null })
       .where(eq(users.id, userId))
       .returning();
     return updated;
@@ -216,6 +236,15 @@ export class DatabaseStorage implements IStorage {
       return result.map((r: { user: User }) => r.user);
     } catch (error) {
       console.error(`Error retrieving enrollments for course ${courseId}:`, error);
+      return [];
+    }
+  }
+
+  async listStudents(): Promise<User[]> {
+    try {
+      return await db.select().from(users).where(eq(users.role, 'student'));
+    } catch (error) {
+      console.error('Error retrieving students:', error);
       return [];
     }
   }
@@ -997,6 +1026,32 @@ export class DatabaseStorage implements IStorage {
       console.error('Error checking file type enablement:', error);
       return false; // Default to disallowed in case of error
     }
+  }
+
+  // User Notification Settings operations
+  async getUserNotificationSettings(userId: number): Promise<UserNotificationSetting | undefined> {
+    const [settings] = await db.select().from(userNotificationSettings).where(eq(userNotificationSettings.userId, userId));
+    return settings;
+  }
+
+  async upsertUserNotificationSettings(setting: InsertUserNotificationSetting): Promise<UserNotificationSetting> {
+    const existing = await this.getUserNotificationSettings(setting.userId);
+    if (existing) {
+      const [updated] = await db.update(userNotificationSettings)
+        .set({
+          emailNotifications: setting.emailNotifications,
+          assignmentNotifications: setting.assignmentNotifications,
+          feedbackNotifications: setting.feedbackNotifications,
+          systemNotifications: setting.systemNotifications,
+          updatedAt: new Date()
+        })
+        .where(eq(userNotificationSettings.userId, setting.userId))
+        .returning();
+      return updated;
+    }
+
+    const [inserted] = await db.insert(userNotificationSettings).values(setting).returning();
+    return inserted;
   }
 }
 
