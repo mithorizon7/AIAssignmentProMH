@@ -98,7 +98,10 @@ export function FeedbackCard({ feedback, expanded = true, onToggle }: FeedbackCa
             {feedback.criteriaScores.map((criterion) => (
               <div key={criterion.criteriaId}>
                 <div className="flex justify-between text-sm mb-1">
-                  <div className="font-medium text-gray-700">{criterion.criteriaId}</div>
+                  <div className="font-medium text-gray-700">
+                    {/* Try to convert numeric criteriaId to a more readable format if it's just a number */}
+                    {criterion.criteriaName || getCriterionDisplayName(criterion.criteriaId)}
+                  </div>
                   <div className="font-semibold">
                     <span className={getScoreColor(criterion.score)}>{criterion.score}%</span>
                   </div>
