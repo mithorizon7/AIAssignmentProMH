@@ -712,6 +712,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let contentType: ContentType | null = null;
 
       if (submissionType === 'file' && req.file) {
+        // Validate file buffer exists and is not empty
+        if (!req.file.buffer || req.file.buffer.length === 0) {
+          console.error(`[SUBMISSION] Empty file buffer received from user ${user.id}`);
+          return res.status(400).json({
+            message: "File upload failed - empty file",
+            details: "The uploaded file contains no data. Please check the file and try again."
+          });
+        }
+        
         fileName = req.file.originalname;
         mimeType = req.file.mimetype;
         fileSize = req.file.size;
@@ -719,8 +728,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const fileExtension = path.extname(fileName).slice(1).toLowerCase();
         contentType = determineContentType(mimeType, fileName);
 
-        console.log(`User ${user.id} submission: ${fileName}, MIME: ${mimeType}, Content type: ${contentType}`);
+        console.log(`[SUBMISSION] User ${user.id} submission: ${fileName}, MIME: ${mimeType}, Content type: ${contentType}, Size: ${fileSize} bytes`);
 
+        // Check if file type is allowed
         const isAllowed = await storage.checkFileTypeEnabled(contentType, fileExtension, mimeType);
         if (!isAllowed) {
           return res.status(400).json({
@@ -729,10 +739,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        fileUrl = await storageService.storeSubmissionFile(req.file, user.id, assignmentId);
+        // Store the file with error handling
+        try {
+          fileUrl = await storageService.storeSubmissionFile(req.file, user.id, assignmentId);
+          console.log(`[SUBMISSION] File stored successfully at ${fileUrl}`);
+        } catch (storageError: any) {
+          console.error(`[SUBMISSION] File storage error for user ${user.id}: ${storageError.message}`);
+          return res.status(500).json({
+            message: "Failed to store file submission",
+            details: "An error occurred while saving your file. Please try again."
+          });
+        }
 
+        // For text files, extract content safely
         if (contentType === 'text' && mimeType.startsWith('text/')) {
-          content = req.file.buffer.toString('utf8');
+          try {
+            content = req.file.buffer.toString('utf8');
+          } catch (textError: any) {
+            console.warn(`[SUBMISSION] Failed to extract text content from file: ${textError.message}`);
+            // Continue without text extraction for binary files
+          }
         }
       } else if (submissionType === 'code') {
         content = req.body.code || '';
