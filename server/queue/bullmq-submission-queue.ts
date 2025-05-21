@@ -96,7 +96,7 @@ function createAIService() {
   if (process.env.GEMINI_API_KEY) {
     logger.info('AI adapter selected', { 
       adapter: 'Gemini',
-      model: 'models/gemini-2.5-flash-preview-04-17'
+      model: 'models/gemini-2.5-flash-preview-05-20'
     });
     aiAdapter = new GeminiAdapter();
   } 
