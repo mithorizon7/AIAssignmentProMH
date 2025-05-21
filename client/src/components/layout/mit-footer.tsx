@@ -39,23 +39,23 @@ export function MITFooter() {
             <h3 className="text-base font-semibold text-gray-900 mb-4">About</h3>
             <ul className="space-y-3">
               <li>
-                <Link href="/about">
-                  <a className="text-sm text-gray-600 hover:text-mit-red">About Us</a>
+                <Link href="/about" className="text-sm text-gray-600 hover:text-mit-red">
+                  About Us
                 </Link>
               </li>
               <li>
-                <Link href="/contact">
-                  <a className="text-sm text-gray-600 hover:text-mit-red">Contact</a>
+                <Link href="/contact" className="text-sm text-gray-600 hover:text-mit-red">
+                  Contact
                 </Link>
               </li>
               <li>
-                <Link href="/privacy">
-                  <a className="text-sm text-gray-600 hover:text-mit-red">Privacy Policy</a>
+                <Link href="/privacy" className="text-sm text-gray-600 hover:text-mit-red">
+                  Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="/terms">
-                  <a className="text-sm text-gray-600 hover:text-mit-red">Terms of Service</a>
+                <Link href="/terms" className="text-sm text-gray-600 hover:text-mit-red">
+                  Terms of Service
                 </Link>
               </li>
             </ul>
