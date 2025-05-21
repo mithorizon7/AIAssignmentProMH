@@ -55,6 +55,10 @@ export interface IStorage {
   createEnrollment(enrollment: InsertEnrollment): Promise<Enrollment>;
   listUserEnrollments(userId: number): Promise<Course[]>;
   listCourseEnrollments(courseId: number): Promise<User[]>;
+  /**
+   * List all users with the student role
+   */
+  listStudents(): Promise<User[]>;
 
   // Assignment operations
   getAssignment(id: number): Promise<Assignment | undefined>;
@@ -216,6 +220,15 @@ export class DatabaseStorage implements IStorage {
       return result.map((r: { user: User }) => r.user);
     } catch (error) {
       console.error(`Error retrieving enrollments for course ${courseId}:`, error);
+      return [];
+    }
+  }
+
+  async listStudents(): Promise<User[]> {
+    try {
+      return await db.select().from(users).where(eq(users.role, 'student'));
+    } catch (error) {
+      console.error('Error retrieving students:', error);
       return [];
     }
   }
