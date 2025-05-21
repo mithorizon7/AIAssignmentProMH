@@ -449,6 +449,3 @@
 
   export type LmsCourseMapping = typeof lmsCourseMappings.$inferSelect; // From main
   export type InsertLmsCourseMapping = z.infer<typeof insertLmsCourseMappingSchema>; // From main
-
-  // Exporting new interfaces from HEAD
-  export type { LmsSettings, StorageSettings, SecuritySettings };
