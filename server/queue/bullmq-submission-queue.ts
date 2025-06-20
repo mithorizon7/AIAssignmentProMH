@@ -319,7 +319,7 @@ if (queueActive) {
       }
     },
     { 
-      connection: queueConnection,
+      connection: queueConnectionOptions.connection,
       concurrency: 5,  // Process up to 5 jobs concurrently
       autorun: true,   // Start processing jobs automatically
     }
