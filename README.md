@@ -36,6 +36,7 @@ The application relies on several environment variables for configuration. Copy 
 | `REDIS_URL` | Complete Redis connection string (e.g., redis://username:password@host:port). Takes precedence over individual Redis parameters |
 | `REDIS_HOST`, `REDIS_PORT`, etc. | Individual Redis connection parameters used if REDIS_URL is not provided |
 | `GEMINI_API_KEY` | API key for Google's Gemini AI model |
+| `GEMINI_MODEL_NAME` | Specific Gemini model to use (e.g., 'gemini-2.5-flash'). Defaults to 'gemini-2.5-flash-preview-05-20' if not set |
 | `OPENAI_API_KEY` | Alternative API key for OpenAI models (Gemini is used by default if both are provided) |
 | `DATABASE_URL` | PostgreSQL connection string |
 
