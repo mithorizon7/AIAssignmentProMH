@@ -634,90 +634,29 @@ export class DatabaseStorage implements IStorage {
 
       console.log('[INFO] Creating feedback with validated data structure');
 
-      // Use raw SQL to avoid type issues
-      const sqlQuery = `
-        INSERT INTO feedback (
-          submission_id, strengths, improvements, suggestions,
-          summary, score, criteria_scores, processing_time,
-          raw_response, token_count, model_name, created_at
-        )
-        VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW()
-        )
-        RETURNING *;
-      `;
+      // Use Drizzle ORM insert which handles parameter binding correctly
+      const [result] = await db
+        .insert(feedback)
+        .values({
+          submissionId: insertFeedback.submissionId,
+          strengths: ensureArray(insertFeedback.strengths),
+          improvements: ensureArray(insertFeedback.improvements),
+          suggestions: ensureArray(insertFeedback.suggestions),
+          summary: insertFeedback.summary || null,
+          score: insertFeedback.score || null,
+          criteriaScores: insertFeedback.criteriaScores || null,
+          processingTime: insertFeedback.processingTime,
+          rawResponse: insertFeedback.rawResponse || null,
+          tokenCount: insertFeedback.tokenCount || null,
+          modelName: insertFeedback.modelName || null,
+        })
+        .returning();
 
-      const params = [
-        insertFeedback.submissionId,
-        JSON.stringify(ensureArray(insertFeedback.strengths)),
-        JSON.stringify(ensureArray(insertFeedback.improvements)),
-        JSON.stringify(ensureArray(insertFeedback.suggestions)),
-        insertFeedback.summary || null,
-        insertFeedback.score || null,
-        insertFeedback.criteriaScores ? JSON.stringify(insertFeedback.criteriaScores) : null,
-        insertFeedback.processingTime,
-        insertFeedback.rawResponse ? JSON.stringify(insertFeedback.rawResponse) : null,
-        insertFeedback.tokenCount || null,
-        insertFeedback.modelName || null
-      ];
-
-      const result = await db.execute(sqlQuery, params); // Renamed 'sql' to 'sqlQuery'
-      return result.rows[0] as Feedback; // Added type assertion
-    } catch (initialError: unknown) {
-      console.error('[ERROR] Error creating feedback:', initialError);
-      const initialErrorMessage = initialError instanceof Error ? initialError.message : String(initialError);
-
-      // Try a fallback approach with direct SQL if needed
-      try {
-        console.log('[INFO] Attempting fallback SQL for feedback creation');
-
-        // Convert arrays to JSON strings for SQL insertion
-        const strengths = JSON.stringify(
-          Array.isArray(insertFeedback.strengths) ? insertFeedback.strengths : []
-        );
-        const improvements = JSON.stringify(
-          Array.isArray(insertFeedback.improvements) ? insertFeedback.improvements : []
-        );
-        const suggestions = JSON.stringify(
-          Array.isArray(insertFeedback.suggestions) ? insertFeedback.suggestions : []
-        );
-
-        const fallbackSqlQuery = `
-          INSERT INTO feedback (
-            submission_id, strengths, improvements, suggestions,
-            summary, score, criteria_scores, processing_time,
-            raw_response, token_count, model_name, created_at
-          )
-          VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW()
-          )
-          RETURNING *;
-        `;
-
-        const fallbackParams = [ // Renamed 'params' to 'fallbackParams'
-          insertFeedback.submissionId,
-          strengths,
-          improvements,
-          suggestions,
-          insertFeedback.summary || null,
-          insertFeedback.score || null,
-          insertFeedback.criteriaScores ? JSON.stringify(insertFeedback.criteriaScores) : null,
-          insertFeedback.processingTime,
-          insertFeedback.rawResponse ? JSON.stringify(insertFeedback.rawResponse) : null,
-          insertFeedback.tokenCount || null,
-          insertFeedback.modelName || null
-        ];
-
-        const result = await db.execute(fallbackSqlQuery, fallbackParams); // Renamed 'sql' to 'fallbackSqlQuery'
-        if (result.rows.length === 0) {
-          throw new Error('Failed to create feedback with fallback SQL');
-        }
-
-        return result.rows[0] as Feedback;
-      } catch (fallbackError: unknown) {
-        console.error('[ERROR] Fallback feedback creation also failed:', fallbackError);
-        throw new Error(`Failed to create feedback: ${initialErrorMessage}`);
-      }
+      return result;
+    } catch (error: unknown) {
+      console.error('[ERROR] Error creating feedback:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create feedback: ${errorMessage}`);
     }
   }
 
