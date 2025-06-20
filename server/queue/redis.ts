@@ -244,13 +244,20 @@ function createRedisClient() {
   }
 }
 
-// Create a Redis client (with production mode or mock fallback)
-const redisClient = createRedisClient();
+// Create a Redis client lazily (with production mode or mock fallback)
+let redisClient: any = null;
+
+function getRedisClient() {
+  if (!redisClient) {
+    redisClient = createRedisClient();
+  }
+  return redisClient;
+}
 
 // Function to create connection options for BullMQ
 export function createRedisClientOptions() {
   return {
-    connection: redisClient,
+    connection: getRedisClient(),
     // Ensure maxRetriesPerRequest is explicitly set to null
     // This is required for compatibility with many Redis providers
     maxRetriesPerRequest: null
@@ -260,4 +267,4 @@ export function createRedisClientOptions() {
 // Export connection options for BullMQ
 export const connectionOptions = createRedisClientOptions();
 
-export default redisClient;
+export default getRedisClient();

@@ -8,7 +8,7 @@
 import crypto from 'crypto';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { Redis } from 'ioredis';
+import redisClient from '../queue/redis';
 
 // Define the file data interface in the format expected by the Gemini API
 export interface GeminiFileData {
@@ -20,18 +20,8 @@ export interface GeminiFileData {
 export const MAX_INLINE_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const CACHE_TTL = 47 * 60 * 60; // 47 hours (just under Gemini's 48-hour limit)
 
-// Setup Redis for caching file URIs (with fallback if unavailable)
-let redis: Redis | null = null;
-try {
-  redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
-  
-  redis.on('error', (err) => {
-    console.warn(`[REDIS] Connection error (file caching will be disabled): ${err.message}`);
-    redis = null;
-  });
-} catch (err) {
-  console.warn(`[REDIS] Failed to initialize Redis: ${err instanceof Error ? err.message : String(err)}`);
-}
+// Use the centralized Redis client (which handles mock fallback automatically)
+const redis = redisClient;
 
 /**
  * Convert different source formats (URL, file path, Buffer, string) to a Buffer
