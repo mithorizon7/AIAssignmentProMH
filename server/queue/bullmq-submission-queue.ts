@@ -7,26 +7,25 @@ import { OpenAIAdapter } from '../adapters/openai-adapter';
 import { AIService } from '../services/ai-service';
 import { StorageService } from '../services/storage-service';
 import { storage } from '../storage';
-import { UpstashRedisAdapter } from './upstash-redis';
+import { createRedisClientOptions } from './redis';
 import { queueLogger as logger } from '../lib/logger';
 
 // Queue name
 const SUBMISSION_QUEUE_NAME = 'submission-processing';
 
-// Disable BullMQ due to Upstash connection incompatibility - will implement direct processing
-const queueActive = false;
+// Enable BullMQ with proper Upstash Redis TLS configuration
+const queueActive = true;
 logger.info(`BullMQ queue status`, { 
   active: queueActive, 
   mode: process.env.NODE_ENV || 'development' 
 });
 
-// BullMQ disabled - using direct processing instead
-let queueConnection: any = null;
-logger.info('BullMQ disabled - using direct submission processing');
+// Get the centralized Redis connection for BullMQ
+const queueConnectionOptions = createRedisClientOptions();
 
-// Create queue configuration only when connection is available
-const queueConfig = queueConnection ? {
-  connection: queueConnection,
+// Create queue configuration with proper Redis connection
+const queueConfig = {
+  connection: queueConnectionOptions.connection,
   defaultJobOptions: {
     attempts: 3,              // Retry failed jobs up to 3 times
     backoff: {
@@ -36,16 +35,20 @@ const queueConfig = queueConnection ? {
     removeOnComplete: 100,    // Keep the last 100 completed jobs
     removeOnFail: 100         // Keep the last 100 failed jobs
   }
-} : {};
+};
 
-// Create queue only if active
-const submissionQueue: Queue | null = queueActive ? new Queue(SUBMISSION_QUEUE_NAME, queueConfig) : null;
+// Create queue only if active and Redis connection is available
+const submissionQueue: Queue | null = queueActive && queueConnectionOptions.connection 
+  ? new Queue(SUBMISSION_QUEUE_NAME, queueConfig) 
+  : null;
 
 // Type for worker
 type SubmissionWorker = Worker | null;
 
 // Create queue events only if active
-const queueEvents = queueActive ? new QueueEvents(SUBMISSION_QUEUE_NAME, queueConnection) : null;
+const queueEvents = queueActive && queueConnectionOptions.connection 
+  ? new QueueEvents(SUBMISSION_QUEUE_NAME, { connection: queueConnectionOptions.connection }) 
+  : null;
 
 // Log queue events if active
 if (queueEvents) {

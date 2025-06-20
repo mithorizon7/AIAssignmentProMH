@@ -1,7 +1,6 @@
-// Removed ioredis import - using only Upstash REST API
+import { Redis, RedisOptions } from 'ioredis';
 import { EventEmitter } from 'events';
 import { queueLogger as logger } from '../lib/logger';
-import { UpstashRedisAdapter } from './upstash-redis';
 
 /**
  * Enhanced Redis client factory with fallback to mock implementation
@@ -148,32 +147,61 @@ class MockRedisClient extends EventEmitter {
   }
 }
 
-// Function to create a Redis client with Upstash-only support
+// Function to create a properly configured Redis client for Upstash
 function createRedisClient() {
   try {
     const redisUrl = process.env.REDIS_URL;
     const redisToken = process.env.REDIS_TOKEN;
     
     if (redisUrl?.includes('upstash.io') && redisToken) {
-      // Use Upstash adapter for their hosted service
-      logger.info('Configuring Upstash Redis connection', {
-        url: redisUrl.substring(0, 30) + '...',
-        hasToken: !!redisToken
+      // Parse Upstash Redis URL
+      const url = new URL(redisUrl);
+      
+      // Create ioredis client with proper TLS configuration for Upstash
+      const redisOptions: RedisOptions = {
+        host: url.hostname,
+        port: parseInt(url.port) || 6380,
+        password: redisToken,
+        tls: {
+          // Upstash requires TLS connection
+        },
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+        lazyConnect: false,
+        connectTimeout: 30000,
+        commandTimeout: 10000,
+        family: 4
+      };
+      
+      const redisClient = new Redis(redisOptions);
+      
+      // Handle connection events
+      redisClient.on('connect', () => {
+        logger.info('Successfully connected to Upstash Redis via ioredis');
       });
       
-      try {
-        const upstashAdapter = new UpstashRedisAdapter(redisUrl, redisToken);
-        return upstashAdapter as any;
-      } catch (error: any) {
-        logger.error('Failed to create Upstash adapter, falling back to mock', {
-          error: error.message
+      redisClient.on('ready', () => {
+        logger.info('Upstash Redis connection ready for BullMQ');
+      });
+      
+      redisClient.on('error', (err: any) => {
+        logger.error('Upstash Redis connection error', { 
+          error: err.message,
+          code: err.code
         });
-        return new MockRedisClient();
-      }
+      });
+      
+      logger.info('Configured ioredis client for Upstash Redis', {
+        host: url.hostname,
+        port: parseInt(url.port) || 6380,
+        tls: true
+      });
+      
+      return redisClient;
     }
     
-    // No localhost Redis fallback - use mock only
-    logger.info('Using mock Redis client for file caching');
+    // Fallback to mock for development without proper Redis configuration
+    logger.warn('No Upstash Redis configuration found, using mock client');
     return new MockRedisClient();
   } catch (error: any) {
     const isProd = process.env.NODE_ENV === 'production';
