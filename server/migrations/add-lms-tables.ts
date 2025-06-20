@@ -43,7 +43,7 @@ export async function addLmsTables() {
     }
     
     // Create lms_credentials table
-    await db.execute(sql`
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS "lms_credentials" (
         "id" SERIAL PRIMARY KEY,
         "provider" "lms_provider" NOT NULL,
@@ -58,8 +58,8 @@ export async function addLmsTables() {
         "created_by" INTEGER REFERENCES "users"("id")
       );
       
-      CREATE INDEX "idx_lms_credentials_provider" ON "lms_credentials"("provider");
-      CREATE INDEX "idx_lms_credentials_active" ON "lms_credentials"("active");
+      CREATE INDEX IF NOT EXISTS "idx_lms_credentials_provider" ON "lms_credentials"("provider");
+      CREATE INDEX IF NOT EXISTS "idx_lms_credentials_active" ON "lms_credentials"("active");
     `);
     console.log('Created lms_credentials table');
     
