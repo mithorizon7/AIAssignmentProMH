@@ -7,7 +7,7 @@ import { OpenAIAdapter } from '../adapters/openai-adapter';
 import { AIService } from '../services/ai-service';
 import { StorageService } from '../services/storage-service';
 import { storage } from '../storage';
-import { createRedisClientOptions } from './redis';
+import redisClient from './redis';
 import { queueLogger as logger } from '../lib/logger';
 
 // Queue name
@@ -20,12 +20,9 @@ logger.info(`BullMQ queue status`, {
   mode: process.env.NODE_ENV || 'development' 
 });
 
-// Get the centralized Redis connection for BullMQ
-const queueConnectionOptions = createRedisClientOptions();
-
-// Create queue configuration with proper Redis connection
+// Create queue configuration using the centralized Redis client
 const queueConfig = {
-  connection: queueConnectionOptions.connection,
+  connection: redisClient,
   defaultJobOptions: {
     attempts: 3,              // Retry failed jobs up to 3 times
     backoff: {
@@ -37,17 +34,17 @@ const queueConfig = {
   }
 };
 
-// Create queue only if active and Redis connection is available
-const submissionQueue: Queue | null = queueActive && queueConnectionOptions.connection 
+// Create queue using the centralized Redis client
+const submissionQueue: Queue | null = queueActive 
   ? new Queue(SUBMISSION_QUEUE_NAME, queueConfig) 
   : null;
 
 // Type for worker
 type SubmissionWorker = Worker | null;
 
-// Create queue events only if active
-const queueEvents = queueActive && queueConnectionOptions.connection 
-  ? new QueueEvents(SUBMISSION_QUEUE_NAME, { connection: queueConnectionOptions.connection }) 
+// Create queue events using the centralized Redis client
+const queueEvents = queueActive 
+  ? new QueueEvents(SUBMISSION_QUEUE_NAME, { connection: redisClient }) 
   : null;
 
 // Log queue events if active
@@ -319,7 +316,7 @@ if (queueActive) {
       }
     },
     { 
-      connection: queueConnectionOptions.connection,
+      connection: redisClient,
       concurrency: 5,  // Process up to 5 jobs concurrently
       autorun: true,   // Start processing jobs automatically
     }

@@ -1,10 +1,10 @@
 import { Queue, Worker } from 'bullmq';
-import { connectionOptions } from './redis';
+import redisClient from './redis';
 import { queueLogger as logger } from '../lib/logger';
 
 const AUDIT_QUEUE_NAME = 'security-audit';
 
-const auditQueue = new Queue(AUDIT_QUEUE_NAME, connectionOptions);
+const auditQueue = new Queue(AUDIT_QUEUE_NAME, { connection: redisClient });
 
 new Worker(
   AUDIT_QUEUE_NAME,
@@ -12,7 +12,7 @@ new Worker(
     logger.info('Running security audit', { jobId: job.id, requestedBy: job.data.userId });
     // TODO: implement actual audit logic and email results
   },
-  connectionOptions
+  { connection: redisClient }
 );
 
 export async function queueSecurityAudit(userId: number): Promise<string> {
