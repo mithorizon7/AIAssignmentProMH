@@ -17,6 +17,10 @@ const REDIS_CONFIG = {
   maxRetriesPerRequest: null,
   enableReadyCheck: true,
   retryStrategy: (times: number) => {
+    // Stop retrying after 3 attempts in development
+    if (process.env.NODE_ENV !== 'production' && times > 3) {
+      return null;
+    }
     // Exponential backoff with a maximum of 10 seconds
     const delay = Math.min(times * 500, 10000);
     return delay;
