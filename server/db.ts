@@ -1,20 +1,23 @@
-import { Pool } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from "ws";
 import * as schema from "@shared/schema";
 
-if (!process.env.DATABASE_URL) {
+neonConfig.webSocketConstructor = ws;
+
+// Use NEON_DATABASE_URL if available, otherwise fall back to DATABASE_URL
+const databaseUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
+
+if (!databaseUrl) {
   throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
+    "NEON_DATABASE_URL or DATABASE_URL must be set. Did you forget to provision a database?",
   );
 }
 
-export const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+export const pool = new Pool({ connectionString: databaseUrl });
 
 // Create drizzle instance
-const drizzleInstance = drizzle(pool, { schema });
+const drizzleInstance = drizzle({ client: pool, schema });
 
 // Define the types for the execute method parameters and result
 type QueryParams = unknown[];
@@ -25,19 +28,34 @@ type QueryResult<T> = { rows: T[] };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = drizzleInstance as any;
 
-// Define the execute method with more flexible parameter handling
+// Define the execute method with proper handling for Drizzle SQL queries
 db.execute = async function<T extends Record<string, unknown>>(
-  sqlOrConfig: string | { text: string; values?: any[] },
-  params?: QueryParams
+  query: any
 ): Promise<QueryResult<T>> {
   let result;
   
-  if (typeof sqlOrConfig === 'string') {
-    // Called with (sql, params)
-    result = params ? await pool.query(sqlOrConfig, params) : await pool.query(sqlOrConfig);
+  // Handle Drizzle SQL template objects
+  if (query && typeof query === 'object') {
+    // Check for different possible SQL template formats
+    if ('queryChunks' in query && 'values' in query) {
+      // Drizzle SQL template format
+      const sqlString = query.queryChunks.join('$' + (query.values.length + 1));
+      result = await pool.query(sqlString, query.values);
+    } else if ('sql' in query) {
+      // Alternative format
+      const sqlString = query.sql;
+      const values = query.params || query.values || [];
+      result = await pool.query(sqlString, values);
+    } else {
+      // Try to convert to string if it has a toString method
+      const sqlString = query.toString();
+      result = await pool.query(sqlString);
+    }
+  } else if (typeof query === 'string') {
+    // Plain SQL string
+    result = await pool.query(query);
   } else {
-    // Called with ({ text, values }) config object
-    result = await pool.query(sqlOrConfig);
+    throw new Error('Invalid query format: ' + typeof query);
   }
   
   // Safe casting - we know the result has a rows property
