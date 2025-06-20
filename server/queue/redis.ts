@@ -154,26 +154,18 @@ function createRedisClient() {
     const redisToken = process.env.REDIS_TOKEN;
     
     if (redisUrl?.includes('upstash.io') && redisToken) {
-      // Parse Upstash Redis URL
+      // Convert HTTPS REST URL to Redis protocol URL for ioredis
+      // Upstash provides both REST API (https) and Redis protocol endpoints
       const url = new URL(redisUrl);
+      const redisProtocolUrl = `rediss://:${redisToken}@${url.hostname}:6380`;
       
-      // Create ioredis client with proper TLS configuration for Upstash
-      const redisOptions: RedisOptions = {
-        host: url.hostname,
-        port: parseInt(url.port) || 6380,
-        password: redisToken,
-        tls: {
-          // Upstash requires TLS connection
-        },
-        maxRetriesPerRequest: null,
+      // Use the Redis protocol endpoint with ioredis
+      const redisClient = new Redis(redisProtocolUrl, {
+        tls: {}, // Required for secure connection to Upstash
+        maxRetriesPerRequest: null, // Required for BullMQ
         enableReadyCheck: false,
-        lazyConnect: false,
-        connectTimeout: 30000,
-        commandTimeout: 10000,
-        family: 4
-      };
-      
-      const redisClient = new Redis(redisOptions);
+        lazyConnect: true
+      });
       
       // Handle connection events
       redisClient.on('connect', () => {
@@ -191,11 +183,7 @@ function createRedisClient() {
         });
       });
       
-      logger.info('Configured ioredis client for Upstash Redis', {
-        host: url.hostname,
-        port: parseInt(url.port) || 6380,
-        tls: true
-      });
+      logger.info('Configured ioredis client for Upstash Redis with official settings');
       
       return redisClient;
     }
