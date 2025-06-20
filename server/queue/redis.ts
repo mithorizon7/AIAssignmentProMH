@@ -1,40 +1,22 @@
 import IORedis from 'ioredis';
-import { queueLogger as logger } from '../lib/logger';
 
-// This should be the only place a Redis client is created.
-// It must use the full REDIS_URL from the environment secrets, which
-// starts with "rediss://" and contains the password.
-const redisClient = new IORedis(process.env.REDIS_URL!, {
-    // The tls object is mandatory for connecting to Upstash.
-    tls: {},
-    // This is a best practice for BullMQ compatibility.
-    maxRetriesPerRequest: null
+// This must be the only Redis client instance created in the entire application.
+const redisUrl = process.env.REDIS_URL!;
+
+// Configure Redis client based on the URL format
+let redisOptions: any = {
+    maxRetriesPerRequest: null // BullMQ best practice
+};
+
+// If the URL contains Upstash domain or uses rediss://, enable TLS
+if (redisUrl.includes('upstash.io') || redisUrl.startsWith('rediss://')) {
+    redisOptions.tls = {}; // Mandatory for Upstash
+}
+
+const redisClient = new IORedis(redisUrl, redisOptions);
+
+redisClient.on('error', (err) => {
+    console.error('Central Redis Client Error:', err);
 });
 
-// Handle connection errors for logging.
-redisClient.on('error', (err: any) => {
-    logger.error('Redis Client Error', { error: err.message, code: err.code });
-});
-
-redisClient.on('connect', () => {
-    logger.info('Successfully connected to Upstash Redis');
-});
-
-redisClient.on('ready', () => {
-    logger.info('Upstash Redis connection ready for BullMQ');
-});
-
-// Export the single, correctly configured client for the rest of the app to use.
 export default redisClient;
-
-// Legacy exports for backward compatibility
-export function getRedisClient() {
-    return redisClient;
-}
-
-export function createRedisClientOptions() {
-    return {
-        connection: redisClient,
-        maxRetriesPerRequest: null
-    };
-}
