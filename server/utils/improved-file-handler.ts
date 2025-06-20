@@ -20,8 +20,9 @@ export interface GeminiFileData {
 export const MAX_INLINE_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const CACHE_TTL = 47 * 60 * 60; // 47 hours (just under Gemini's 48-hour limit)
 
-// Disable Redis caching for file handlers to eliminate connection attempts
-const redis = null;
+// Use centralized Redis client for file caching
+import redisClient from '../queue/redis';
+const redis = redisClient;
 
 /**
  * Convert different source formats (URL, file path, Buffer, string) to a Buffer

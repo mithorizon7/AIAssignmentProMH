@@ -13,18 +13,15 @@ import { queueLogger as logger } from '../lib/logger';
 // Queue name
 const SUBMISSION_QUEUE_NAME = 'submission-processing';
 
-// Temporarily disable BullMQ to eliminate localhost connection attempts
-// until proper Upstash compatibility is implemented
-const queueActive = false;
+// Re-enable BullMQ with proper Upstash Redis connection
+const queueActive = true;
 logger.info(`BullMQ queue status`, { 
   active: queueActive, 
   mode: process.env.NODE_ENV || 'development' 
 });
 
 // Get the Redis configuration for BullMQ using our established Redis client
-const queueConnection = queueActive 
-  ? connectionOptions 
-  : {}; // Empty object for development mode (will use mock)
+const queueConnection = connectionOptions;
 
 // Create queue configuration
 const queueConfig = {
@@ -43,18 +40,14 @@ const queueConfig = {
   } : {})
 };
 
-// Create queue
-const submissionQueue: Queue = queueActive 
-  ? new Queue(SUBMISSION_QUEUE_NAME, queueConfig) 
-  : {} as Queue;
+// Create queue with proper Upstash connection
+const submissionQueue: Queue = new Queue(SUBMISSION_QUEUE_NAME, queueConfig);
 
 // Type for worker
 type SubmissionWorker = Worker | null;
 
-// Create queue events if active
-const queueEvents = queueActive 
-  ? new QueueEvents(SUBMISSION_QUEUE_NAME, queueConnection)
-  : null;
+// Create queue events with proper Upstash connection
+const queueEvents = new QueueEvents(SUBMISSION_QUEUE_NAME, queueConnection);
 
 // Log queue events if active
 if (queueEvents) {
