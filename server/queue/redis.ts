@@ -192,11 +192,31 @@ function createRedisClient() {
       // Still attempt to connect with defaults, but log a clear error
     }
     
-    const client = redisUrl 
-      ? new Redis(redisUrl, { 
+    // Clean up Redis URL if it contains command line artifacts
+    let cleanRedisUrl = redisUrl;
+    if (redisUrl) {
+      // Remove command line flags and URL encoding artifacts
+      cleanRedisUrl = redisUrl
+        .replace(/%20--tls%20-u%20/g, '')
+        .replace(/^.*redis:\/\//, 'redis://')  // Extract just the redis:// part
+        .trim();
+      
+      // Log the cleanup for debugging
+      if (cleanRedisUrl !== redisUrl) {
+        logger.info('Cleaned Redis URL format', {
+          original_length: redisUrl.length,
+          cleaned_length: cleanRedisUrl.length
+        });
+      }
+    }
+    
+    const client = cleanRedisUrl 
+      ? new Redis(cleanRedisUrl, { 
           maxRetriesPerRequest: null, // Required by some Redis providers for production
-          connectTimeout: 2000,    // Only wait 2 seconds before timing out
-          enableOfflineQueue: false // Don't queue commands when disconnected
+          connectTimeout: 10000,    // Increased timeout for TLS connections
+          enableOfflineQueue: false, // Don't queue commands when disconnected
+          tls: cleanRedisUrl.includes('upstash.io') ? {} : undefined, // Enable TLS for Upstash
+          family: 4 // Force IPv4
         }) 
       : new Redis(REDIS_CONFIG);
     
