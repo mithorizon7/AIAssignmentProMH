@@ -10,8 +10,8 @@ export async function runMigrations() {
     // Run existing migrations
     await runExistingMigrations();
     
-    // Run new LMS migrations
-    await addLmsTables();
+    // TODO: Re-enable LMS migrations after fixing SQL syntax
+    // await addLmsTables();
     
     console.log('All migrations completed successfully!');
   } catch (error) {

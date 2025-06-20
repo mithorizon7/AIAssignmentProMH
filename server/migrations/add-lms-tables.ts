@@ -17,7 +17,7 @@ export async function addLmsTables() {
     // Create lms_provider enum if it doesn't exist
     try {
       await db.execute(sql`
-        CREATE TYPE "lms_provider" AS ENUM ('canvas', 'blackboard', 'moodle', 'd2l');
+        CREATE TYPE lms_provider AS ENUM ('canvas', 'blackboard', 'moodle', 'd2l')
       `);
       console.log('Created lms_provider enum');
     } catch (error) {
@@ -31,7 +31,7 @@ export async function addLmsTables() {
     // Create sync_status enum if it doesn't exist
     try {
       await db.execute(sql`
-        CREATE TYPE "sync_status" AS ENUM ('pending', 'in_progress', 'completed', 'failed');
+        CREATE TYPE sync_status AS ENUM ('pending', 'in_progress', 'completed', 'failed')
       `);
       console.log('Created sync_status enum');
     } catch (error) {
@@ -43,7 +43,7 @@ export async function addLmsTables() {
     }
     
     // Create lms_credentials table
-    await db.execute(`
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS "lms_credentials" (
         "id" SERIAL PRIMARY KEY,
         "provider" "lms_provider" NOT NULL,
@@ -56,10 +56,15 @@ export async function addLmsTables() {
         "created_at" TIMESTAMP NOT NULL DEFAULT NOW(),
         "updated_at" TIMESTAMP NOT NULL DEFAULT NOW(),
         "created_by" INTEGER REFERENCES "users"("id")
-      );
-      
-      CREATE INDEX IF NOT EXISTS "idx_lms_credentials_provider" ON "lms_credentials"("provider");
-      CREATE INDEX IF NOT EXISTS "idx_lms_credentials_active" ON "lms_credentials"("active");
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "idx_lms_credentials_provider" ON "lms_credentials"("provider")
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "idx_lms_credentials_active" ON "lms_credentials"("active")
     `);
     console.log('Created lms_credentials table');
     
@@ -76,12 +81,23 @@ export async function addLmsTables() {
         "sync_data" JSONB,
         "created_at" TIMESTAMP NOT NULL DEFAULT NOW(),
         "created_by" INTEGER REFERENCES "users"("id")
-      );
-      
-      CREATE INDEX "idx_lms_sync_jobs_credential_id" ON "lms_sync_jobs"("credential_id");
-      CREATE INDEX "idx_lms_sync_jobs_status" ON "lms_sync_jobs"("status");
-      CREATE INDEX "idx_lms_sync_jobs_sync_type" ON "lms_sync_jobs"("sync_type");
-      CREATE INDEX "idx_lms_sync_jobs_created_at" ON "lms_sync_jobs"("created_at");
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "idx_lms_sync_jobs_credential_id" ON "lms_sync_jobs"("credential_id")
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "idx_lms_sync_jobs_status" ON "lms_sync_jobs"("status")
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "idx_lms_sync_jobs_sync_type" ON "lms_sync_jobs"("sync_type")
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "idx_lms_sync_jobs_created_at" ON "lms_sync_jobs"("created_at")
     `);
     console.log('Created lms_sync_jobs table');
     
@@ -97,12 +113,23 @@ export async function addLmsTables() {
         "sync_enabled" BOOLEAN NOT NULL DEFAULT true,
         "created_at" TIMESTAMP NOT NULL DEFAULT NOW(),
         "updated_at" TIMESTAMP NOT NULL DEFAULT NOW()
-      );
-      
-      CREATE INDEX "idx_lms_course_mappings_course_id" ON "lms_course_mappings"("course_id");
-      CREATE INDEX "idx_lms_course_mappings_credential_id" ON "lms_course_mappings"("credential_id");
-      CREATE INDEX "idx_lms_course_mappings_course_credential" ON "lms_course_mappings"("course_id", "credential_id");
-      CREATE INDEX "idx_lms_course_mappings_lms_course_id" ON "lms_course_mappings"("lms_course_id");
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "idx_lms_course_mappings_course_id" ON "lms_course_mappings"("course_id")
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "idx_lms_course_mappings_credential_id" ON "lms_course_mappings"("credential_id")
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "idx_lms_course_mappings_course_credential" ON "lms_course_mappings"("course_id", "credential_id")
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "idx_lms_course_mappings_lms_course_id" ON "lms_course_mappings"("lms_course_id")
     `);
     console.log('Created lms_course_mappings table');
     
