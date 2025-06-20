@@ -62,18 +62,7 @@ export function Sidebar() {
         </div>
       </div>
       
-      {/* User Profile Section */}
-      <div className="p-4 border-b border-neutral-200 dark:border-sidebar-border">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center overflow-hidden">
-            <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-8 w-8" />
-          </div>
-          <div>
-            <p className="font-medium dark:text-sidebar-foreground">{user.name}</p>
-            <p className="text-sm text-neutral-600 dark:text-sidebar-foreground/70 capitalize">{user.role}</p>
-          </div>
-        </div>
-      </div>
+
 
       {/* Navigation Links - Student View */}
       {isStudent && (
@@ -147,11 +136,27 @@ export function Sidebar() {
       
       <Separator className="dark:bg-sidebar-border" />
       <div className="p-4">
+        {/* User Profile Section */}
+        <div className="flex items-center mb-4">
+          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm">
+            {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+          </div>
+          <div className="ml-3 min-w-0 flex-1">
+            <p className="text-sm font-medium text-neutral-800 dark:text-sidebar-foreground truncate">
+              {user.name}
+            </p>
+            <p className="text-xs text-neutral-500 dark:text-sidebar-foreground/70 truncate capitalize">
+              {user.role}
+            </p>
+          </div>
+        </div>
+
+        {/* Logout Button */}
         <button 
           onClick={() => logout()} 
-          className="flex items-center text-neutral-700 hover:text-neutral-900 dark:text-sidebar-foreground/80 dark:hover:text-sidebar-foreground transition-colors duration-150"
+          className="flex items-center w-full text-neutral-700 hover:text-neutral-900 dark:text-sidebar-foreground/80 dark:hover:text-sidebar-foreground transition-colors duration-150"
         >
-          <LogOut size={22} className="mr-2 text-mit-red" />
+          <LogOut size={20} className="mr-2 text-mit-red" />
           <span>Logout</span>
         </button>
       </div>
