@@ -25,9 +25,8 @@ export interface GeminiFileData {
 // For handling different SDK versions
 type GenAIType = GoogleGenAI | any;
 
-// Use the centralized Redis client from our queue system
-import redisClient from '../queue/redis';
-const redis = redisClient;
+// Disable Redis caching for file handlers to eliminate localhost connection attempts
+const redis = null;
 
 // Size thresholds
 export const MAX_INLINE_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -191,7 +190,7 @@ export async function createFileData(
     }
     
     // Cache the file ID
-    if (redis !== null) {
+    if (redis && typeof redis.setex === 'function') {
       try {
         await redis.setex(cacheKey, CACHE_TTL, fileId);
       } catch (err) {
