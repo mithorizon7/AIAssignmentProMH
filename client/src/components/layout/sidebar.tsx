@@ -52,7 +52,11 @@ export function Sidebar() {
         <div className="flex items-center">
           <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-10 mr-3" />
           <div>
-            <h1 className="text-xl font-medium text-primary">Instructor Portal</h1>
+            <h1 className="text-xl font-medium text-primary">
+              {user.role === 'admin' ? 'Admin Portal' : 
+               user.role === 'instructor' ? 'Instructor Portal' : 
+               'Student Portal'}
+            </h1>
             <p className="text-sm text-neutral-600 dark:text-sidebar-foreground/70">AI Grader</p>
           </div>
         </div>

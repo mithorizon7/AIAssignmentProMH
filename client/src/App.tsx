@@ -59,6 +59,13 @@ function PrivateRoute({ component: Component, requireRole, ...rest }: PrivateRou
     
     // Check exact role match for other cases
     if (user?.role !== requireRole) {
+      if (user?.role === 'admin') {
+        return <Redirect to="/admin/dashboard" />;
+      }
+      if (user?.role === 'instructor') {
+        return <Redirect to="/instructor/dashboard" />;
+      }
+      // Default redirect for students or other roles
       return <Redirect to="/dashboard" />;
     }
   }
