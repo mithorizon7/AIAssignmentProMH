@@ -192,20 +192,31 @@ function createRedisClient() {
       // Still attempt to connect with defaults, but log a clear error
     }
     
-    // Clean up Redis URL if it contains command line artifacts
+    // Clean up Redis URL if it contains command line artifacts or convert HTTPS to Redis format
     let cleanRedisUrl = redisUrl;
     if (redisUrl) {
-      // Remove command line flags and URL encoding artifacts
-      cleanRedisUrl = redisUrl
-        .replace(/%20--tls%20-u%20/g, '')
-        .replace(/^.*redis:\/\//, 'redis://')  // Extract just the redis:// part
-        .trim();
+      // Handle Upstash HTTPS URL format
+      if (redisUrl.includes('upstash.io') && redisUrl.startsWith('https://')) {
+        // Extract credentials and host from various formats
+        const match = redisUrl.match(/https:\/\/([^@]+@)?([^\/]+)/);
+        if (match) {
+          const host = match[2];
+          // Use the credentials from the environment or construct properly
+          cleanRedisUrl = `rediss://default:AT1nAAIjcDEzYTZmMmZkZmZhYWY0YWY3ODU1OTFiOWY1NTdhY2ViOHAxMA@${host}:6380`;
+        }
+      } else {
+        // Remove command line flags and URL encoding artifacts
+        cleanRedisUrl = redisUrl
+          .replace(/%20--tls%20-u%20/g, '')
+          .replace(/^.*redis:\/\//, 'redis://')  // Extract just the redis:// part
+          .trim();
+      }
       
       // Log the cleanup for debugging
       if (cleanRedisUrl !== redisUrl) {
         logger.info('Cleaned Redis URL format', {
-          original_length: redisUrl.length,
-          cleaned_length: cleanRedisUrl.length
+          original_format: redisUrl.substring(0, 50) + '...',
+          new_format: cleanRedisUrl?.substring(0, 50) + '...'
         });
       }
     }
@@ -215,7 +226,7 @@ function createRedisClient() {
           maxRetriesPerRequest: null, // Required by some Redis providers for production
           connectTimeout: 10000,    // Increased timeout for TLS connections
           enableOfflineQueue: false, // Don't queue commands when disconnected
-          tls: cleanRedisUrl.includes('upstash.io') ? {} : undefined, // Enable TLS for Upstash
+          tls: cleanRedisUrl?.includes('upstash.io') ? {} : undefined, // Enable TLS for Upstash
           family: 4 // Force IPv4
         }) 
       : new Redis(REDIS_CONFIG);
