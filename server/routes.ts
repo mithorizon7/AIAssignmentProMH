@@ -658,40 +658,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const createdSubmission = await storage.createSubmission(submission);
 
-    // Process submission directly since BullMQ with Upstash requires complex compatibility layer
+    // Add submission to BullMQ queue for processing
     try {
-      const assignment = await storage.getAssignment(assignmentId);
-      if (assignment) {
-        // Initialize AI service for direct processing
-        const { GeminiAdapter } = await import('../adapters/gemini-adapter');
-        const { AIService } = await import('../services/ai-service');
-        const { StorageService } = await import('../services/storage-service');
-        
-        const geminiAdapter = new GeminiAdapter();
-        const aiService = new AIService(geminiAdapter);
-        const storageService = new StorageService(storage);
-
-        // Process submission asynchronously without blocking response
-        setImmediate(async () => {
-          try {
-            const feedback = await aiService.analyzeProgrammingAssignment(
-              createdSubmission.content || '',
-              assignment.description || '',
-              createdSubmission.contentType || 'text'
-            );
-            
-            const feedbackData = await aiService.prepareFeedbackForStorage(feedback, createdSubmission.id);
-            await storageService.saveFeedback(feedbackData);
-            
-            await storage.updateSubmissionStatus(createdSubmission.id, 'completed');
-          } catch (error) {
-            console.error('Error processing submission:', error);
-            await storage.updateSubmissionStatus(createdSubmission.id, 'failed');
-          }
-        });
-      }
+      const { queueApi } = await import('./queue/bullmq-submission-queue');
+      await queueApi.addSubmission(createdSubmission.id);
     } catch (error) {
-      console.error('Error initializing submission processing:', error);
+      console.error('Error adding submission to queue:', error);
+      // Fallback: mark as failed if queue addition fails
+      await storage.updateSubmissionStatus(createdSubmission.id, 'failed');
     }
 
     res.status(201).json({
