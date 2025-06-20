@@ -78,7 +78,7 @@ async function testBullMQSystem() {
     
     // Test 7: Final queue statistics
     console.log('\n7. Final queue statistics...');
-    const finalStats = await queueApi.getQueueStats();
+    const finalStats = await queueApi.getStats();
     console.log('Final stats:', JSON.stringify(finalStats, null, 2));
     
     console.log('\n✅ BullMQ system test completed');
