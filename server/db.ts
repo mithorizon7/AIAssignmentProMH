@@ -16,9 +16,12 @@ if (!databaseUrl) {
 
 export const pool = new Pool({ 
   connectionString: databaseUrl,
-  max: 5,
-  connectionTimeoutMillis: 5000,
-  idleTimeoutMillis: 30000
+  max: 10,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 60000,
+  maxUses: Infinity,
+  allowExitOnIdle: false,
+  maxLifetimeSeconds: 0
 });
 
 // Create drizzle instance
