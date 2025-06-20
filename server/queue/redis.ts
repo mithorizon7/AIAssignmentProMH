@@ -8,25 +8,9 @@ import { UpstashRedisAdapter } from './upstash-redis';
  * Provides a real Redis client for production use and graceful fallback for development
  */
 
-// Configuration for Redis connection
+// Configuration disabled - using only Upstash Redis via REST API
 const REDIS_CONFIG = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379', 10),
-  password: process.env.REDIS_PASSWORD,
-  username: process.env.REDIS_USERNAME,
-  db: parseInt(process.env.REDIS_DB || '0', 10),
-  maxRetriesPerRequest: null,
-  enableReadyCheck: true,
-  retryStrategy: (times: number) => {
-    // Stop retrying after 3 attempts in development
-    if (process.env.NODE_ENV !== 'production' && times > 3) {
-      return null;
-    }
-    // Exponential backoff with a maximum of 10 seconds
-    const delay = Math.min(times * 500, 10000);
-    return delay;
-  },
-  // If using sentinel or cluster, add those configurations here
+  // Legacy configuration removed - system now uses only Upstash Redis
 };
 
 // Mock Redis client for development environments without Redis
@@ -164,36 +148,10 @@ class MockRedisClient extends EventEmitter {
   }
 }
 
-// Function to create a Redis client with fallback capability
+// Function to create a Redis client with Upstash-only support
 function createRedisClient() {
-  // Use real Redis when:
-  // 1. In production environment, OR
-  // 2. ENABLE_REDIS=true is set, OR
-  // 3. REDIS_URL is explicitly provided
-  const useRealRedis = process.env.NODE_ENV === 'production' || 
-                      process.env.ENABLE_REDIS === 'true' ||
-                      !!process.env.REDIS_URL;
-  
-  if (!useRealRedis) {
-    logger.info('Development environment detected, using mock Redis implementation');
-    return new MockRedisClient();
-  }
-  
   try {
-    // Configure Redis client
     const redisUrl = process.env.REDIS_URL;
-    
-    // In production, check for Redis configuration
-    if (process.env.NODE_ENV === 'production' && !redisUrl && !process.env.REDIS_HOST) {
-      logger.error('CRITICAL: Redis configuration missing in production environment', {
-        error: 'Missing REDIS_URL or REDIS_HOST configuration',
-        required: true,
-        resolution: 'Set REDIS_URL or individual REDIS_* environment variables for production deployment'
-      });
-      // Still attempt to connect with defaults, but log a clear error
-    }
-    
-    // Check if we should use Upstash SDK or standard Redis
     const redisToken = process.env.REDIS_TOKEN;
     
     if (redisUrl?.includes('upstash.io') && redisToken) {
@@ -214,11 +172,8 @@ function createRedisClient() {
       }
     }
     
-    // If we reach here without Upstash, fall back to mock
-    logger.warn('No Upstash Redis configuration found, using mock Redis client', {
-      redisUrl: redisUrl ? 'provided but not Upstash' : 'not provided',
-      redisToken: redisToken ? 'provided' : 'not provided'
-    });
+    // No localhost Redis fallback - use mock only
+    logger.info('Using mock Redis client for file caching');
     return new MockRedisClient();
   } catch (error: any) {
     const isProd = process.env.NODE_ENV === 'production';

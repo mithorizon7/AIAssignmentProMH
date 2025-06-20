@@ -20,55 +20,9 @@ logger.info(`BullMQ queue status`, {
   mode: process.env.NODE_ENV || 'development' 
 });
 
-// Use proper ioredis configuration for Upstash Redis
-import { Redis } from 'ioredis';
-
-const redisUrl = process.env.REDIS_URL;
-const redisToken = process.env.REDIS_TOKEN;
-
-let queueConnection: any;
-if (redisUrl?.includes('upstash.io') && redisToken) {
-  // Configure Redis connection specifically for Upstash
-  queueConnection = new Redis(redisUrl, {
-    password: redisToken,
-    tls: {
-      rejectUnauthorized: false
-    },
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-    lazyConnect: false,
-    connectTimeout: 30000,
-    commandTimeout: 10000,
-    retryDelayOnFailover: 1000,
-    family: 4,
-    keepAlive: true,
-  });
-  
-  // Handle connection events
-  queueConnection.on('connect', () => {
-    logger.info('BullMQ successfully connected to Upstash Redis');
-  });
-  
-  queueConnection.on('ready', () => {
-    logger.info('BullMQ Upstash Redis connection ready');
-  });
-  
-  queueConnection.on('error', (err: any) => {
-    logger.error('BullMQ Upstash Redis error', { 
-      error: err.message,
-      code: err.code
-    });
-  });
-  
-  queueConnection.on('close', () => {
-    logger.warn('BullMQ Upstash Redis connection closed');
-  });
-  
-  logger.info('Configuring BullMQ with Upstash Redis');
-} else {
-  logger.warn('Upstash Redis configuration not found, BullMQ disabled');
-  queueConnection = null;
-}
+// BullMQ disabled - using direct processing instead
+let queueConnection: any = null;
+logger.info('BullMQ disabled - using direct submission processing');
 
 // Create queue configuration only when connection is available
 const queueConfig = queueConnection ? {
