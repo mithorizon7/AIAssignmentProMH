@@ -54,9 +54,9 @@ export function AssignmentCard({ assignment, latestSubmission }: AssignmentCardP
           
           {isActive && !isSubmitted && (
             <Link href={APP_ROUTES.SUBMISSION(assignment.id)} className="slide-in-right" style={{animationDelay: "250ms"}}>
-              <Button size="sm" className="h-8 btn-hover-effect group relative overflow-hidden">
+              <Button size="sm" className="h-10 px-4 btn-hover-effect group relative overflow-hidden whitespace-nowrap">
                 <span className="relative z-10">Submit Assignment</span>
-                <ArrowRightCircle className="ml-1 h-4 w-4 relative z-10 group-hover:translate-x-0.5 transition-transform" />
+                <ArrowRightCircle className="ml-2 h-4 w-4 relative z-10 group-hover:translate-x-0.5 transition-transform" />
                 <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
               </Button>
             </Link>
@@ -67,10 +67,10 @@ export function AssignmentCard({ assignment, latestSubmission }: AssignmentCardP
               <Button 
                 size="sm" 
                 variant="outline" 
-                className="h-8 text-primary border-primary hover:bg-primary/5 btn-hover-effect group"
+                className="h-10 px-4 text-primary border-primary hover:bg-primary/5 btn-hover-effect group whitespace-nowrap"
               >
                 View Feedback
-                <ArrowRightCircle className="ml-1 h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                <ArrowRightCircle className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
               </Button>
             </Link>
           )}
