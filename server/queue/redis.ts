@@ -214,46 +214,12 @@ function createRedisClient() {
       }
     }
     
-    // Standard Redis connection
-    const cleanRedisUrl = redisUrl
-      ?.replace(/%20--tls%20-u%20/g, '')
-      ?.replace(/^.*redis:\/\//, 'redis://')
-      ?.trim();
-    
-    const client = cleanRedisUrl 
-      ? new Redis(cleanRedisUrl, { 
-          maxRetriesPerRequest: null,
-          connectTimeout: 10000,
-          enableOfflineQueue: false,
-          family: 4
-        }) 
-      : new Redis(REDIS_CONFIG);
-    
-    // Add error handling for standard Redis clients
-    if (client && typeof client.on === 'function') {
-      client.on('error', (err: Error & { code?: string }) => {
-        const isProd = process.env.NODE_ENV === 'production';
-        logger.error(`Redis connection error${isProd ? ' - CRITICAL FOR PRODUCTION' : ''}`, { 
-          error: err.message,
-          code: err.code || 'unknown',
-          environment: process.env.NODE_ENV || 'development',
-          resolution: isProd ? 'Provide valid Redis credentials in environment variables' : 'Development can continue with mock Redis'
-        });
-      });
-      
-      client.on('connect', () => {
-        logger.info('Connected to Redis server successfully', { 
-          host: process.env.REDIS_HOST || redisUrl?.split(':')[0] || 'unknown',
-          port: process.env.REDIS_PORT || 'default'
-        });
-      });
-      
-      client.on('reconnecting', () => {
-        logger.warn('Reconnecting to Redis server...');
-      });
-    }
-    
-    return client;
+    // If we reach here without Upstash, fall back to mock
+    logger.warn('No Upstash Redis configuration found, using mock Redis client', {
+      redisUrl: redisUrl ? 'provided but not Upstash' : 'not provided',
+      redisToken: redisToken ? 'provided' : 'not provided'
+    });
+    return new MockRedisClient();
   } catch (error: any) {
     const isProd = process.env.NODE_ENV === 'production';
     logger.error(`Failed to connect to Redis${isProd ? ' - CRITICAL FOR PRODUCTION' : ''}`, { 

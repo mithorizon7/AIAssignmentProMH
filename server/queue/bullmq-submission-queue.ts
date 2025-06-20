@@ -13,8 +13,9 @@ import { queueLogger as logger } from '../lib/logger';
 // Queue name
 const SUBMISSION_QUEUE_NAME = 'submission-processing';
 
-// Check if Redis is available
-const queueActive = process.env.NODE_ENV === 'production' || process.env.ENABLE_REDIS === 'true';
+// Temporarily disable BullMQ to eliminate localhost connection attempts
+// until proper Upstash compatibility is implemented
+const queueActive = false;
 logger.info(`BullMQ queue status`, { 
   active: queueActive, 
   mode: process.env.NODE_ENV || 'development' 
@@ -52,9 +53,7 @@ type SubmissionWorker = Worker | null;
 
 // Create queue events if active
 const queueEvents = queueActive 
-  ? new QueueEvents(SUBMISSION_QUEUE_NAME, { 
-      connection: connectionOptions.connection as unknown as ConnectionOptions 
-    })
+  ? new QueueEvents(SUBMISSION_QUEUE_NAME, queueConnection)
   : null;
 
 // Log queue events if active

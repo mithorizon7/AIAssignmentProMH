@@ -25,18 +25,9 @@ export interface GeminiFileData {
 // For handling different SDK versions
 type GenAIType = GoogleGenAI | any;
 
-// Initialize Redis client for caching (fallback if unavailable)
-let redis: Redis | null = null;
-try {
-  redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
-  
-  redis.on('error', (err) => {
-    console.warn(`[REDIS] Connection error (file caching will be disabled): ${err.message}`);
-    redis = null;
-  });
-} catch (err) {
-  console.warn(`[REDIS] Failed to initialize Redis: ${err instanceof Error ? err.message : String(err)}`);
-}
+// Use the centralized Redis client from our queue system
+import redisClient from '../queue/redis';
+const redis = redisClient;
 
 // Size thresholds
 export const MAX_INLINE_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
