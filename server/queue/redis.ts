@@ -1,6 +1,7 @@
 import { Redis } from 'ioredis';
 import { EventEmitter } from 'events';
 import { queueLogger as logger } from '../lib/logger';
+import { UpstashRedisAdapter } from './upstash-redis';
 
 /**
  * Enhanced Redis client factory with fallback to mock implementation
@@ -192,46 +193,35 @@ function createRedisClient() {
       // Still attempt to connect with defaults, but log a clear error
     }
     
-    // Clean up Redis URL if it contains command line artifacts or convert HTTPS to Redis format
-    let cleanRedisUrl = redisUrl;
-    if (redisUrl) {
-      // Handle Upstash HTTPS URL format
-      if (redisUrl.includes('upstash.io') && redisUrl.startsWith('https://')) {
-        // Extract credentials and host from various formats
-        const match = redisUrl.match(/https:\/\/([^@]+@)?([^\/]+)/);
-        if (match) {
-          const host = match[2];
-          // Use the credentials from the environment or construct properly
-          cleanRedisUrl = `rediss://default:AT1nAAIjcDEzYTZmMmZkZmZhYWY0YWY3ODU1OTFiOWY1NTdhY2ViOHAxMA@${host}:6380`;
-        }
-      } else {
-        // Remove command line flags and URL encoding artifacts
-        cleanRedisUrl = redisUrl
-          .replace(/%20--tls%20-u%20/g, '')
-          .replace(/^.*redis:\/\//, 'redis://')  // Extract just the redis:// part
-          .trim();
-      }
+    // Check if we should use Upstash SDK or standard Redis
+    const redisToken = process.env.REDIS_TOKEN;
+    
+    if (redisUrl?.includes('upstash.io') && redisToken) {
+      // Use Upstash adapter for their hosted service
+      logger.info('Configuring Upstash Redis connection', {
+        url: redisUrl.substring(0, 30) + '...',
+        hasToken: !!redisToken
+      });
       
-      // Log the cleanup for debugging
-      if (cleanRedisUrl !== redisUrl) {
-        logger.info('Cleaned Redis URL format', {
-          original_format: redisUrl.substring(0, 50) + '...',
-          new_format: cleanRedisUrl?.substring(0, 50) + '...'
-        });
-      }
+      return new UpstashRedisAdapter(redisUrl, redisToken) as any;
     }
+    
+    // Standard Redis connection
+    const cleanRedisUrl = redisUrl
+      ?.replace(/%20--tls%20-u%20/g, '')
+      ?.replace(/^.*redis:\/\//, 'redis://')
+      ?.trim();
     
     const client = cleanRedisUrl 
       ? new Redis(cleanRedisUrl, { 
-          maxRetriesPerRequest: null, // Required by some Redis providers for production
-          connectTimeout: 10000,    // Increased timeout for TLS connections
-          enableOfflineQueue: false, // Don't queue commands when disconnected
-          tls: cleanRedisUrl?.includes('upstash.io') ? {} : undefined, // Enable TLS for Upstash
-          family: 4 // Force IPv4
+          maxRetriesPerRequest: null,
+          connectTimeout: 10000,
+          enableOfflineQueue: false,
+          family: 4
         }) 
       : new Redis(REDIS_CONFIG);
     
-    // Add error handling
+    // Add error handling for standard Redis clients
     client.on('error', (err: Error & { code?: string }) => {
       const isProd = process.env.NODE_ENV === 'production';
       logger.error(`Redis connection error${isProd ? ' - CRITICAL FOR PRODUCTION' : ''}`, { 
@@ -253,7 +243,6 @@ function createRedisClient() {
       logger.warn('Reconnecting to Redis server...');
     });
     
-    // Test connection immediately
     return client;
   } catch (error: any) {
     const isProd = process.env.NODE_ENV === 'production';
