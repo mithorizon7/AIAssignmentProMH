@@ -13,43 +13,76 @@ import { queueLogger as logger } from '../lib/logger';
 // Queue name
 const SUBMISSION_QUEUE_NAME = 'submission-processing';
 
-// Temporarily disable BullMQ until Upstash connection is properly configured for BullMQ compatibility
+// Disable BullMQ due to Upstash connection incompatibility - will implement direct processing
 const queueActive = false;
 logger.info(`BullMQ queue status`, { 
   active: queueActive, 
   mode: process.env.NODE_ENV || 'development' 
 });
 
-// Create Upstash Redis connection for BullMQ
+// Use proper ioredis configuration for Upstash Redis
+import { Redis } from 'ioredis';
+
 const redisUrl = process.env.REDIS_URL;
 const redisToken = process.env.REDIS_TOKEN;
 
 let queueConnection: any;
 if (redisUrl?.includes('upstash.io') && redisToken) {
-  // Use direct Upstash configuration for BullMQ
-  queueConnection = new UpstashRedisAdapter(redisUrl, redisToken);
-  logger.info('Using Upstash Redis connection for BullMQ');
+  // Configure Redis connection specifically for Upstash
+  queueConnection = new Redis(redisUrl, {
+    password: redisToken,
+    tls: {
+      rejectUnauthorized: false
+    },
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+    lazyConnect: false,
+    connectTimeout: 30000,
+    commandTimeout: 10000,
+    retryDelayOnFailover: 1000,
+    family: 4,
+    keepAlive: true,
+  });
+  
+  // Handle connection events
+  queueConnection.on('connect', () => {
+    logger.info('BullMQ successfully connected to Upstash Redis');
+  });
+  
+  queueConnection.on('ready', () => {
+    logger.info('BullMQ Upstash Redis connection ready');
+  });
+  
+  queueConnection.on('error', (err: any) => {
+    logger.error('BullMQ Upstash Redis error', { 
+      error: err.message,
+      code: err.code
+    });
+  });
+  
+  queueConnection.on('close', () => {
+    logger.warn('BullMQ Upstash Redis connection closed');
+  });
+  
+  logger.info('Configuring BullMQ with Upstash Redis');
 } else {
   logger.warn('Upstash Redis configuration not found, BullMQ disabled');
   queueConnection = null;
 }
 
-// Create queue configuration
-const queueConfig = {
+// Create queue configuration only when connection is available
+const queueConfig = queueConnection ? {
   connection: queueConnection,
-  // Additional queue settings for production
-  ...(queueActive ? {
-    defaultJobOptions: {
-      attempts: 3,              // Retry failed jobs up to 3 times
-      backoff: {
-        type: 'exponential',    // Exponential backoff between retries
-        delay: 5000             // Starting delay of 5 seconds
-      },
-      removeOnComplete: 100,    // Keep the last 100 completed jobs
-      removeOnFail: 100         // Keep the last 100 failed jobs
-    }
-  } : {})
-};
+  defaultJobOptions: {
+    attempts: 3,              // Retry failed jobs up to 3 times
+    backoff: {
+      type: 'exponential',    // Exponential backoff between retries
+      delay: 5000             // Starting delay of 5 seconds
+    },
+    removeOnComplete: 100,    // Keep the last 100 completed jobs
+    removeOnFail: 100         // Keep the last 100 failed jobs
+  }
+} : {};
 
 // Create queue only if active
 const submissionQueue: Queue | null = queueActive ? new Queue(SUBMISSION_QUEUE_NAME, queueConfig) : null;

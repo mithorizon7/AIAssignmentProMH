@@ -658,17 +658,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const createdSubmission = await storage.createSubmission(submission);
 
-    // Queue system temporarily disabled
-    // await submissionQueue.add('process', {
-    //   submissionId: createdSubmission.id,
-    //   assignmentId: assignmentId,
-    //   userId: userId,
-    //   submissionType: submissionType,
-    //   contentType: submission.contentType,
-    //   content: submission.content,
-    //   fileName: submission.fileName,
-    //   fileExtension: submission.fileExtension,
-    // });
+    // Process submission directly since BullMQ with Upstash requires complex compatibility layer
+    try {
+      const assignment = await storage.getAssignment(assignmentId);
+      if (assignment) {
+        // Initialize AI service for direct processing
+        const geminiAdapter = new GeminiAdapter();
+        const aiService = new AIService(geminiAdapter);
+        const storageService = new StorageService(storage);
+
+        // Process submission asynchronously without blocking response
+        setImmediate(async () => {
+          try {
+            const feedback = await aiService.analyzeProgrammingAssignment(
+              createdSubmission.content || '',
+              assignment.description || '',
+              createdSubmission.contentType || 'text'
+            );
+            
+            const feedbackData = await aiService.prepareFeedbackForStorage(feedback, createdSubmission.id);
+            await storageService.saveFeedback(feedbackData);
+            
+            await storage.updateSubmissionStatus(createdSubmission.id, 'completed');
+          } catch (error) {
+            console.error('Error processing submission:', error);
+            await storage.updateSubmissionStatus(createdSubmission.id, 'failed');
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error initializing submission processing:', error);
+    }
 
     res.status(201).json({
       id: createdSubmission.id,
