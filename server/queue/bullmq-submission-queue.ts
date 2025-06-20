@@ -7,21 +7,32 @@ import { OpenAIAdapter } from '../adapters/openai-adapter';
 import { AIService } from '../services/ai-service';
 import { StorageService } from '../services/storage-service';
 import { storage } from '../storage';
-import { connectionOptions } from './redis';
+import { UpstashRedisAdapter } from './upstash-redis';
 import { queueLogger as logger } from '../lib/logger';
 
 // Queue name
 const SUBMISSION_QUEUE_NAME = 'submission-processing';
 
-// Re-enable BullMQ with proper Upstash Redis connection
-const queueActive = true;
+// Temporarily disable BullMQ until Upstash connection is properly configured for BullMQ compatibility
+const queueActive = false;
 logger.info(`BullMQ queue status`, { 
   active: queueActive, 
   mode: process.env.NODE_ENV || 'development' 
 });
 
-// Get the Redis configuration for BullMQ using our established Redis client
-const queueConnection = connectionOptions;
+// Create Upstash Redis connection for BullMQ
+const redisUrl = process.env.REDIS_URL;
+const redisToken = process.env.REDIS_TOKEN;
+
+let queueConnection: any;
+if (redisUrl?.includes('upstash.io') && redisToken) {
+  // Use direct Upstash configuration for BullMQ
+  queueConnection = new UpstashRedisAdapter(redisUrl, redisToken);
+  logger.info('Using Upstash Redis connection for BullMQ');
+} else {
+  logger.warn('Upstash Redis configuration not found, BullMQ disabled');
+  queueConnection = null;
+}
 
 // Create queue configuration
 const queueConfig = {
@@ -40,14 +51,14 @@ const queueConfig = {
   } : {})
 };
 
-// Create queue with proper Upstash connection
-const submissionQueue: Queue = new Queue(SUBMISSION_QUEUE_NAME, queueConfig);
+// Create queue only if active
+const submissionQueue: Queue | null = queueActive ? new Queue(SUBMISSION_QUEUE_NAME, queueConfig) : null;
 
 // Type for worker
 type SubmissionWorker = Worker | null;
 
-// Create queue events with proper Upstash connection
-const queueEvents = new QueueEvents(SUBMISSION_QUEUE_NAME, queueConnection);
+// Create queue events only if active
+const queueEvents = queueActive ? new QueueEvents(SUBMISSION_QUEUE_NAME, queueConnection) : null;
 
 // Log queue events if active
 if (queueEvents) {
