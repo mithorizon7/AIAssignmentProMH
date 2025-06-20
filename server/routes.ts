@@ -2,7 +2,8 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { configureAuth } from "./auth";
-import { submissionQueue } from "./queue/worker";
+// Queue system temporarily disabled to eliminate Redis connection attempts
+// import { submissionQueue } from "./queue/worker";
 import multer from "multer";
 import path from "path";
 import * as fs from 'fs';
@@ -657,16 +658,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const createdSubmission = await storage.createSubmission(submission);
 
-    await submissionQueue.add('process', {
-      submissionId: createdSubmission.id,
-      assignmentId: assignmentId,
-      userId: userId,
-      submissionType: submissionType,
-      contentType: submission.contentType,
-      content: submission.content,
-      fileName: submission.fileName,
-      fileExtension: submission.fileExtension,
-    });
+    // Queue system temporarily disabled
+    // await submissionQueue.add('process', {
+    //   submissionId: createdSubmission.id,
+    //   assignmentId: assignmentId,
+    //   userId: userId,
+    //   submissionType: submissionType,
+    //   contentType: submission.contentType,
+    //   content: submission.content,
+    //   fileName: submission.fileName,
+    //   fileExtension: submission.fileExtension,
+    // });
 
     res.status(201).json({
       id: createdSubmission.id,
@@ -787,7 +789,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contentType: contentType || null
       });
 
-      submissionQueue.addSubmission(submission.id);
+      // Queue system temporarily disabled
+      // submissionQueue.addSubmission(submission.id);
 
       res.status(201).json(submission);
   }));

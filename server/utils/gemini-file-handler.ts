@@ -22,19 +22,8 @@ export interface GeminiFileData {
   mimeType: string; // camelCase format for SDK
 }
 
-// Initialize Redis client for caching file URIs (with fallback if unavailable)
-let redis: Redis | null = null;
-try {
-  redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
-  
-  // Handle connection errors gracefully
-  redis.on('error', (err) => {
-    console.warn(`[REDIS] Connection error (file caching will be disabled): ${err.message}`);
-    redis = null;
-  });
-} catch (err) {
-  console.warn(`[REDIS] Failed to initialize Redis: ${err instanceof Error ? err.message : String(err)}`);
-}
+// Disable Redis caching to eliminate localhost connection attempts
+const redis: Redis | null = null;
 
 // Size thresholds
 export const MAX_INLINE_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
