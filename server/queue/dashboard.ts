@@ -3,7 +3,7 @@ import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { Queue } from 'bullmq';
 import express from 'express';
-import { Redis } from 'ioredis';
+// Removed ioredis import - using only Upstash Redis via REST API
 
 // This module provides a dashboard for monitoring the submission queue
 
@@ -40,7 +40,7 @@ export function setupQueueDashboard(app: express.Express, submissionQueue: Queue
 }
 
 // Function to get queue stats
-export async function getQueueStats(redisClient: Redis) {
+export async function getQueueStats(redisClient: any) {
   try {
     // Get the number of jobs in each state for the submissions queue
     const pending = await redisClient.zcard('bull:submissions:wait');

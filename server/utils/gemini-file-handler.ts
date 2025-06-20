@@ -14,7 +14,6 @@ import { GoogleGenAI } from '@google/genai';
 // Use a more flexible type for the Google Gemini AI client
 // This allows us to support different SDK versions without type errors
 type GoogleAIClient = any;
-import { Redis } from 'ioredis';
 // Define the file data interface locally to avoid circular dependencies
 // Updated to match the format expected by the current SDK version
 export interface GeminiFileData {

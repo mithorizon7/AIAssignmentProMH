@@ -1,4 +1,4 @@
-import { Redis } from 'ioredis';
+// Removed ioredis import - using only Upstash REST API
 import { EventEmitter } from 'events';
 import { queueLogger as logger } from '../lib/logger';
 import { UpstashRedisAdapter } from './upstash-redis';

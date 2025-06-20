@@ -10,7 +10,7 @@ import { promises as fsp } from 'fs';
 // Import the Google AI SDK
 // We use 'any' type for broader compatibility with different SDK versions
 import { GoogleGenAI } from '@google/genai';
-import { Redis } from 'ioredis';
+// Removed ioredis import - using only Upstash Redis via REST API
 import path from 'path';
 
 // Type definitions for different Google Gemini SDK versions

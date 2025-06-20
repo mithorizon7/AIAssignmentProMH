@@ -663,6 +663,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignment = await storage.getAssignment(assignmentId);
       if (assignment) {
         // Initialize AI service for direct processing
+        const { GeminiAdapter } = await import('../adapters/gemini-adapter');
+        const { AIService } = await import('../services/ai-service');
+        const { StorageService } = await import('../services/storage-service');
+        
         const geminiAdapter = new GeminiAdapter();
         const aiService = new AIService(geminiAdapter);
         const storageService = new StorageService(storage);
