@@ -203,7 +203,15 @@ function createRedisClient() {
         hasToken: !!redisToken
       });
       
-      return new UpstashRedisAdapter(redisUrl, redisToken) as any;
+      try {
+        const upstashAdapter = new UpstashRedisAdapter(redisUrl, redisToken);
+        return upstashAdapter as any;
+      } catch (error: any) {
+        logger.error('Failed to create Upstash adapter, falling back to mock', {
+          error: error.message
+        });
+        return new MockRedisClient();
+      }
     }
     
     // Standard Redis connection
@@ -222,26 +230,28 @@ function createRedisClient() {
       : new Redis(REDIS_CONFIG);
     
     // Add error handling for standard Redis clients
-    client.on('error', (err: Error & { code?: string }) => {
-      const isProd = process.env.NODE_ENV === 'production';
-      logger.error(`Redis connection error${isProd ? ' - CRITICAL FOR PRODUCTION' : ''}`, { 
-        error: err.message,
-        code: err.code || 'unknown',
-        environment: process.env.NODE_ENV || 'development',
-        resolution: isProd ? 'Provide valid Redis credentials in environment variables' : 'Development can continue with mock Redis'
+    if (client && typeof client.on === 'function') {
+      client.on('error', (err: Error & { code?: string }) => {
+        const isProd = process.env.NODE_ENV === 'production';
+        logger.error(`Redis connection error${isProd ? ' - CRITICAL FOR PRODUCTION' : ''}`, { 
+          error: err.message,
+          code: err.code || 'unknown',
+          environment: process.env.NODE_ENV || 'development',
+          resolution: isProd ? 'Provide valid Redis credentials in environment variables' : 'Development can continue with mock Redis'
+        });
       });
-    });
-    
-    client.on('connect', () => {
-      logger.info('Connected to Redis server successfully', { 
-        host: process.env.REDIS_HOST || redisUrl?.split(':')[0] || 'unknown',
-        port: process.env.REDIS_PORT || 'default'
+      
+      client.on('connect', () => {
+        logger.info('Connected to Redis server successfully', { 
+          host: process.env.REDIS_HOST || redisUrl?.split(':')[0] || 'unknown',
+          port: process.env.REDIS_PORT || 'default'
+        });
       });
-    });
-    
-    client.on('reconnecting', () => {
-      logger.warn('Reconnecting to Redis server...');
-    });
+      
+      client.on('reconnecting', () => {
+        logger.warn('Reconnecting to Redis server...');
+      });
+    }
     
     return client;
   } catch (error: any) {
