@@ -21,87 +21,24 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
+import { 
+  validateApiResponseWithFallback,
+  systemHealthSchema,
+  productionReadinessSchema,
+  securityHealthSchema,
+  recoveryStatusSchema,
+  defaultSystemHealth,
+  defaultProductionReadiness,
+  defaultSecurityHealth,
+  defaultRecoveryStatus,
+  type SystemHealth,
+  type ProductionReadiness,
+  type SecurityHealth,
+  type RecoveryStatus,
+  type HealthCheck
+} from '@/lib/api-schemas';
 
-interface HealthCheck {
-  status: 'pass' | 'fail' | 'warn';
-  response_time: number;
-  message?: string;
-  details?: Record<string, any>;
-}
-
-interface SystemHealth {
-  status: 'healthy' | 'degraded' | 'unhealthy';
-  timestamp: string;
-  uptime: number;
-  checks: {
-    database: HealthCheck;
-    redis: HealthCheck;
-    ai_services: HealthCheck;
-    storage: HealthCheck;
-    memory: HealthCheck;
-    queue: HealthCheck;
-  };
-  metrics: {
-    memory_usage: number;
-    queue_size?: number;
-  };
-}
-
-interface ProductionReadiness {
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-  checks: {
-    environment: boolean;
-    database: boolean;
-    redis: boolean;
-    security: boolean;
-    apiKeys: boolean;
-    storage: boolean;
-  };
-}
-
-interface SecurityHealth {
-  status: 'secure' | 'monitoring' | 'threat_detected';
-  metrics: {
-    blockedRequests: number;
-    suspiciousActivity: number;
-    rateLimit: number;
-    csrfFailures: number;
-    threatsDetected: number;
-  };
-  recentThreats: Array<{
-    type: string;
-    severity: string;
-    description: string;
-    timestamp: string;
-  }>;
-}
-
-interface RecoveryStatus {
-  status: {
-    actions: Array<{
-      id: string;
-      name: string;
-      enabled: boolean;
-      retries: number;
-      lastAttempt?: string;
-      lastSuccess?: string;
-    }>;
-    recentHistory: Array<{
-      timestamp: string;
-      action: string;
-      success: boolean;
-      error?: string;
-    }>;
-  };
-  metrics: {
-    totalAttempts: number;
-    successfulRecoveries: number;
-    failedRecoveries: number;
-    recentActivity: number;
-  };
-}
+// Type definitions are now imported from api-schemas.ts
 
 const StatusBadge = ({ status }: { status: 'pass' | 'fail' | 'warn' | 'healthy' | 'degraded' | 'unhealthy' | 'secure' | 'monitoring' | 'threat_detected' }) => {
   const variants = {
@@ -171,10 +108,30 @@ export default function SystemStatusPage() {
     queryClient.invalidateQueries({ queryKey: ['/api/admin/recovery-status'] });
   };
 
-  const health = systemHealth as SystemHealth;
-  const readiness = productionReadiness as ProductionReadiness;
-  const security = securityHealth as SecurityHealth;
-  const recovery = recoveryStatus as RecoveryStatus;
+  // Validate API responses with proper error handling and fallbacks
+  const health = validateApiResponseWithFallback(
+    systemHealthSchema, 
+    systemHealth, 
+    defaultSystemHealth
+  );
+  
+  const readiness = validateApiResponseWithFallback(
+    productionReadinessSchema, 
+    productionReadiness, 
+    defaultProductionReadiness
+  );
+  
+  const security = validateApiResponseWithFallback(
+    securityHealthSchema, 
+    securityHealth, 
+    defaultSecurityHealth
+  );
+  
+  const recovery = validateApiResponseWithFallback(
+    recoveryStatusSchema, 
+    recoveryStatus, 
+    defaultRecoveryStatus
+  );
 
   if (healthLoading || readinessLoading || securityLoading || recoveryLoading) {
     return (
@@ -223,7 +180,7 @@ export default function SystemStatusPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">System Health</p>
-                <StatusBadge status={health?.status || 'fail'} />
+                <StatusBadge status={health.status} />
               </div>
               <Server className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -235,7 +192,7 @@ export default function SystemStatusPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Production Ready</p>
-                <StatusBadge status={readiness?.isValid ? 'pass' : 'fail'} />
+                <StatusBadge status={readiness.isValid ? 'pass' : 'fail'} />
               </div>
               <CheckCircle className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -247,7 +204,7 @@ export default function SystemStatusPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Security</p>
-                <StatusBadge status={security?.status || 'fail'} />
+                <StatusBadge status={security.status} />
               </div>
               <Shield className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -259,7 +216,7 @@ export default function SystemStatusPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Memory Usage</p>
-                <p className="text-2xl font-bold">{health?.metrics?.memory_usage || 0}MB</p>
+                <p className="text-2xl font-bold">{health.metrics.memory_usage}MB</p>
               </div>
               <TrendingUp className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -277,7 +234,7 @@ export default function SystemStatusPage() {
 
         <TabsContent value="health" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {health?.checks && Object.entries(health.checks).map(([key, check]) => (
+            {Object.entries(health.checks).map(([key, check]) => (
               <Card key={key}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
@@ -318,19 +275,19 @@ export default function SystemStatusPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Blocked Requests</span>
-                    <Badge variant="destructive">{security?.metrics?.blockedRequests || 0}</Badge>
+                    <Badge variant="destructive">{security.metrics.blockedRequests}</Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Suspicious Activity</span>
-                    <Badge variant="secondary">{security?.metrics?.suspiciousActivity || 0}</Badge>
+                    <Badge variant="secondary">{security.metrics.suspiciousActivity}</Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Rate Limit Hits</span>
-                    <Badge variant="outline">{security?.metrics?.rateLimit || 0}</Badge>
+                    <Badge variant="outline">{security.metrics.rateLimit}</Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">CSRF Failures</span>
-                    <Badge variant="destructive">{security?.metrics?.csrfFailures || 0}</Badge>
+                    <Badge variant="destructive">{security.metrics.csrfFailures}</Badge>
                   </div>
                 </div>
               </CardContent>
@@ -342,7 +299,7 @@ export default function SystemStatusPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {security?.recentThreats?.length > 0 ? (
+                  {security.recentThreats.length > 0 ? (
                     security.recentThreats.map((threat, index) => (
                       <Alert key={index}>
                         <AlertTriangle className="h-4 w-4" />
@@ -376,7 +333,7 @@ export default function SystemStatusPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {recovery?.status?.actions?.map((action) => (
+                  {recovery.status.actions.map((action) => (
                     <div key={action.id} className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium">{action.name}</p>
@@ -407,19 +364,19 @@ export default function SystemStatusPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Total Attempts</span>
-                    <span className="text-sm font-medium">{recovery?.metrics?.totalAttempts || 0}</span>
+                    <span className="text-sm font-medium">{recovery.metrics.totalAttempts}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Successful Recoveries</span>
-                    <span className="text-sm font-medium text-green-600">{recovery?.metrics?.successfulRecoveries || 0}</span>
+                    <span className="text-sm font-medium text-green-600">{recovery.metrics.successfulRecoveries}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Failed Recoveries</span>
-                    <span className="text-sm font-medium text-red-600">{recovery?.metrics?.failedRecoveries || 0}</span>
+                    <span className="text-sm font-medium text-red-600">{recovery.metrics.failedRecoveries}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Recent Activity</span>
-                    <span className="text-sm font-medium">{recovery?.metrics?.recentActivity || 0}</span>
+                    <span className="text-sm font-medium">{recovery.metrics.recentActivity}</span>
                   </div>
                 </div>
               </CardContent>
@@ -435,7 +392,7 @@ export default function SystemStatusPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {readiness?.checks && Object.entries(readiness.checks).map(([key, passed]) => (
+                  {Object.entries(readiness.checks).map(([key, passed]) => (
                     <div key={key} className="flex items-center justify-between">
                       <span className="text-sm capitalize">{key.replace('_', ' ')}</span>
                       {passed ? (
