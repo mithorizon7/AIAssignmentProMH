@@ -147,7 +147,13 @@ export const validateApiResponse = <T>(schema: z.ZodSchema<T>, data: unknown): T
   try {
     return schema.parse(data);
   } catch (error) {
-    console.error('API response validation failed:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('API response validation failed:', {
+        error: error instanceof Error ? error.message : error,
+        data: data,
+        schema: schema._def
+      });
+    }
     return null;
   }
 };
@@ -160,7 +166,13 @@ export const validateApiResponseWithFallback = <T>(
   try {
     return schema.parse(data);
   } catch (error) {
-    console.error('API response validation failed, using fallback:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('API response validation failed, using fallback:', {
+        error: error instanceof Error ? error.message : error,
+        data: data,
+        fallback: fallback
+      });
+    }
     return fallback;
   }
 };

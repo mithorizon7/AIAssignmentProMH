@@ -40,25 +40,30 @@ import {
 
 // Type definitions are now imported from api-schemas.ts
 
-const StatusBadge = ({ status }: { status: 'pass' | 'fail' | 'warn' | 'healthy' | 'degraded' | 'unhealthy' | 'secure' | 'monitoring' | 'threat_detected' }) => {
+// Status badge component with proper typing
+interface StatusBadgeProps {
+  status: 'pass' | 'fail' | 'warn' | 'healthy' | 'degraded' | 'unhealthy' | 'secure' | 'monitoring' | 'threat_detected';
+}
+
+const StatusBadge = ({ status }: StatusBadgeProps) => {
   const variants = {
-    pass: { color: 'bg-green-500', text: 'Healthy' },
-    healthy: { color: 'bg-green-500', text: 'Healthy' },
-    secure: { color: 'bg-green-500', text: 'Secure' },
-    warn: { color: 'bg-yellow-500', text: 'Warning' },
-    degraded: { color: 'bg-yellow-500', text: 'Degraded' },
-    monitoring: { color: 'bg-yellow-500', text: 'Monitoring' },
-    fail: { color: 'bg-red-500', text: 'Failed' },
-    unhealthy: { color: 'bg-red-500', text: 'Unhealthy' },
-    threat_detected: { color: 'bg-red-500', text: 'Threat Detected' }
-  };
+    pass: { color: 'bg-green-500', text: 'Healthy', textColor: 'text-green-700' },
+    healthy: { color: 'bg-green-500', text: 'Healthy', textColor: 'text-green-700' },
+    secure: { color: 'bg-green-500', text: 'Secure', textColor: 'text-green-700' },
+    warn: { color: 'bg-yellow-500', text: 'Warning', textColor: 'text-yellow-700' },
+    degraded: { color: 'bg-yellow-500', text: 'Degraded', textColor: 'text-yellow-700' },
+    monitoring: { color: 'bg-yellow-500', text: 'Monitoring', textColor: 'text-yellow-700' },
+    fail: { color: 'bg-red-500', text: 'Failed', textColor: 'text-red-700' },
+    unhealthy: { color: 'bg-red-500', text: 'Unhealthy', textColor: 'text-red-700' },
+    threat_detected: { color: 'bg-red-500', text: 'Threat Detected', textColor: 'text-red-700' }
+  } as const;
 
   const variant = variants[status] || variants.fail;
   
   return (
     <div className="flex items-center space-x-2">
       <div className={`w-2 h-2 rounded-full ${variant.color}`} />
-      <span className="text-sm font-medium">{variant.text}</span>
+      <span className={`text-sm font-medium ${variant.textColor}`}>{variant.text}</span>
     </div>
   );
 };
@@ -133,12 +138,20 @@ export default function SystemStatusPage() {
     defaultRecoveryStatus
   );
 
-  if (healthLoading || readinessLoading || securityLoading || recoveryLoading) {
+  // Enhanced loading state with progress indication
+  const isLoading = healthLoading || readinessLoading || securityLoading || recoveryLoading;
+  
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="flex items-center space-x-2">
-          <RefreshCw className="h-4 w-4 animate-spin" />
-          <span>Loading system status...</span>
+        <div className="flex flex-col items-center space-y-4">
+          <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+          <div className="text-center">
+            <p className="text-lg font-medium">Loading system status...</p>
+            <p className="text-sm text-muted-foreground">
+              Fetching health, security, and recovery data
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -158,8 +171,9 @@ export default function SystemStatusPage() {
             variant="outline"
             size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
+            className={autoRefresh ? 'bg-green-50 border-green-200 text-green-700' : ''}
           >
-            <Activity className="h-4 w-4 mr-2" />
+            <Activity className={`h-4 w-4 mr-2 ${autoRefresh ? 'animate-pulse' : ''}`} />
             Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
           </Button>
           <Button
@@ -173,8 +187,8 @@ export default function SystemStatusPage() {
         </div>
       </div>
 
-      {/* Overall Status */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Overall Status Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -216,7 +230,12 @@ export default function SystemStatusPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Memory Usage</p>
-                <p className="text-2xl font-bold">{health.metrics.memory_usage}MB</p>
+                <div className="flex items-center space-x-2">
+                  <p className="text-2xl font-bold">{health.metrics.memory_usage}MB</p>
+                  {health.metrics.memory_usage > 500 && (
+                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  )}
+                </div>
               </div>
               <TrendingUp className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -233,9 +252,9 @@ export default function SystemStatusPage() {
         </TabsList>
 
         <TabsContent value="health" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Object.entries(health.checks).map(([key, check]) => (
-              <Card key={key}>
+              <Card key={key} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-medium capitalize">
@@ -248,15 +267,26 @@ export default function SystemStatusPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span>Response Time</span>
-                      <span>{check.response_time}ms</span>
+                      <span className={`font-medium ${
+                        check.response_time > 1000 ? 'text-red-600' : 
+                        check.response_time > 500 ? 'text-yellow-600' : 
+                        'text-green-600'
+                      }`}>
+                        {check.response_time}ms
+                      </span>
                     </div>
                     {check.message && (
                       <p className="text-sm text-muted-foreground">{check.message}</p>
                     )}
                     {check.details && (
-                      <div className="text-xs text-muted-foreground">
-                        <pre>{JSON.stringify(check.details, null, 2)}</pre>
-                      </div>
+                      <details className="text-xs text-muted-foreground">
+                        <summary className="cursor-pointer hover:text-foreground transition-colors">
+                          View Details
+                        </summary>
+                        <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-x-auto max-h-32 overflow-y-auto">
+                          {JSON.stringify(check.details, null, 2)}
+                        </pre>
+                      </details>
                     )}
                   </div>
                 </CardContent>
@@ -266,7 +296,7 @@ export default function SystemStatusPage() {
         </TabsContent>
 
         <TabsContent value="security" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Security Metrics</CardTitle>
@@ -326,7 +356,7 @@ export default function SystemStatusPage() {
         </TabsContent>
 
         <TabsContent value="recovery" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Recovery Actions</CardTitle>
@@ -338,17 +368,25 @@ export default function SystemStatusPage() {
                       <div>
                         <p className="text-sm font-medium">{action.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {action.enabled ? 'Enabled' : 'Disabled'} • {action.retries} retries
+                          <span className={`font-medium ${action.enabled ? 'text-green-600' : 'text-red-600'}`}>
+                            {action.enabled ? 'Enabled' : 'Disabled'}
+                          </span> • {action.retries} retries
+                          {action.lastAttempt && (
+                            <span className="block mt-1">
+                              Last attempt: {new Date(action.lastAttempt).toLocaleString()}
+                            </span>
+                          )}
                         </p>
                       </div>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => triggerRecovery.mutate(action.id)}
-                        disabled={triggerRecovery.isPending}
+                        disabled={triggerRecovery.isPending || !action.enabled}
+                        className={triggerRecovery.isPending ? 'opacity-50' : ''}
                       >
-                        <Zap className="h-4 w-4 mr-1" />
-                        Trigger
+                        <Zap className={`h-4 w-4 mr-1 ${triggerRecovery.isPending ? 'animate-pulse' : ''}`} />
+                        {triggerRecovery.isPending ? 'Running...' : 'Trigger'}
                       </Button>
                     </div>
                   ))}
@@ -385,7 +423,7 @@ export default function SystemStatusPage() {
         </TabsContent>
 
         <TabsContent value="readiness" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Production Checks</CardTitle>
@@ -412,19 +450,19 @@ export default function SystemStatusPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {readiness?.errors?.map((error, index) => (
+                  {readiness.errors.map((error, index) => (
                     <Alert key={index} variant="destructive">
                       <XCircle className="h-4 w-4" />
                       <AlertDescription>{error}</AlertDescription>
                     </Alert>
                   ))}
-                  {readiness?.warnings?.map((warning, index) => (
+                  {readiness.warnings.map((warning, index) => (
                     <Alert key={index}>
                       <AlertTriangle className="h-4 w-4" />
                       <AlertDescription>{warning}</AlertDescription>
                     </Alert>
                   ))}
-                  {(!readiness?.errors?.length && !readiness?.warnings?.length) && (
+                  {(!readiness.errors.length && !readiness.warnings.length) && (
                     <p className="text-sm text-muted-foreground">No issues found</p>
                   )}
                 </div>

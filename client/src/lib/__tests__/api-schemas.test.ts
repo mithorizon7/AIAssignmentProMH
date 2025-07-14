@@ -305,22 +305,32 @@ describe('API Response Validation', () => {
   });
 
   describe('Error Handling', () => {
-    test('validation logs errors to console', () => {
+    test('validation logs errors to console in development', () => {
       const originalError = console.error;
+      const originalEnv = process.env.NODE_ENV;
       const errorLogs: any[] = [];
+      
+      // Set development environment
+      process.env.NODE_ENV = 'development';
       console.error = (...args) => errorLogs.push(args);
 
       validateApiResponse(systemHealthSchema, { invalid: 'data' });
       
       expect(errorLogs.length).toBeGreaterThan(0);
-      expect(errorLogs[0][0]).toContain('validation failed');
+      expect(errorLogs[0][0]).toContain('API response validation failed');
       
+      // Restore original values
       console.error = originalError;
+      process.env.NODE_ENV = originalEnv;
     });
 
-    test('fallback validation logs errors to console', () => {
+    test('fallback validation logs errors to console in development', () => {
       const originalError = console.error;
+      const originalEnv = process.env.NODE_ENV;
       const errorLogs: any[] = [];
+      
+      // Set development environment
+      process.env.NODE_ENV = 'development';
       console.error = (...args) => errorLogs.push(args);
 
       validateApiResponseWithFallback(
@@ -330,9 +340,29 @@ describe('API Response Validation', () => {
       );
       
       expect(errorLogs.length).toBeGreaterThan(0);
-      expect(errorLogs[0][0]).toContain('validation failed');
+      expect(errorLogs[0][0]).toContain('API response validation failed');
       
+      // Restore original values
       console.error = originalError;
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    test('validation does not log errors in production', () => {
+      const originalError = console.error;
+      const originalEnv = process.env.NODE_ENV;
+      const errorLogs: any[] = [];
+      
+      // Set production environment
+      process.env.NODE_ENV = 'production';
+      console.error = (...args) => errorLogs.push(args);
+
+      validateApiResponse(systemHealthSchema, { invalid: 'data' });
+      
+      expect(errorLogs.length).toBe(0);
+      
+      // Restore original values
+      console.error = originalError;
+      process.env.NODE_ENV = originalEnv;
     });
   });
 });
