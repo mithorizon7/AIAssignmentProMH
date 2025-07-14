@@ -1,0 +1,19 @@
+Alright, look over this carefully as well to validate if these issues are correct and need to be address. If they are incorrect, see if there are any other issues related that need addressing. If they are actual issues, figure out the best way to address them. Then go forward with any and all fixed necessary. Be very thorough.
+
+
+
+
+
+
+Password Storage & Authentication: The app uses bcrypt for password hashing, which is standard and secureGitHub. Ensure that a strong salt factor (e.g. 10 or higher) is used and that password verification is done in constant time to prevent timing attacks. The presence of role-based access control means routes are likely protected by user rolesGitHub; verify that all admin or instructor routes indeed check the user’s role and that there’s no way to escalate privileges (e.g., a student manually hitting an admin API). Recommendation: Conduct a quick audit of route protections to make sure each sensitive route has appropriate authorization middleware. Also confirm that session management is secure: use HttpOnly cookies, Secure flag in production, SameSite set to Lax or StrictGitHub – the documentation says these are in place, so just verify the Express session/cookie configuration in code matches the policy.
+
+
+CSRF Protection: The docs mention a double-submit CSRF token strategy and usage of an CSRF_SECRETGitHubGitHub. Confirm that the frontend is including CSRF tokens on state-changing requests and that the backend validates them. There is likely an endpoint to get a CSRF token (the doc mentions a rate limit on /api/csrf-tokenGitHub). Recommendation:Test that an unauthorized request (without token or with wrong token) to a protected endpoint is correctly rejected with 403. This ensures CSRF is truly active. Also ensure the CSRF secret is set in production env; the app should refuse to run if CSRF_SECRET or SESSION_SECRET are missing (as noted in docs)
+
+
+
+Dependency Security: The project should be kept up to date with patches for any third-party libraries. The docs suggest running npm audit regularly and have a policy for updatesGitHub. Recommendation: Before launch, run npm audit --productionGitHub and address any high-severity vulnerabilities in the dependency tree. Set up Dependabot or similar to alert for new vulnerabilities going forward. This proactivity will reduce the risk of known exploits in the app’s dependencies.
+
+
+
+Secret Management: All secrets (DB password, API keys, JWT or session secrets, etc.) are stored in environment variables – which is correctGitHub. Ensure that no secrets are hard-coded or accidentally logged. The .env.exampleshould list all required secrets so that none are forgotten when deploying. For production, load these through your hosting environment’s secret management (never commit actual secrets to the repo). Recommendation: Do a quick scan of the repository to ensure no .env or secret key was inadvertently checked in. Also implement a policy (possibly via code review or a pre-commit hook) to prevent committing secrets in the future.

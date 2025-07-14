@@ -19,7 +19,11 @@ npx tsc --noEmit || handle_error "TypeScript compilation"
 
 # Run linting with auto-fix
 echo "🧹 Linting and fixing code..."
-npx eslint . --ext .ts,.tsx,.js,.jsx --fix --max-warnings 0 || handle_error "ESLint"
+if [ -f "eslint.config.js" ]; then
+  npx eslint . --fix --max-warnings 0 || handle_error "ESLint"
+else
+  npx eslint . --ext .ts,.tsx,.js,.jsx --fix --max-warnings 0 || handle_error "ESLint"
+fi
 
 # Run formatting with auto-fix
 echo "💅 Formatting code..."

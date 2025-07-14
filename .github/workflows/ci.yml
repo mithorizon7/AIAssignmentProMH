@@ -39,7 +39,13 @@ jobs:
       run: npx tsc --noEmit
     
     - name: ESLint code linting
-      run: npx eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0
+      run: |
+        # Use the legacy config format for compatibility
+        if [ -f "eslint.config.js" ]; then
+          npx eslint . --max-warnings 0
+        else
+          npx eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0
+        fi
     
     - name: Prettier formatting check
       run: npx prettier --check "**/*.{ts,tsx,js,jsx,json,md,yml,yaml}"

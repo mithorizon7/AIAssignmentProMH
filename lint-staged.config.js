@@ -6,9 +6,14 @@
 module.exports = {
   // TypeScript and JavaScript files
   '*.{ts,tsx,js,jsx}': [
-    'eslint --fix --max-warnings 0',
-    'prettier --write',
-    () => 'tsc --noEmit', // Type check all files, not just staged
+    (filenames) => {
+      const files = filenames.join(' ');
+      return [
+        `npx eslint ${files} --fix --max-warnings 0`,
+        `npx prettier --write ${files}`,
+        'npx tsc --noEmit', // Type check all files, not just staged
+      ];
+    },
   ],
   
   // JSON, Markdown, and YAML files
