@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { logger } from './lib/error-handler';
 import session from 'express-session';
 import passport from 'passport';
 
@@ -61,7 +62,7 @@ function validateSecurityEnvVars() {
     if (isProduction) {
       throw new Error('FATAL ERROR: SESSION_SECRET environment variable is not set. This is required for production deployments.');
     } else {
-      console.error('\x1b[31m%s\x1b[0m', 'WARNING: SESSION_SECRET environment variable is not set. ' + 
+      logger.error('\x1b[31m%s\x1b[0m', 'WARNING: SESSION_SECRET environment variable is not set. ' + 
                    'This is a security risk. Never deploy to production without setting SESSION_SECRET ' +
                    'to a strong, random value.');
       process.exit(1); // Exit even in development to ensure proper configuration
@@ -70,7 +71,7 @@ function validateSecurityEnvVars() {
     if (isProduction) {
       throw new Error('FATAL ERROR: SESSION_SECRET is too weak. It should be at least 32 characters long.');
     } else {
-      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: SESSION_SECRET is too weak. It should be at least 32 characters long.');
+      logger.warn('\x1b[33m%s\x1b[0m', 'WARNING: SESSION_SECRET is too weak. It should be at least 32 characters long.');
     }
   }
   
@@ -79,7 +80,7 @@ function validateSecurityEnvVars() {
     if (isProduction) {
       throw new Error('FATAL ERROR: CSRF_SECRET environment variable is not set. This is required for production deployments.');
     } else {
-      console.error('\x1b[31m%s\x1b[0m', 'WARNING: CSRF_SECRET environment variable is not set. ' +
+      logger.error('\x1b[31m%s\x1b[0m', 'WARNING: CSRF_SECRET environment variable is not set. ' +
                    'This is a security risk. Never deploy to production without setting CSRF_SECRET ' +
                    'to a strong, random value.');
       process.exit(1); // Exit even in development to ensure proper configuration
@@ -88,7 +89,7 @@ function validateSecurityEnvVars() {
     if (isProduction) {
       throw new Error('FATAL ERROR: CSRF_SECRET is too weak. It should be at least 32 characters long.');
     } else {
-      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: CSRF_SECRET is too weak. It should be at least 32 characters long.');
+      logger.warn('\x1b[33m%s\x1b[0m', 'WARNING: CSRF_SECRET is too weak. It should be at least 32 characters long.');
     }
   }
   
@@ -96,29 +97,29 @@ function validateSecurityEnvVars() {
   const auth0Enabled = process.env.AUTH0_DOMAIN && process.env.AUTH0_CLIENT_ID && process.env.AUTH0_CLIENT_SECRET;
   
   if (auth0Enabled) {
-    console.log('[INFO] Auth0 SSO configuration detected');
+    logger.info('[INFO] Auth0 SSO configuration detected');
     
     // Check for BASE_URL environment variable which is preferred for production deployments
     if (isProduction && !process.env.BASE_URL) {
-      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: BASE_URL environment variable is not set in production. This is recommended for ensuring correct callback URLs.');
+      logger.warn('\x1b[33m%s\x1b[0m', 'WARNING: BASE_URL environment variable is not set in production. This is recommended for ensuring correct callback URLs.');
     }
     
     // Validate Auth0 callback URL - explicit configuration is strongly recommended
     if (!process.env.AUTH0_CALLBACK_URL) {
       if (isProduction) {
-        console.error('\x1b[31m%s\x1b[0m', 'ERROR: AUTH0_CALLBACK_URL is not set in production. Auth0 SSO will likely fail without an explicit callback URL.');
+        logger.error('\x1b[31m%s\x1b[0m', 'ERROR: AUTH0_CALLBACK_URL is not set in production. Auth0 SSO will likely fail without an explicit callback URL.');
       } else {
-        console.warn('\x1b[33m%s\x1b[0m', 'WARNING: AUTH0_CALLBACK_URL is not set. A fallback URL will be generated, but explicit configuration is recommended.');
+        logger.warn('\x1b[33m%s\x1b[0m', 'WARNING: AUTH0_CALLBACK_URL is not set. A fallback URL will be generated, but explicit configuration is recommended.');
       }
     } else if (!process.env.AUTH0_CALLBACK_URL.startsWith('http')) {
-      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: AUTH0_CALLBACK_URL should be a full URL including http/https protocol.');
+      logger.warn('\x1b[33m%s\x1b[0m', 'WARNING: AUTH0_CALLBACK_URL should be a full URL including http/https protocol.');
     }
   } else {
     // Only warn in development mode to allow local development without Auth0
     if (!isProduction) {
-      console.log('[INFO] Auth0 SSO is not configured. Local authentication will be used.');
+      logger.info('[INFO] Auth0 SSO is not configured. Local authentication will be used.');
     } else {
-      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: Auth0 SSO environment variables (AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET) are not fully set in production. SSO functionality will be disabled.');
+      logger.warn('\x1b[33m%s\x1b[0m', 'WARNING: Auth0 SSO environment variables (AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET) are not fully set in production. SSO functionality will be disabled.');
     }
   }
   
@@ -129,19 +130,19 @@ function validateSecurityEnvVars() {
                            process.env.MIT_HORIZON_OIDC_CALLBACK_URL;
   
   if (mitHorizonEnabled) {
-    console.log('[INFO] MIT Horizon OIDC configuration detected');
+    logger.info('[INFO] MIT Horizon OIDC configuration detected');
     
     // Validate the issuer URL and callback URL
     if (!process.env.MIT_HORIZON_OIDC_ISSUER_URL!.startsWith('https://')) {
-      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: MIT_HORIZON_OIDC_ISSUER_URL should be a full URL starting with https://');
+      logger.warn('\x1b[33m%s\x1b[0m', 'WARNING: MIT_HORIZON_OIDC_ISSUER_URL should be a full URL starting with https://');
     }
     
     if (!process.env.MIT_HORIZON_OIDC_CALLBACK_URL!.startsWith('http')) {
-      console.warn('\x1b[33m%s\x1b[0m', 'WARNING: MIT_HORIZON_OIDC_CALLBACK_URL should be a full URL including http/https protocol.');
+      logger.warn('\x1b[33m%s\x1b[0m', 'WARNING: MIT_HORIZON_OIDC_CALLBACK_URL should be a full URL including http/https protocol.');
     }
   } else {
     // Only log informational message
-    console.log('[INFO] MIT Horizon OIDC is not configured. This authentication method will be disabled.');
+    logger.info('[INFO] MIT Horizon OIDC is not configured. This authentication method will be disabled.');
   }
 }
 
@@ -203,7 +204,7 @@ export function configureAuth(app: any) {
     generateCsrfToken: (req: any, res: any) => {
       try {
         if (!req.session) {
-          console.error('Session not available for CSRF token generation');
+          logger.error('Session not available for CSRF token generation');
           throw new Error('Session not initialized');
         }
         
@@ -222,7 +223,7 @@ export function configureAuth(app: any) {
         
         return token;
       } catch (error) {
-        console.error('Error generating production CSRF token:', error);
+        logger.error('Error generating production CSRF token:', error);
         throw error;
       }
     },
@@ -230,7 +231,7 @@ export function configureAuth(app: any) {
     doubleCsrfProtection: (req: any, res: any, next: any) => {
       try {
         if (!req.session) {
-          console.error('Session not available for CSRF validation');
+          logger.error('Session not available for CSRF validation');
           throw new Error('Session not initialized');
         }
         
@@ -250,7 +251,7 @@ export function configureAuth(app: any) {
         
         validator.doubleCsrfProtection(req, res, next);
       } catch (error) {
-        console.error('CSRF validation failed in production mode:', error);
+        logger.error('CSRF validation failed in production mode:', error);
         throw error;
       }
     }
@@ -269,18 +270,18 @@ export function configureAuth(app: any) {
     
     doubleCsrfProtection: (req: any, res: any, next: any) => {
       // In development, perform lighter validation but still enforce security
-      console.log('Development CSRF validation - proceeding with relaxed security checks');
+      logger.info('Development CSRF validation - proceeding with relaxed security checks');
       
       // If there's no session, create it
       if (!req.session) {
-        console.warn('No session available for CSRF validation');
+        logger.warn('No session available for CSRF validation');
         return next();
       }
       
       // Initialize csrfTokens if not present
       if (!req.session.csrfTokens) {
         req.session.csrfTokens = {};
-        console.warn('CSRF session initialized');
+        logger.warn('CSRF session initialized');
         return next();
       }
       
@@ -289,17 +290,17 @@ export function configureAuth(app: any) {
       
       // If no token is provided, log warning but proceed in development
       if (!token) {
-        console.warn('Missing CSRF token in development - would fail in production');
+        logger.warn('Missing CSRF token in development - would fail in production');
         return next();
       }
       
       // Validate token
       if (req.session.csrfTokens[token]) {
-        console.log('CSRF token validation passed');
+        logger.info('CSRF token validation passed');
         next();
       } else {
         // Log warning and proceed, but at least validate in development
-        console.warn('CSRF token validation failed in development - would return 403 in production');
+        logger.warn('CSRF token validation failed in development - would return 403 in production');
         next();
       }
     }
@@ -344,7 +345,7 @@ export function configureAuth(app: any) {
     try {
       // Skip validation if session is not properly initialized
       if (!req.session) {
-        console.warn(`CSRF validation skipped for ${req.method} ${req.path} due to missing session`);
+        logger.warn(`CSRF validation skipped for ${req.method} ${req.path} due to missing session`);
         return next();
       }
       
@@ -352,7 +353,7 @@ export function configureAuth(app: any) {
       // or throw an error on failure
       csrfProtection.doubleCsrfProtection(req, res, next);
     } catch (error: any) {
-      console.error(`CSRF validation failed for ${req.method} ${req.path}:`, error);
+      logger.error(`CSRF validation failed for ${req.method} ${req.path}:`, error);
       
       // Log CSRF failure for security monitoring
       logSecurityEvent(
@@ -383,7 +384,7 @@ export function configureAuth(app: any) {
         const token = crypto.randomBytes(32).toString('hex');
         return res.json({ csrfToken: token });
       }).catch(error => {
-        console.error('Error importing crypto module - this is a critical security failure:', error);
+        logger.error('Error importing crypto module - this is a critical security failure:', error);
         // No fallback - if crypto is unavailable, we can't generate secure tokens
         return res.status(500).json({ 
           error: 'Unable to generate secure token',
@@ -391,7 +392,7 @@ export function configureAuth(app: any) {
         });
       });
     } catch (error: any) {
-      console.error('Error generating CSRF token - this is a critical security failure:', error);
+      logger.error('Error generating CSRF token - this is a critical security failure:', error);
       // No fallback - if we can't generate secure tokens, we must fail closed
       return res.status(500).json({ 
         error: 'Critical security error',
@@ -435,7 +436,7 @@ export function configureAuth(app: any) {
   const auth0Enabled = process.env.AUTH0_DOMAIN && process.env.AUTH0_CLIENT_ID && process.env.AUTH0_CLIENT_SECRET;
   
   if (auth0Enabled) {
-    console.log('[INFO] Configuring Auth0 strategy for SSO');
+    logger.info('[INFO] Configuring Auth0 strategy for SSO');
     
     // Determine the most reliable callback URL to use
     const getCallbackUrl = () => {
@@ -457,7 +458,7 @@ export function configureAuth(app: any) {
     
     // Log the callback URL being used
     const callbackUrl = getCallbackUrl();
-    console.log(`[INFO] Auth0 callback URL: ${callbackUrl}`);
+    logger.info(`[INFO] Auth0 callback URL: ${callbackUrl}`);
     
     passport.use(
       new Auth0Strategy(
@@ -499,7 +500,7 @@ export function configureAuth(app: any) {
               if (existingUser) {
                 // Update existing user with Auth0 ID
                 user = await storage.updateUserAuth0Sub(existingUser.id, auth0UserId);
-                console.log(`[INFO] Linked Auth0 ID to existing user: ${existingUser.username}`);
+                logger.info(`[INFO] Linked Auth0 ID to existing user: ${existingUser.username}`);
                 
                 // Update email verification status
                 if (user) {
@@ -526,7 +527,7 @@ export function configureAuth(app: any) {
                   emailVerified
                 });
                 
-                console.log(`[INFO] Created new user from Auth0 login: ${username}`);
+                logger.info(`[INFO] Created new user from Auth0 login: ${username}`);
                 
                 // Log the user creation event for audit purposes
                 if (user) {
@@ -561,7 +562,7 @@ export function configureAuth(app: any) {
             
             return done(null, userWithoutPassword as User);
           } catch (error) {
-            console.error('[ERROR] Auth0 authentication error:', error);
+            logger.error('[ERROR] Auth0 authentication error:', error);
             return done(error);
           }
         }
@@ -584,18 +585,18 @@ export function configureAuth(app: any) {
     app.get('/api/auth-sso/callback', (req: Request, res: Response, next: NextFunction) => {
       passport.authenticate('auth0', (err: Error | null, user: User | undefined, info: any) => {
         if (err) {
-          console.error('[ERROR] Auth0 callback error:', err);
+          logger.error('[ERROR] Auth0 callback error:', err);
           return res.redirect('/login?error=sso_failed&reason=' + encodeURIComponent(err.message));
         }
         
         if (!user) {
-          console.error('[ERROR] Auth0 callback did not return a user');
+          logger.error('[ERROR] Auth0 callback did not return a user');
           return res.redirect('/login?error=sso_failed&reason=no_user_returned');
         }
         
         req.login(user, (err) => {
           if (err) {
-            console.error('[ERROR] Session login error:', err);
+            logger.error('[ERROR] Session login error:', err);
             return res.redirect('/login?error=sso_failed&reason=session_error');
           }
           
@@ -611,13 +612,13 @@ export function configureAuth(app: any) {
             returnTo = '/';
           }
             
-          console.log('[INFO] Redirecting after successful Auth0 login to:', returnTo);
+          logger.info('[INFO] Redirecting after successful Auth0 login to:', returnTo);
           return res.redirect(returnTo);
         });
       })(req, res, next);
     });
   } else {
-    console.log('[INFO] Auth0 SSO not configured, skipping Auth0 strategy setup');
+    logger.info('[INFO] Auth0 SSO not configured, skipping Auth0 strategy setup');
   }
   
   // Configure MIT Horizon OIDC strategy if environment variables are set
@@ -627,7 +628,7 @@ export function configureAuth(app: any) {
                           process.env.MIT_HORIZON_OIDC_CALLBACK_URL;
   
   if (mitHorizonEnabled) {
-    console.log('[INFO] Configuring MIT Horizon OIDC strategy');
+    logger.info('[INFO] Configuring MIT Horizon OIDC strategy');
     
     passport.use('horizon-oidc', new OIDCStrategy({
       issuer: process.env.MIT_HORIZON_OIDC_ISSUER_URL!,
@@ -676,7 +677,7 @@ export function configureAuth(app: any) {
           if (existingUser) {
             // Update existing user with MIT Horizon ID
             user = await storage.updateUserMitHorizonSub(existingUser.id, mitHorizonUserId);
-            console.log(`[INFO] Linked MIT Horizon ID to existing user: ${existingUser.username}`);
+            logger.info(`[INFO] Linked MIT Horizon ID to existing user: ${existingUser.username}`);
             
             // Update email verification status
             if (user) {
@@ -703,7 +704,7 @@ export function configureAuth(app: any) {
               emailVerified
             });
             
-            console.log(`[INFO] Created new user from MIT Horizon login: ${username}`);
+            logger.info(`[INFO] Created new user from MIT Horizon login: ${username}`);
             
             // Log the user creation event for audit purposes
             if (user) {
@@ -738,7 +739,7 @@ export function configureAuth(app: any) {
         
         return done(null, userWithoutPassword as User);
       } catch (error) {
-        console.error('[ERROR] MIT Horizon OIDC authentication error:', error);
+        logger.error('[ERROR] MIT Horizon OIDC authentication error:', error);
         return done(error);
       }
     }));
@@ -759,18 +760,18 @@ export function configureAuth(app: any) {
     app.get('/api/auth/horizon/callback', (req: Request, res: Response, next: NextFunction) => {
       passport.authenticate('horizon-oidc', (err: Error | null, user: User | undefined, info: any) => {
         if (err) {
-          console.error('[ERROR] MIT Horizon OIDC callback error:', err);
+          logger.error('[ERROR] MIT Horizon OIDC callback error:', err);
           return res.redirect('/login?error=horizon_failed&reason=' + encodeURIComponent(err.message));
         }
         
         if (!user) {
-          console.error('[ERROR] MIT Horizon OIDC callback did not return a user');
+          logger.error('[ERROR] MIT Horizon OIDC callback did not return a user');
           return res.redirect('/login?error=horizon_failed&reason=no_user_returned');
         }
         
         req.login(user, (err) => {
           if (err) {
-            console.error('[ERROR] Session login error:', err);
+            logger.error('[ERROR] Session login error:', err);
             return res.redirect('/login?error=horizon_failed&reason=session_error');
           }
           
@@ -786,19 +787,19 @@ export function configureAuth(app: any) {
             returnTo = '/';
           }
             
-          console.log('[INFO] Redirecting after successful login to:', returnTo);
+          logger.info('[INFO] Redirecting after successful login to:', returnTo);
           return res.redirect(returnTo);
         });
       })(req, res, next);
     });
   } else {
-    console.log('[INFO] MIT Horizon OIDC not configured, skipping MIT Horizon OIDC strategy setup');
+    logger.info('[INFO] MIT Horizon OIDC not configured, skipping MIT Horizon OIDC strategy setup');
   }
 
   // Configure passport serialization with better error handling
   passport.serializeUser((user: any, done) => {
     if (!user || !user.id) {
-      console.error('[ERROR] Failed to serialize user - invalid user object:', user);
+      logger.error('[ERROR] Failed to serialize user - invalid user object:', user);
       return done(new Error('Invalid user object during serialization'));
     }
     logger.debug('Serializing user session', { userId: user.id });
@@ -807,7 +808,7 @@ export function configureAuth(app: any) {
 
   passport.deserializeUser(async (id: number, done) => {
     if (!id) {
-      console.error('[ERROR] Failed to deserialize user - no ID provided');
+      logger.error('[ERROR] Failed to deserialize user - no ID provided');
       return done(new Error('No user ID provided for deserialization'));
     }
 
@@ -828,7 +829,7 @@ export function configureAuth(app: any) {
       });
       done(null, userWithoutPassword);
     } catch (error) {
-      console.error(`[ERROR] Error deserializing user ID ${id}:`, error);
+      logger.error(`[ERROR] Error deserializing user ID ${id}:`, error);
       done(null, false);
     }
   });
@@ -846,7 +847,7 @@ export function configureAuth(app: any) {
     });
     
     if (!req.isAuthenticated()) {
-      console.error(`[WARN] Unauthorized access attempt to ${req.path}`);
+      logger.error(`[WARN] Unauthorized access attempt to ${req.path}`);
       return res.status(401).json({ message: 'Unauthorized - Please log in again' });
     }
     next();
@@ -908,7 +909,7 @@ export function configureAuth(app: any) {
 
       passport.authenticate('local', async (err: any, user: any, info: any) => {
         if (err) {
-          console.error('[ERROR] Authentication error:', err);
+          logger.error('[ERROR] Authentication error:', err);
           return next(err);
         }
         
@@ -924,7 +925,7 @@ export function configureAuth(app: any) {
         }
         
         // Log before login
-        console.log('[DEBUG] Attempting to login user:', {
+        logger.info('[DEBUG] Attempting to login user:', {
           userId: user.id,
           username: user.username,
           role: user.role,
@@ -942,7 +943,7 @@ export function configureAuth(app: any) {
 
         req.login(user, (err) => {
           if (err) {
-            console.error('[ERROR] Session login error:', err);
+            logger.error('[ERROR] Session login error:', err);
             return next(err);
           }
           
@@ -952,19 +953,19 @@ export function configureAuth(app: any) {
           // Regenerate session to prevent session fixation
           req.session.regenerate((err) => {
             if (err) {
-              console.error('[ERROR] Session regeneration error:', err);
+              logger.error('[ERROR] Session regeneration error:', err);
               return next(err);
             }
             
             // Re-login the user after session regeneration
             req.login(userData, (loginErr) => {
               if (loginErr) {
-                console.error('[ERROR] Re-login error after session regeneration:', loginErr);
+                logger.error('[ERROR] Re-login error after session regeneration:', loginErr);
                 
                 // More robust error handling - try to destroy the inconsistent session before redirecting
                 req.session.destroy((destroyErr) => {
                   if (destroyErr) {
-                    console.error('[ERROR] Failed to destroy inconsistent session:', destroyErr);
+                    logger.error('[ERROR] Failed to destroy inconsistent session:', destroyErr);
                   }
                   
                   // Return login error with redirect instructions
@@ -980,12 +981,12 @@ export function configureAuth(app: any) {
               // Save the session to store
               req.session.save((saveErr) => {
                 if (saveErr) {
-                  console.error('[ERROR] Session save error:', saveErr);
+                  logger.error('[ERROR] Session save error:', saveErr);
                   return next(saveErr);
                 }
                 
                 // Log after successful login
-                console.log('[DEBUG] User successfully logged in:', {
+                logger.info('[DEBUG] User successfully logged in:', {
                   userId: userData.id,
                   username: userData.username,
                   role: userData.role,
@@ -1007,7 +1008,7 @@ export function configureAuth(app: any) {
         });
       })(req, res, next);
     } catch (error) {
-      console.error('[ERROR] Login error:', error);
+      logger.error('[ERROR] Login error:', error);
       next(error);
     }
   });
@@ -1027,7 +1028,7 @@ export function configureAuth(app: any) {
     
     // Log a warning that BASE_URL should be set in production
     if (process.env.NODE_ENV === 'production') {
-      console.warn('\x1b[33m%s\x1b[0m', 
+      logger.warn('\x1b[33m%s\x1b[0m', 
         `WARNING: Using fallback URL ${fallbackUrl} for login redirects. ` +
         `This may not work correctly in production environments. ` +
         `Please set BASE_URL environment variable.`
@@ -1040,8 +1041,8 @@ export function configureAuth(app: any) {
   const validateReturnToUrl = (returnToUrl: string, idpName: string) => {
     // In production, this URL must be whitelisted in the IdP configuration
     if (process.env.NODE_ENV === 'production') {
-      console.log(`[INFO] Return URL for ${idpName} logout: ${returnToUrl}`);
-      console.log(`[INFO] Ensure this URL is whitelisted in the ${idpName} configuration`);
+      logger.info(`[INFO] Return URL for ${idpName} logout: ${returnToUrl}`);
+      logger.info(`[INFO] Ensure this URL is whitelisted in the ${idpName} configuration`);
     }
     return returnToUrl;
   };
@@ -1060,7 +1061,7 @@ export function configureAuth(app: any) {
 
     req.logout((logoutErr) => {
       if (logoutErr) {
-        console.error('[ERROR] Logout error:', logoutErr);
+        logger.error('[ERROR] Logout error:', logoutErr);
         return res.status(500).json({ message: 'Error during logout process' });
       }
       
@@ -1068,7 +1069,7 @@ export function configureAuth(app: any) {
       if (req.session) {
         req.session.destroy((destroyErr) => {
           if (destroyErr) {
-            console.error('[ERROR] Session destruction error:', destroyErr);
+            logger.error('[ERROR] Session destruction error:', destroyErr);
             // Continue with logout even if session destruction fails
           }
           
@@ -1085,7 +1086,7 @@ export function configureAuth(app: any) {
           if (isAuth0User && process.env.AUTH0_DOMAIN && process.env.AUTH0_CLIENT_ID) {
             const loginPageUrl = getLoginPageUrl();
             const validatedReturnTo = validateReturnToUrl(loginPageUrl, 'Auth0');
-            console.log(`[INFO] Redirecting to Auth0 logout URL with returnTo: ${validatedReturnTo}`);
+            logger.info(`[INFO] Redirecting to Auth0 logout URL with returnTo: ${validatedReturnTo}`);
             
             // Ensure client_id and returnTo parameters are properly included
             const auth0LogoutUrl = `https://${process.env.AUTH0_DOMAIN}/v2/logout?` + 
@@ -1104,7 +1105,7 @@ export function configureAuth(app: any) {
           if (isMitHorizonUser && process.env.MIT_HORIZON_OIDC_ISSUER_URL && process.env.MIT_HORIZON_OIDC_CLIENT_ID) {
             const loginPageUrl = getLoginPageUrl();
             const validatedReturnTo = validateReturnToUrl(loginPageUrl, 'MIT Horizon');
-            console.log(`[INFO] Redirecting to MIT Horizon logout URL with returnTo: ${validatedReturnTo}`);
+            logger.info(`[INFO] Redirecting to MIT Horizon logout URL with returnTo: ${validatedReturnTo}`);
             
             // Ensure OIDC issuer URL ends with a trailing slash before adding the logout endpoint
             const issuerUrl = process.env.MIT_HORIZON_OIDC_ISSUER_URL.endsWith('/')
@@ -1131,7 +1132,7 @@ export function configureAuth(app: any) {
         });
       } else {
         // No active session to destroy
-        console.log('[WARN] Logout called without an active session');
+        logger.info('[WARN] Logout called without an active session');
         
         // Log the logout event if the user was authenticated
         if (userId && username) {

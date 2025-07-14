@@ -1,35 +1,34 @@
 import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import { fileURLToPath } from 'url';
 import { resolve } from 'path';
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
-
 export default defineConfig({
-  plugins: [react()],
   test: {
     globals: true,
-    environment: 'jsdom',
+    environment: 'node',
     setupFiles: ['./test/setup.ts'],
-    include: ['**/*.{test,spec}.{ts,tsx}'],
     coverage: {
-      reporter: ['text', 'json', 'html'],
-      include: ['client/src/**/*.{ts,tsx}', 'server/**/*.ts'],
+      reporter: ['text', 'html'],
       exclude: [
-        'node_modules',
-        'test',
-        '**/*.d.ts',
-        '**/*.config.ts',
-        '**/types.ts',
-      ],
-    },
+        'node_modules/',
+        'dist/',
+        'test/',
+        '**/*.test.ts',
+        '**/*.spec.ts',
+        'scripts/',
+        'docs/',
+        'temp/',
+        'attached_assets/',
+        'test_files/',
+        'client/src/**/*.test.ts',
+        'client/src/**/*.spec.ts'
+      ]
+    }
   },
   resolve: {
     alias: {
       '@': resolve(__dirname, './client/src'),
-      '@assets': resolve(__dirname, './attached_assets'),
       '@shared': resolve(__dirname, './shared'),
-      '@test': resolve(__dirname, './test'),
-    },
-  },
+      '@server': resolve(__dirname, './server')
+    }
+  }
 });

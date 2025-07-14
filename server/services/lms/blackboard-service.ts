@@ -9,6 +9,7 @@
  */
 
 import fetch from 'node-fetch';
+import { logger } from '../lib/error-handler';
 import { 
   BaseLmsService, 
   ConnectionTestResult, 
@@ -76,7 +77,7 @@ export class BlackboardService implements BaseLmsService {
       
       return this.accessToken;
     } catch (error) {
-      console.error('Error getting Blackboard access token:', error);
+      logger.error('Error getting Blackboard access token:', error);
       throw error;
     }
   }
@@ -165,7 +166,7 @@ export class BlackboardService implements BaseLmsService {
           : undefined
       }));
     } catch (error) {
-      console.error('Error fetching Blackboard courses:', error);
+      logger.error('Error fetching Blackboard courses:', error);
       throw error;
     }
   }
@@ -197,7 +198,7 @@ export class BlackboardService implements BaseLmsService {
         externalId: user.externalId
       }));
     } catch (error) {
-      console.error(`Error fetching Blackboard students for course ${courseId}:`, error);
+      logger.error(`Error fetching Blackboard students for course ${courseId}:`, error);
       throw error;
     }
   }
@@ -232,7 +233,7 @@ export class BlackboardService implements BaseLmsService {
           points: assignment.grading?.score?.possible || 100
         }));
     } catch (error) {
-      console.error(`Error fetching Blackboard assignments for course ${courseId}:`, error);
+      logger.error(`Error fetching Blackboard assignments for course ${courseId}:`, error);
       throw error;
     }
   }
@@ -267,7 +268,7 @@ export class BlackboardService implements BaseLmsService {
         gradedAt: entry.lastActivityDate ? new Date(entry.lastActivityDate) : undefined
       }));
     } catch (error) {
-      console.error(`Error fetching Blackboard grades for assignment ${assignmentId}:`, error);
+      logger.error(`Error fetching Blackboard grades for assignment ${assignmentId}:`, error);
       throw error;
     }
   }
@@ -301,7 +302,7 @@ export class BlackboardService implements BaseLmsService {
 
       return true;
     } catch (error) {
-      console.error(`Error submitting Blackboard grade for student ${studentId}:`, error);
+      logger.error(`Error submitting Blackboard grade for student ${studentId}:`, error);
       return false;
     }
   }

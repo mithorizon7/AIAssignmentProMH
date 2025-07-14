@@ -1,4 +1,5 @@
 import { storage } from '../storage';
+import { logger } from '../lib/error-handler';
 import { submissions, feedback, users, courses, assignments, enrollments } from '@shared/schema';
 import { db } from '../db';
 import { eq, and, lt, desc, sql, count, inArray } from 'drizzle-orm';
@@ -282,7 +283,7 @@ export class BatchOperationsService {
         // Count already enrolled as "successful" since they're already enrolled
         successCount += existingStudentIds.size;
       } catch (error) {
-        console.error(`Error in batch enrollment:`, error);
+        logger.error(`Error in batch enrollment:`, error);
         failedCount += studentsToEnroll.length;
       }
     }

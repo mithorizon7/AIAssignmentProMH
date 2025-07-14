@@ -1,4 +1,5 @@
 import { InsertFeedback, Rubric, CriteriaScore, InstructorContext } from '@shared/schema';
+import { logger } from '../lib/error-handler';
 import { AIAdapter, MultimodalPromptPart } from '../adapters/ai-adapter';
 import { processFileForMultimodal } from '../utils/multimodal-processor';
 import { ContentType, determineContentType } from '../utils/file-type-settings';
@@ -193,7 +194,7 @@ Your feedback should:
 Respond ONLY with valid, complete JSON matching the requested structure.
 Do not include explanatory text, comments, or markdown outside the JSON object.`;
 
-      console.log(`[AIService] Using system prompt for text submission (${systemPrompt.length} chars)`);
+      logger.info(`[AIService] Using system prompt for text submission (${systemPrompt.length} chars)`);
       
       // Send to AI adapter with system prompt
       const response = await this.adapter.generateCompletion(finalPrompt, systemPrompt);
@@ -205,7 +206,7 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
         processingTime
       };
     } catch (error: unknown) {
-      console.error('AI submission analysis error:', error);
+      logger.error('AI submission analysis error:', error);
       if (error instanceof Error) {
         throw new Error(`Failed to analyze submission: ${error.message}`);
       } else {
@@ -250,14 +251,14 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
     const startTime = Date.now();
     
     try {
-      console.log(`[AIService] Analyzing multimodal submission: ${params.fileName} (${params.mimeType})`);
+      logger.info(`[AIService] Analyzing multimodal submission: ${params.fileName} (${params.mimeType})`);
       
       let processedFile;
       
       // Handle file data in different forms (data URI, buffer, or path)
       if (params.fileDataUri && params.mimeType.startsWith('image/')) {
         // Use data URI for small images for reliable processing
-        console.log(`[AIService] Processing image from data URI`);
+        logger.info(`[AIService] Processing image from data URI`);
         let contentType: ContentType = 'image';
         
         processedFile = {
@@ -267,7 +268,7 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
           textContent: params.textContent
         };
       } else if (params.fileBuffer) {
-        console.log(`[AIService] Processing file from buffer (${params.fileBuffer.length} bytes)`);
+        logger.info(`[AIService] Processing file from buffer (${params.fileBuffer.length} bytes)`);
         // If we have a buffer (from multer memory storage), we need special handling
         
         // Determine content type based on MIME type
@@ -303,7 +304,7 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
           const path = require('path');
           const fs = require('fs').promises;
           
-          console.log(`[AIService] Binary file detected (${contentType}), creating temporary file for processing`);
+          logger.info(`[AIService] Binary file detected (${contentType}), creating temporary file for processing`);
           
           try {
             // Create a temporary file
@@ -314,7 +315,7 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
             
             // Write the buffer to the temporary file
             await fs.writeFile(tempPath, params.fileBuffer);
-            console.log(`[AIService] Created temporary file at ${tempPath} (${params.fileBuffer.length} bytes)`);
+            logger.info(`[AIService] Created temporary file at ${tempPath} (${params.fileBuffer.length} bytes)`);
             
             // Process using our file handling utility
             processedFile = await processFileForMultimodal(
@@ -325,11 +326,11 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
             
             // Clean up the temporary file (we'll do this asynchronously)
             fs.unlink(tempPath).catch((error: Error) => {
-              console.warn(`[AIService] Failed to clean up temporary file: ${error.message}`);
+              logger.warn(`[AIService] Failed to clean up temporary file: ${error.message}`);
             });
           } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error(`[AIService] Error creating temporary file: ${errorMessage}`);
+            logger.error(`[AIService] Error creating temporary file: ${errorMessage}`);
             throw new Error(`Failed to process ${contentType} file: ${errorMessage}`);
           }
         } else if (contentType === 'image' && params.fileBuffer.length < 4 * 1024 * 1024) {
@@ -339,7 +340,7 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
             const base64 = params.fileBuffer.toString('base64');
             const dataUri = `data:${params.mimeType};base64,${base64}`;
             
-            console.log(`[AIService] Small image detected (${params.fileBuffer.length} bytes), using data URI`);
+            logger.info(`[AIService] Small image detected (${params.fileBuffer.length} bytes), using data URI`);
             
             processedFile = {
               content: dataUri,
@@ -349,7 +350,7 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
             };
           } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error(`[AIService] Error creating data URI: ${errorMessage}`);
+            logger.error(`[AIService] Error creating data URI: ${errorMessage}`);
             
             // Fall back to using the buffer directly if data URI conversion fails
             processedFile = {
@@ -380,23 +381,23 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
         throw new Error("Either filePath or fileBuffer must be provided");
       }
       
-      console.log(`[AIService] File processed, content type: ${processedFile.contentType}`);
+      logger.info(`[AIService] File processed, content type: ${processedFile.contentType}`);
       
       // If the adapter doesn't support multimodal input, fallback to text analysis
       if (!this.adapter.generateMultimodalCompletion) {
-        console.log('[AIService] AI adapter does not support multimodal content; falling back to text-only analysis');
+        logger.info('[AIService] AI adapter does not support multimodal content; falling back to text-only analysis');
         
         // Use extracted text content if available
         let textContent = params.textContent || '';
         if (processedFile.textContent) {
           textContent = processedFile.textContent;
-          console.log('[AIService] Using extracted text content for fallback analysis');
+          logger.info('[AIService] Using extracted text content for fallback analysis');
         } else if (typeof processedFile.content === 'string') {
           textContent = processedFile.content;
-          console.log('[AIService] Using raw string content for fallback analysis');
+          logger.info('[AIService] Using raw string content for fallback analysis');
         } else {
           textContent = `[This submission contains ${processedFile.contentType} content that could not be automatically processed as text]`;
-          console.log('[AIService] No text content available, using placeholder');
+          logger.info('[AIService] No text content available, using placeholder');
         }
         
         return this.analyzeSubmission({
@@ -542,20 +543,20 @@ into your evaluation logic while keeping the actual guidance confidential.`;
         }
       }
       
-      console.log(`[AIService] Sending multimodal request to AI adapter with content type: ${processedFile.contentType}`);
+      logger.info(`[AIService] Sending multimodal request to AI adapter with content type: ${processedFile.contentType}`);
       
       // Generate the completion using multimodal capabilities
       const response = await this.adapter.generateMultimodalCompletion(promptParts, systemPrompt);
       
       const processingTime = Date.now() - startTime;
-      console.log(`[AIService] Multimodal analysis completed in ${processingTime}ms`);
+      logger.info(`[AIService] Multimodal analysis completed in ${processingTime}ms`);
       
       return {
         ...response,
         processingTime
       };
     } catch (error: unknown) {
-      console.error('[AIService] AI multimodal submission analysis error:', error);
+      logger.error('[AIService] AI multimodal submission analysis error:', error);
       if (error instanceof Error) {
         throw new Error(`Failed to analyze multimodal submission: ${error.message}`);
       } else {

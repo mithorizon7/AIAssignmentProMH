@@ -9,6 +9,7 @@
  */
 
 import fetch from 'node-fetch';
+import { logger } from '../lib/error-handler';
 import { 
   BaseLmsService, 
   ConnectionTestResult, 
@@ -108,7 +109,7 @@ export class CanvasService implements BaseLmsService {
         endDate: course.end_at ? new Date(course.end_at) : undefined
       }));
     } catch (error) {
-      console.error('Error fetching Canvas courses:', error);
+      logger.error('Error fetching Canvas courses:', error);
       throw error;
     }
   }
@@ -139,7 +140,7 @@ export class CanvasService implements BaseLmsService {
         externalId: student.sis_user_id
       }));
     } catch (error) {
-      console.error(`Error fetching Canvas students for course ${courseId}:`, error);
+      logger.error(`Error fetching Canvas students for course ${courseId}:`, error);
       throw error;
     }
   }
@@ -171,7 +172,7 @@ export class CanvasService implements BaseLmsService {
         points: assignment.points_possible
       }));
     } catch (error) {
-      console.error(`Error fetching Canvas assignments for course ${courseId}:`, error);
+      logger.error(`Error fetching Canvas assignments for course ${courseId}:`, error);
       throw error;
     }
   }
@@ -219,7 +220,7 @@ export class CanvasService implements BaseLmsService {
         gradedAt: submission.graded_at ? new Date(submission.graded_at) : undefined
       }));
     } catch (error) {
-      console.error(`Error fetching Canvas grades for assignment ${assignmentId}:`, error);
+      logger.error(`Error fetching Canvas grades for assignment ${assignmentId}:`, error);
       throw error;
     }
   }
@@ -254,7 +255,7 @@ export class CanvasService implements BaseLmsService {
 
       return true;
     } catch (error) {
-      console.error(`Error submitting Canvas grade for student ${studentId}:`, error);
+      logger.error(`Error submitting Canvas grade for student ${studentId}:`, error);
       return false;
     }
   }
