@@ -913,8 +913,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contentType: contentType || null
       });
 
-      // Queue system temporarily disabled
-      // submissionQueue.addSubmission(submission.id);
+      // Add submission to queue for asynchronous processing
+      try {
+        const { queueApi } = await import('./queue/bullmq-submission-queue');
+        await queueApi.addSubmission(submission.id);
+        console.log(`[SUBMISSION] Added submission ${submission.id} to queue for processing`);
+      } catch (queueError: any) {
+        console.error(`[SUBMISSION] Failed to add submission ${submission.id} to queue:`, queueError);
+        // Mark submission as failed if queue addition fails
+        await storage.updateSubmissionStatus(submission.id, 'failed');
+      }
 
       res.status(201).json(submission);
   }));
