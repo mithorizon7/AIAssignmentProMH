@@ -31,42 +31,39 @@ import SystemStatusPage from "@/pages/admin/system-status";
 import LogsPage from "@/pages/admin/logs";
 import UXExamples from "@/pages/ux-examples";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { getDashboardPath, hasRolePermission, getUnauthorizedRedirectPath, type UserRole } from "./utils/route-utils";
+import { RoleBasedRedirect } from "./components/RoleBasedRedirect";
 
 interface PrivateRouteProps {
   component: React.ComponentType<any>; // Using any here is unavoidable due to varying component props
-  requireRole?: 'student' | 'instructor' | 'admin';
+  requireRole?: UserRole;
   id?: string | number;
   code?: string;
   [key: string]: unknown;
 }
 
+/**
+ * PrivateRoute component focused solely on authentication and authorization
+ * Role-based redirects are handled centrally via route utilities
+ */
 function PrivateRoute({ component: Component, requireRole, ...rest }: PrivateRouteProps) {
   const { user, isAuthenticated } = useAuth();
   
+  // Check authentication first
   if (!isAuthenticated) {
     return <Redirect to="/login" />;
   }
   
-  if (requireRole) {
-    // Admin can access all routes
-    if (user?.role === "admin") {
-      return <Component {...rest} />;
-    }
-    
-    // Strict role-based access control - each role can only access their own routes
-    if (user?.role !== requireRole) {
-      // Redirect to appropriate dashboard based on user role
-      if (user?.role === 'admin') {
-        return <Redirect to="/admin/dashboard" />;
-      }
-      if (user?.role === 'instructor') {
-        return <Redirect to="/instructor/dashboard" />;
-      }
-      // Default redirect for students or other roles
-      return <Redirect to="/dashboard" />;
+  // Check authorization if a role is required
+  if (requireRole && user?.role) {
+    if (!hasRolePermission(user.role as UserRole, requireRole)) {
+      // Redirect to user's appropriate dashboard
+      const redirectPath = getUnauthorizedRedirectPath(user.role as UserRole);
+      return <Redirect to={redirectPath} />;
     }
   }
   
+  // User is authenticated and authorized
   return <Component {...rest} />;
 }
 
@@ -147,24 +144,7 @@ function Router() {
       </Route>
       
       {/* Redirect root to dashboard or login */}
-      <Route path="/">
-        {() => {
-          const { isAuthenticated, user } = useAuth();
-          
-          if (!isAuthenticated) {
-            return <Redirect to="/login" />;
-          }
-          
-          // Redirect based on user role
-          if (user?.role === "admin") {
-            return <Redirect to="/admin/dashboard" />;
-          } else if (user?.role === "instructor") {
-            return <Redirect to="/instructor/dashboard" />;
-          } else {
-            return <Redirect to="/dashboard" />;
-          }
-        }}
-      </Route>
+      <Route path="/" component={RoleBasedRedirect} />
       
       {/* UX Examples route */}
       <Route path="/ux-examples" component={UXExamples} />
