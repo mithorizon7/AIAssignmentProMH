@@ -402,9 +402,9 @@
   export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true, createdAt: true, updatedAt: true });
   export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true, createdAt: true, updatedAt: true });
   export const insertFeedbackSchema = createInsertSchema(feedback).omit({ id: true, createdAt: true });
-  export const insertSystemSettingsSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true }); // For extended systemSettings table
-  export const insertFileTypeSettingsSchema = createInsertSchema(fileTypeSettings).omit({ id: true, updatedAt: true }); // From HEAD
-  export const insertUserNotificationSettingsSchema = createInsertSchema(userNotificationSettings).omit({ id: true, updatedAt: true }); // From HEAD
+  export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true }); // For extended systemSettings table
+  export const insertFileTypeSettingSchema = createInsertSchema(fileTypeSettings).omit({ id: true, updatedAt: true }); // From HEAD
+  export const insertUserNotificationSettingSchema = createInsertSchema(userNotificationSettings).omit({ id: true, updatedAt: true }); // From HEAD
   export const insertNewsletterSubscriberSchema = createInsertSchema(newsletterSubscribers).omit({ id: true, createdAt: true }); // From main
   export const insertLmsCredentialsSchema = createInsertSchema(lmsCredentials).omit({ id: true, createdAt: true, updatedAt: true }); // From main
   export const insertLmsSyncJobSchema = createInsertSchema(lmsSyncJobs).omit({ id: true, createdAt: true }); // From main
@@ -430,13 +430,13 @@
   export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 
   export type SystemSetting = typeof systemSettings.$inferSelect;
-  export type InsertSystemSetting = z.infer<typeof insertSystemSettingsSchema>;
+  export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
 
   export type FileTypeSetting = typeof fileTypeSettings.$inferSelect; // From HEAD
-  export type InsertFileTypeSetting = z.infer<typeof insertFileTypeSettingsSchema>; // From HEAD
+  export type InsertFileTypeSetting = z.infer<typeof insertFileTypeSettingSchema>; // From HEAD
 
   export type UserNotificationSetting = typeof userNotificationSettings.$inferSelect; // From HEAD
-  export type InsertUserNotificationSetting = z.infer<typeof insertUserNotificationSettingsSchema>; // From HEAD
+  export type InsertUserNotificationSetting = z.infer<typeof insertUserNotificationSettingSchema>; // From HEAD
 
   export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect; // From main
   export type InsertNewsletterSubscriber = z.infer<typeof insertNewsletterSubscriberSchema>; // From main

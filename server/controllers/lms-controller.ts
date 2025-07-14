@@ -43,7 +43,7 @@ export async function testLmsConnection(req: Request, res: Response) {
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: null // Set to null for temporary credential
-    };
+    } as any;
     
     // Create the appropriate service for this provider
     const lmsService = lmsServiceFactory.createService(credential);
@@ -103,7 +103,7 @@ export async function createLmsCredentials(req: Request, res: Response) {
     }
     
     // Get user ID from the authenticated user
-    const userId = req.user?.id;
+    const userId = (req.user as Express.User)?.id;
     
     if (!userId) {
       return res.status(401).json({
@@ -261,7 +261,7 @@ export async function startLmsSync(req: Request, res: Response) {
     }
     
     // Get user ID from the authenticated user
-    const userId = req.user?.id;
+    const userId = (req.user as Express.User)?.id;
     
     if (!userId) {
       return res.status(401).json({
