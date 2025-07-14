@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 import { 
   validateApiResponseWithFallback,
   systemHealthSchema,
@@ -71,6 +72,7 @@ const StatusBadge = ({ status }: StatusBadgeProps) => {
 export default function SystemStatusPage() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // Queries
   const { data: systemHealth, isLoading: healthLoading } = useQuery({
@@ -101,8 +103,21 @@ export default function SystemStatusPage() {
         body: { actionId }
       });
     },
-    onSuccess: () => {
+    onSuccess: (data, actionId) => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/recovery-status'] });
+      toast({
+        title: "Recovery Triggered",
+        description: `Recovery action "${actionId}" has been successfully triggered.`,
+        variant: "default"
+      });
+    },
+    onError: (error: any, actionId) => {
+      console.error('Recovery trigger failed:', error);
+      toast({
+        title: "Recovery Failed",
+        description: `Failed to trigger recovery action "${actionId}": ${error?.message || 'Unknown error'}`,
+        variant: "destructive"
+      });
     }
   });
 
@@ -138,24 +153,46 @@ export default function SystemStatusPage() {
     defaultRecoveryStatus
   );
 
-  // Enhanced loading state with progress indication
-  const isLoading = healthLoading || readinessLoading || securityLoading || recoveryLoading;
-  
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center space-y-4">
-          <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
-          <div className="text-center">
-            <p className="text-lg font-medium">Loading system status...</p>
-            <p className="text-sm text-muted-foreground">
-              Fetching health, security, and recovery data
-            </p>
+  // Create skeleton loader component
+  const SkeletonCard = ({ className = "" }: { className?: string }) => (
+    <Card className={className}>
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-4 bg-muted rounded w-24 animate-pulse" />
+            <div className="h-8 bg-muted rounded w-16 animate-pulse" />
           </div>
+          <div className="h-8 w-8 bg-muted rounded animate-pulse" />
         </div>
+      </CardContent>
+    </Card>
+  );
+
+  const TabSkeleton = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <Card key={i} className="animate-pulse">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="h-4 bg-muted rounded w-20" />
+                <div className="h-6 bg-muted rounded w-16" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="h-3 bg-muted rounded w-16" />
+                  <div className="h-3 bg-muted rounded w-12" />
+                </div>
+                <div className="h-3 bg-muted rounded w-full" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -189,58 +226,74 @@ export default function SystemStatusPage() {
 
       {/* Overall Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">System Health</p>
-                <StatusBadge status={health.status} />
-              </div>
-              <Server className="h-8 w-8 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Production Ready</p>
-                <StatusBadge status={readiness.isValid ? 'pass' : 'fail'} />
-              </div>
-              <CheckCircle className="h-8 w-8 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Security</p>
-                <StatusBadge status={security.status} />
-              </div>
-              <Shield className="h-8 w-8 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Memory Usage</p>
-                <div className="flex items-center space-x-2">
-                  <p className="text-2xl font-bold">{health.metrics.memory_usage}MB</p>
-                  {health.metrics.memory_usage > 500 && (
-                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                  )}
+        {healthLoading ? (
+          <SkeletonCard />
+        ) : (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">System Health</p>
+                  <StatusBadge status={health.status} />
                 </div>
+                <Server className="h-8 w-8 text-muted-foreground" />
               </div>
-              <TrendingUp className="h-8 w-8 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
+
+        {readinessLoading ? (
+          <SkeletonCard />
+        ) : (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Production Ready</p>
+                  <StatusBadge status={readiness.isValid ? 'pass' : 'fail'} />
+                </div>
+                <CheckCircle className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {securityLoading ? (
+          <SkeletonCard />
+        ) : (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Security</p>
+                  <StatusBadge status={security.status} />
+                </div>
+                <Shield className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {healthLoading ? (
+          <SkeletonCard />
+        ) : (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Memory Usage</p>
+                  <div className="flex items-center space-x-2">
+                    <p className="text-2xl font-bold">{health.metrics.memory_usage}MB</p>
+                    {health.metrics.memory_usage > 500 && (
+                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                    )}
+                  </div>
+                </div>
+                <TrendingUp className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Tabs defaultValue="health" className="space-y-4">
@@ -252,8 +305,11 @@ export default function SystemStatusPage() {
         </TabsList>
 
         <TabsContent value="health" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(health.checks).map(([key, check]) => (
+          {healthLoading ? (
+            <TabSkeleton />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(health.checks).map(([key, check]) => (
               <Card key={key} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
@@ -291,12 +347,16 @@ export default function SystemStatusPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="security" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {securityLoading ? (
+            <TabSkeleton />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Security Metrics</CardTitle>
@@ -352,11 +412,15 @@ export default function SystemStatusPage() {
                 </div>
               </CardContent>
             </Card>
-          </div>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="recovery" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {recoveryLoading ? (
+            <TabSkeleton />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Recovery Actions</CardTitle>
@@ -419,11 +483,15 @@ export default function SystemStatusPage() {
                 </div>
               </CardContent>
             </Card>
-          </div>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="readiness" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {readinessLoading ? (
+            <TabSkeleton />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Production Checks</CardTitle>
@@ -468,7 +536,8 @@ export default function SystemStatusPage() {
                 </div>
               </CardContent>
             </Card>
-          </div>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
