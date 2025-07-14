@@ -359,264 +359,30 @@ export const queueApi = {
       // First update the status in database
       await storage.updateSubmissionStatus(submissionId, 'pending');
       
-      // Handle mock mode (no real Redis connection)
-      if (!queueActive) {
-        const mockJobId = `mock-submission-${submissionId}-${Date.now()}`;
-        console.log(`[DEVELOPMENT] Mock processing submission ${submissionId} with ID ${mockJobId}`);
-        
-        // In development without Redis, immediately process the submission 
-        // using the same process as the worker would
-        setTimeout(async () => {
-          try {
-            console.log(`[DEVELOPMENT] Processing submission ${submissionId} directly`);
-            
-            // Get submission from database
-            const submission = await storage.getSubmission(submissionId);
-            if (!submission) {
-              throw new Error(`Submission ${submissionId} not found`);
-            }
-            
-            // Update status to processing
-            await storage.updateSubmissionStatus(submission.id, 'processing');
-            
-            // Get assignment for context
-            const assignment = await storage.getAssignment(submission.assignmentId);
-            if (!assignment) {
-              throw new Error(`Assignment ${submission.assignmentId} not found`);
-            }
-            
-            // Prepare content for analysis
-            let content = submission.content || '';
-            if (submission.fileUrl && !content) {
-              content = `File submission: ${submission.fileName || 'Unnamed file'}`;
-            }
-            
-            // Initialize AI service and process
-            const aiService = createAIService();
-            
-            // Parse the rubric if it exists
-            let rubric;
-            if (assignment.rubric) {
-              try {
-                // Handle string vs object representation
-                if (typeof assignment.rubric === 'string') {
-                  rubric = JSON.parse(assignment.rubric);
-                } else {
-                  rubric = assignment.rubric;
-                }
-              } catch (parseError: any) {
-                // Log detailed information about the parsing error
-                console.error(`[DEVELOPMENT] Failed to parse rubric for assignment ${assignment.id}:`, {
-                  assignmentId: assignment.id,
-                  submissionId,
-                  error: parseError.message,
-                  rubricString: typeof assignment.rubric === 'string' 
-                    ? (assignment.rubric.length > 500 
-                      ? assignment.rubric.substring(0, 500) + '...' 
-                      : assignment.rubric)
-                    : 'Not a string',
-                  errorCode: 'RUBRIC_PARSE_ERROR'
-                });
-                // Create a notification for the instructor in development mode
-                console.info(`[DEVELOPMENT] Instructor notification would be created for rubric parsing error on assignment ${assignment.id}`);
-                
-                // Continue without rubric but with warning
-                console.warn(`[DEVELOPMENT] Proceeding with submission processing without rubric for assignment ${assignment.id}`);
-                
-                // Set a minimal placeholder rubric with warning about parsing error
-                rubric = {
-                  criteria: [],
-                  maxScore: 100,
-                  _processingNote: "Original rubric could not be parsed. This is a placeholder to indicate that rubric evaluation was intended but could not be performed."
-                };
-              }
-            } else {
-              rubric = undefined;
-            }
-              
-            // Determine if this is a multimodal submission
-            const isMultimodal = submission.mimeType && 
-                                 submission.mimeType !== 'text/plain' && 
-                                 submission.fileUrl;
-            
-            console.log(`[DEVELOPMENT] Submission analysis - isMultimodal: ${isMultimodal}, mimeType: ${submission.mimeType}, fileUrl exists: ${!!submission.fileUrl}`);
-            
-            // Analyze the submission with AI based on file type
-            let feedbackResult;
-            if (isMultimodal) {
-              // The fileUrl is now a path in GCS storage
-              // The multimodal processor will handle retrieving from GCS as needed
-              let filePath = submission.fileUrl || '';
-              
-              console.log(`[DEVELOPMENT] Processing multimodal submission ${submissionId} with original filePath: ${filePath}`);
-              
-              // Check if this is a GCS path without a signed URL
-              // If so, we need to generate a signed URL for access
-              if (filePath && !filePath.startsWith('http')) {
-                try {
-                  // Import only when needed to avoid circular dependencies
-                  const { generateSignedUrl, isGcsConfigured } = require('../utils/gcs-client');
-                  
-                  // Check if GCS is configured
-                  const gcsConfigStatus = isGcsConfigured();
-                  console.log(`[DEVELOPMENT] GCS configured status: ${gcsConfigStatus}`);
-                  
-                  // Generate a signed URL for temporary access if GCS is configured
-                  if (gcsConfigStatus) {
-                    console.log(`[DEVELOPMENT] Generating signed URL for path: ${filePath}`);
-                    const signedUrl = await generateSignedUrl(filePath, 60); // 60 minute expiration
-                    logger.info(`Generated signed URL for GCS file access`, {
-                      submissionId,
-                      objectPath: filePath,
-                      signedUrlLength: signedUrl.length
-                    });
-                    
-                    // Use the signed URL for file processing
-                    filePath = signedUrl;
-                    console.log(`[DEVELOPMENT] Successfully generated signed URL with length: ${signedUrl.length}`);
-                  } else {
-                    console.warn(`[DEVELOPMENT] GCS not configured, cannot generate signed URL`);
-                  }
-                } catch (urlError) {
-                  console.error(`[DEVELOPMENT] Error generating signed URL:`, urlError);
-                  logger.warn(`Failed to generate signed URL for GCS file, using path directly`, {
-                    submissionId,
-                    error: (urlError instanceof Error) ? urlError.message : String(urlError)
-                  });
-                  // Continue with the original path - the processor will handle it
-                }
-              }
-              
-              console.log(`[DEVELOPMENT] Processing multimodal submission ${submissionId} of type ${submission.mimeType} with final filePath: ${filePath.substring(0, 100)}...`);
-              
-              try {
-                console.log(`[MULTIMODAL] Attempting to analyze submission ${submissionId} with these parameters:`, {
-                  fileName: submission.fileName || 'unknown',
-                  fileType: submission.mimeType || 'application/octet-stream',
-                  filePathLength: filePath.length,
-                  filePathStart: filePath.substring(0, 30) + '...',
-                  hasTextContent: !!submission.content
-                });
-                
-                // Examine file path to ensure it's valid
-                if (!filePath || filePath.trim() === '') {
-                  throw new Error('File path is empty - cannot process image submission without a valid file URL');
-                }
-                
-                // Check mime type to ensure it's supported for Gemini
-                if (submission.mimeType && submission.mimeType.startsWith('image/')) {
-                  console.log(`[MULTIMODAL] Processing image submission with MIME type: ${submission.mimeType}`);
-                  
-                  // Additional validation for image submissions
-                  if (filePath.indexOf('storage.googleapis.com') > -1 || 
-                      filePath.indexOf('googleusercontent.com') > -1) {
-                    console.log(`[MULTIMODAL] File appears to be a valid GCS URL`);
-                  } else if (!filePath.startsWith('http')) {
-                    console.log(`[MULTIMODAL] File path is not an HTTP URL, assuming GCS object path: ${filePath}`);
-                  }
-                }
-                
-                // Attempt to process the file with AI
-                feedbackResult = await aiService.analyzeMultimodalSubmission({
-                  filePath: filePath,
-                  fileName: submission.fileName || 'unknown',
-                  mimeType: submission.mimeType || 'application/octet-stream',
-                  textContent: submission.content || undefined, // Optional extracted text
-                  assignmentTitle: assignment.title,
-                  assignmentDescription: assignment.description || undefined,
-                  instructorContext: assignment.instructorContext || undefined, // Instructor-only guidance
-                  rubric: rubric
-                });
-                
-                console.log(`[MULTIMODAL] Successfully received AI feedback for ${submissionId}`);
-                console.log(`[MULTIMODAL] Feedback processing time: ${feedbackResult.processingTime}ms`);
-                
-                // Check if we have actual feedback content
-                if (feedbackResult.strengths && feedbackResult.strengths.length > 0) {
-                  console.log(`[MULTIMODAL] Feedback contains ${feedbackResult.strengths.length} strengths points`);
-                }
-                
-                if (feedbackResult.improvements && feedbackResult.improvements.length > 0) {
-                  console.log(`[MULTIMODAL] Feedback contains ${feedbackResult.improvements.length} improvement points`);
-                }
-              } catch (multimodalError) {
-                console.error(`[MULTIMODAL] Error during analysis of submission ${submissionId}:`, multimodalError);
-                
-                // First, attempt to get detailed error information
-                const errorMessage = multimodalError instanceof Error 
-                  ? multimodalError.message 
-                  : String(multimodalError);
-                
-                // Log additional context for debugging
-                console.error(`[MULTIMODAL] Error context:`, {
-                  submissionId,
-                  fileName: submission.fileName,
-                  mimeType: submission.mimeType,
-                  errorMessage
-                });
-                
-                // For image-specific errors, add more context
-                if (submission.mimeType?.startsWith('image/')) {
-                  console.error(`[MULTIMODAL] Image processing error details:`, {
-                    imageType: submission.mimeType,
-                    filePathStart: filePath.substring(0, 30) + '...',
-                    isGcsPath: !filePath.startsWith('http') && !filePath.startsWith('/'),
-                    isSignedUrl: filePath.includes('storage.googleapis.com') && filePath.includes('Signature=')
-                  });
-                }
-                
-                throw new Error(`Failed to analyze multimodal submission: ${errorMessage}`);
-              }
-            } else {
-              // Process as standard text submission
-              const content = submission.content || '';
-              feedbackResult = await aiService.analyzeSubmission({
-                studentSubmissionContent: content,
-                assignmentTitle: assignment.title,
-                assignmentDescription: assignment.description || undefined,
-                instructorContext: assignment.instructorContext || undefined, // Instructor-only guidance
-                rubric: rubric
-              });
-            }
-            
-            // Prepare and save feedback
-            const feedbackData = await aiService.prepareFeedbackForStorage(
-              submission.id,
-              feedbackResult
-            );
-            
-            await storageService.saveFeedback(feedbackData);
-            
-            // Mark as completed
-            await storage.updateSubmissionStatus(submission.id, 'completed');
-            
-            console.log(`[DEVELOPMENT] Successfully processed submission ${submissionId}`);
-          } catch (error) {
-            console.error(`[DEVELOPMENT] Error processing submission ${submissionId}:`, error);
-            await storage.updateSubmissionStatus(submissionId, 'failed');
-          }
-        }, 100); // Small delay to let the response return first
-        
-        return mockJobId;
+      // Ensure queue is active - no fallback processing allowed
+      if (!queueActive || !submissionQueue) {
+        throw new Error('Queue is not active - cannot process submissions without Redis/BullMQ');
       }
       
-      // Production mode with Redis
-      if ('add' in submissionQueue) {
-        // Add job to the queue
-        const job = await submissionQueue.add('processSubmission', { submissionId }, {
-          jobId: `submission-${submissionId}`,
-          // Job-specific options can override queue defaults here
-        });
-        
-        // BullMQ job.id can be undefined in some edge cases, provide fallback 
-        const jobId = job.id || `submission-${submissionId}-${Date.now()}`;
-        console.log(`Submission ${submissionId} added to queue with job ID ${jobId}`);
-        return jobId;
-      } else {
-        throw new Error('Queue not properly initialized');
-      }
+      // Add job to the queue
+      const job = await submissionQueue.add('processSubmission', { submissionId }, {
+        jobId: `submission-${submissionId}`,
+        // Job-specific options can override queue defaults here
+      });
+      
+      // BullMQ job.id can be undefined in some edge cases, provide fallback 
+      const jobId = job.id || `submission-${submissionId}-${Date.now()}`;
+      logger.info(`Submission queued for processing`, { 
+        submissionId, 
+        jobId,
+        status: 'queued'
+      });
+      return jobId;
     } catch (error) {
-      console.error(`Error adding submission ${submissionId} to queue:`, error);
+      logger.error(`Error adding submission to queue`, { 
+        submissionId, 
+        error: error instanceof Error ? error.message : String(error)
+      });
       throw error;
     }
   },
@@ -648,17 +414,9 @@ export const queueApi = {
    * Get queue statistics
    */
   async getStats(): Promise<any> {
-    // In development mode without Redis, return mock stats
-    if (!queueActive) {
-      return {
-        waiting: 0,
-        active: 0,
-        completed: 0,
-        failed: 0,
-        delayed: 0,
-        total: 0,
-        mode: 'development'
-      };
+    // Ensure queue is active
+    if (!queueActive || !submissionQueue) {
+      throw new Error('Queue is not active - cannot get statistics without Redis/BullMQ');
     }
     
     try {
