@@ -26,6 +26,7 @@ import { processFileForMultimodal } from "./utils/multimodal-processor";
 import { asyncHandler } from "./lib/error-handler";
 import { generateSecret, verifyTotp, generateOtpAuthUrl } from "./utils/totp";
 import { csrfProtection, addCSRFToken, getCSRFToken } from "./middleware/csrf-protection";
+import { createCacheMiddleware, getCacheStats, clearCache } from "./middleware/performance-cache";
 import { performHealthCheck, quickHealthCheck } from "./lib/health-checker";
 import { validateProductionReadiness } from "./lib/production-validator";
 import { getDatabaseHealth } from "./lib/database-optimizer";
@@ -88,11 +89,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Define API routes
   
-  // Basic health check endpoint
-  app.get('/api/health', asyncHandler(async (req, res) => {
-    const result = await quickHealthCheck();
-    res.status(result.status === 'ok' ? 200 : 503).json(result);
-  }));
+  // Optimized health check endpoint - no expensive operations
+  app.get('/api/health', (req: Request, res: Response) => {
+    const startTime = Date.now();
+    
+    try {
+      // Fast health check without database queries
+      const memory = process.memoryUsage();
+      const uptime = process.uptime();
+      
+      const response = {
+        status: 'ok',
+        message: 'System operational',
+        timestamp: new Date().toISOString(),
+        uptime: Math.round(uptime),
+        memory: {
+          used: Math.round(memory.heapUsed / 1024 / 1024),
+          total: Math.round(memory.heapTotal / 1024 / 1024)
+        },
+        responseTime: Date.now() - startTime
+      };
+      
+      res.json(response);
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: 'Health check failed',
+        responseTime: Date.now() - startTime
+      });
+    }
+  });
   
   // Comprehensive health check endpoint
   app.get('/api/health/detailed', asyncHandler(async (req, res) => {
@@ -392,7 +418,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Assignment endpoints
-  app.get('/api/assignments', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/assignments', requireAuth, createCacheMiddleware({ 
+    ttl: 60, // Cache for 60 seconds
+    key: (req) => `/api/assignments:${(req.user as any)?.id}:${req.query.courseId || 'all'}`
+  }), asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as any;
     let assignments;
 
@@ -993,7 +1022,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(submissionsWithFeedback);
   }));
 
-  app.get('/api/courses', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/courses', requireAuth, createCacheMiddleware({ 
+    ttl: 300, // Cache for 5 minutes
+    key: (req) => `/api/courses:${(req.user as any)?.id}`
+  }), asyncHandler(async (req: Request, res: Response) => {
       const user = req.user as any;
       let courses;
 
