@@ -81,8 +81,9 @@ module.exports = {
     // Optional: Separate queue worker process for heavy background tasks
     {
       name: 'aigrader-queue-worker',
-      script: './server/queue/queue-worker.js',
-      interpreter: 'node',
+      script: './server/index.ts',
+      interpreter: 'tsx',
+      args: '--worker-mode',
       instances: Math.max(1, Math.floor(require('os').cpus().length / 2)), // Half the CPU cores
       exec_mode: 'cluster',
       
