@@ -60,57 +60,44 @@ export default function AnalyticsPage() {
     }
   });
 
-  // Fetch analytics data
-  const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
+  // Fetch analytics data from real API
+  const { data: analyticsData, isLoading: analyticsLoading, error: analyticsError } = useQuery({
     queryKey: ["analytics", selectedDateRange, selectedAssignment, selectedCourse, activeTab],
     queryFn: async () => {
-      // This would normally call a backend API endpoint that returns analytics data
-      // Since this endpoint might not exist yet, we'll simulate the response
+      // Call real API endpoint instead of using mock data
+      const response = await fetch(`/api/assignments/${selectedAssignment}/analytics?${new URLSearchParams({
+        dateRange: selectedDateRange,
+        course: selectedCourse,
+        tab: activeTab
+      })}`);
       
-      // Submissions graph data
-      const submissionsData = [
-        { day: "Mon", submissions: 22, completed: 20 },
-        { day: "Tue", submissions: 28, completed: 25 },
-        { day: "Wed", submissions: 35, completed: 29 },
-        { day: "Thu", submissions: 32, completed: 28 },
-        { day: "Fri", submissions: 40, completed: 32 },
-        { day: "Sat", submissions: 15, completed: 12 },
-        { day: "Sun", submissions: 13, completed: 10 },
-      ];
+      if (!response.ok) {
+        throw new Error(`Failed to fetch analytics: ${response.status}`);
+      }
       
-      // Score distribution data
-      const scoreDistributionData = [
-        { score: "0-20", count: 5 },
-        { score: "21-40", count: 10 },
-        { score: "41-60", count: 25 },
-        { score: "61-80", count: 40 },
-        { score: "81-100", count: 20 },
-      ];
-      
-      // Completion time data
-      const completionTimeData = [
-        { range: "0-5 min", count: 15 },
-        { range: "5-15 min", count: 25 },
-        { range: "15-30 min", count: 40 },
-        { range: "30-60 min", count: 15 },
-        { range: "60+ min", count: 5 },
-      ];
-      
-      // Return the different datasets based on active tab
-      return {
-        submissionsData,
-        scoreDistributionData,
-        completionTimeData,
-        summary: {
-          totalSubmissions: 185,
-          avgScore: 72.5,
-          avgCompletionTime: "24 minutes",
-          feedbackQuality: 4.2,
-        }
-      };
+      return response.json();
     },
-    retry: false,
+    // Only fetch if we have the required data
+    enabled: Boolean(selectedAssignment && selectedAssignment !== 'all')
   });
+
+  // Throw error instead of hiding it
+  if (analyticsError) {
+    throw new Error(`Analytics data unavailable: ${analyticsError.message}`);
+  }
+
+  // Use real data when available, otherwise show empty state
+  const displayData = analyticsData || {
+    submissionsData: [],
+    scoreDistributionData: [],
+    completionTimeData: [],
+    summary: {
+      totalSubmissions: 0,
+      avgScore: 0,
+      avgCompletionTime: "N/A",
+      feedbackQuality: 0,
+    }
+  };
 
   // Handle filter changes
   const handleDateRangeChange = (value: string) => {

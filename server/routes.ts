@@ -19,11 +19,13 @@ import { v4 as uuidv4 } from "uuid";
 import { defaultRateLimiter, submissionRateLimiter } from "./middleware/rate-limiter";
 import adminRoutes from "./routes/admin";
 import instructorRoutes from "./routes/instructor";
+import errorReportingRoutes from "./routes/error-reporting";
 import { queueSecurityAudit } from "./queue/security-audit";
 import { determineContentType, isFileTypeAllowed, ContentType } from "./utils/file-type-settings";
 import { processFileForMultimodal } from "./utils/multimodal-processor";
 import { asyncHandler } from "./lib/error-handler";
 import { generateSecret, verifyTotp, generateOtpAuthUrl } from "./utils/totp";
+import { csrfProtection, addCSRFToken, getCSRFToken } from "./middleware/csrf-protection";
 import { performHealthCheck, quickHealthCheck } from "./lib/health-checker";
 import { validateProductionReadiness } from "./lib/production-validator";
 import { getDatabaseHealth } from "./lib/database-optimizer";
@@ -57,6 +59,12 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
   const { requireAuth, requireRole } = configureAuth(app);
+  
+  // Add CSRF protection middleware
+  app.use(addCSRFToken);
+  
+  // CSRF token endpoint
+  app.get('/api/csrf-token', getCSRFToken);
 
   const requireInstructor = (req: Request, res: Response, next: NextFunction) => {
     const role = (req.user as any)?.role;
@@ -74,6 +82,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Mount instructor routes
   app.use('/api/instructor', instructorRoutes);
+  
+  // Mount error reporting routes
+  app.use('/api', errorReportingRoutes);
 
   // Define API routes
   
@@ -123,7 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Manual recovery trigger (admin only)
-  app.post('/api/admin/trigger-recovery', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  app.post('/api/admin/trigger-recovery', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req, res) => {
     const { actionId } = req.body;
     if (!actionId) {
       return res.status(400).json({ error: 'actionId is required' });
@@ -146,7 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(health);
   }));
 
-  app.post('/api/admin/cache-clear', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  app.post('/api/admin/cache-clear', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req, res) => {
     const { pattern, tags } = req.body;
     
     let deletedCount = 0;
@@ -176,7 +187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
 
-  app.post('/api/admin/memory-gc', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  app.post('/api/admin/memory-gc', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req, res) => {
     const forced = memoryMonitor.forceGarbageCollection();
     const statsAfter = memoryMonitor.getMemoryStats();
     
@@ -195,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(result);
   }));
 
-  app.put('/api/admin/system-settings', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  app.put('/api/admin/system-settings', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const updates = req.body as Record<string, any>;
     if (!updates || typeof updates !== 'object') {
       return res.status(400).json({ message: 'Invalid request body' });
@@ -215,7 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(result);
   }));
 
-  app.post('/api/admin/security-audit', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/admin/security-audit', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as User;
     await queueSecurityAudit(user.id);
     res.json({ message: 'Security audit queued' });
@@ -252,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(usersList);
   }));
 
-  app.post('/api/admin/users', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/admin/users', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const userSchema = z.object({
       name: z.string().min(1),
       username: z.string().min(3),
@@ -271,7 +282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(201).json(newUser);
   }));
 
-  app.put('/api/admin/users/:id', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  app.put('/api/admin/users/:id', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
@@ -298,7 +309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(updated);
   }));
 
-  app.delete('/api/admin/users/:id', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  app.delete('/api/admin/users/:id', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
@@ -323,7 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(settings);
   }));
 
-  app.put('/api/user/notifications', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  app.put('/api/user/notifications', requireAuth, csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as User;
     const schema = z.object({
       emailNotifications: z.boolean(),
@@ -354,7 +365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ secret, url });
   }));
 
-  app.post('/api/mfa/enable', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/mfa/enable', requireAuth, csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const { token } = req.body;
     const user = await storage.getUser((req.user as any).id);
     if (!user || !user.mfaSecret) {
@@ -367,7 +378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ enabled: true });
   }));
 
-  app.post('/api/mfa/disable', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/mfa/disable', requireAuth, csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const { token } = req.body;
     const user = await storage.getUser((req.user as any).id);
     if (!user || !user.mfaSecret) { // Should check if MFA is enabled rather than just secret exists
@@ -446,7 +457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Create assignment (instructor only)
-  app.post('/api/assignments', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/assignments', requireAuth, requireRole('instructor'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     try {
       const { title, description, courseId, dueDate, rubric } = req.body;
 
@@ -591,7 +602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
 
-  app.patch('/api/assignments/:id/status', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+  app.patch('/api/assignments/:id/status', requireAuth, requireRole('instructor'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const assignmentId = parseInt(req.params.id);
 
     if (isNaN(assignmentId)) {
@@ -678,7 +689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
 
-  app.post('/api/anonymous-submissions', submissionRateLimiter, requireAuth, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/anonymous-submissions', submissionRateLimiter, requireAuth, csrfProtection, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
     const submissionSchema = z.object({
       assignmentId: z.string().transform(val => parseInt(val)),
       submissionType: z.enum(['file', 'code']),
@@ -789,7 +800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
 
-  app.post('/api/submissions', requireAuth, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/submissions', requireAuth, csrfProtection, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
       const user = req.user as any;
 
       if (user.role !== 'student') {
@@ -1036,7 +1047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
   }));
 
-  app.post('/api/courses', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/courses', requireAuth, requireRole('instructor'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
       const { name, code, description } = req.body;
 
       const courseSchema = z.object({

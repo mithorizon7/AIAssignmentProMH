@@ -39,36 +39,7 @@ import {
 } from "lucide-react";
 import { API_ROUTES } from "@/lib/constants";
 
-const systemStats = [
-  {
-    name: "Users",
-    value: 458,
-    change: 12.5,
-    increasing: true,
-    icon: <Users className="h-5 w-5" />,
-  },
-  {
-    name: "Submissions",
-    value: 1248,
-    change: 8.2,
-    increasing: true,
-    icon: <FileCheck className="h-5 w-5" />,
-  },
-  {
-    name: "API Calls",
-    value: 18432,
-    change: 3.1,
-    increasing: true,
-    icon: <Zap className="h-5 w-5" />,
-  },
-  {
-    name: "Avg. Response Time",
-    value: "1.23s",
-    change: -5.3,
-    increasing: false,
-    icon: <Clock className="h-5 w-5" />,
-  },
-];
+// Remove hardcoded mock data - use real API calls instead
 
 const last30DaysData = [
   { date: "Apr 10", users: 350, submissions: 900, apiCalls: 12000 },
@@ -88,38 +59,40 @@ const errorDistribution = [
   { name: "Other", value: 5 },
 ];
 
-const alerts = [
-  {
-    id: 1,
-    severity: "high",
-    message: "API rate limit exceeded for OpenAI",
-    timestamp: "2 hours ago",
-  },
-  {
-    id: 2,
-    severity: "medium",
-    message: "Database connection pool near capacity",
-    timestamp: "6 hours ago",
-  },
-  {
-    id: 3,
-    severity: "low",
-    message: "New API version available",
-    timestamp: "1 day ago",
-  },
-];
+// Remove hardcoded mock alerts - use real API calls instead
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Simulate fetching system stats
-  const { data: stats = systemStats } = useQuery({
-    queryKey: ["system-stats"],
+  // Show error state instead of hiding errors
+  if (statsError) {
+    throw new Error(`Failed to load admin dashboard: ${statsError.message}`);
+  }
+
+  // Fetch real system stats
+  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
+    queryKey: ["admin-stats"],
     queryFn: async () => {
-      // This would be a real API call in production
-      return systemStats;
+      const response = await fetch('/api/admin/stats');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch admin stats: ${response.status}`);
+      }
+      return response.json();
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Fetch real system alerts
+  const { data: alerts = [], isLoading: alertsLoading, error: alertsError } = useQuery({
+    queryKey: ["admin-alerts"],
+    queryFn: async () => {
+      const response = await fetch('/api/admin/alerts');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch admin alerts: ${response.status}`);
+      }
+      return response.json();
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
   return (
@@ -149,7 +122,22 @@ export default function AdminDashboard() {
 
           <TabsContent value="overview" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {stats.map((stat, i) => (
+              {statsLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <Card key={i}>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-2">
+                          <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
+                          <div className="h-8 w-16 bg-gray-200 rounded animate-pulse" />
+                        </div>
+                        <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : stats ? (
+                stats.map((stat, i) => (
                 <Card key={i}>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">
@@ -166,7 +154,10 @@ export default function AdminDashboard() {
                               : "bg-orange-100 text-orange-600"
                       }`}
                     >
-                      {stat.icon}
+                      {stat.icon === "Users" && <Users className="h-5 w-5" />}
+                      {stat.icon === "FileCheck" && <FileCheck className="h-5 w-5" />}
+                      {stat.icon === "Zap" && <Zap className="h-5 w-5" />}
+                      {stat.icon === "Clock" && <Clock className="h-5 w-5" />}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -188,7 +179,12 @@ export default function AdminDashboard() {
                     </p>
                   </CardContent>
                 </Card>
-              ))}
+              ))
+              ) : (
+                <div className="col-span-full text-center text-gray-500">
+                  No statistics available
+                </div>
+              )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
