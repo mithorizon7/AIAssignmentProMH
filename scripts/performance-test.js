@@ -1,197 +1,127 @@
-#!/usr/bin/env node
-
 /**
  * Performance testing script for AIGrader production readiness
  * Tests system performance under various load conditions
  */
 
-import http from 'http';
-import https from 'https';
 import fs from 'fs';
-import { performance } from 'perf_hooks';
-
-const CONFIG = {
-  baseUrl: process.env.TEST_BASE_URL || 'http://localhost:5000',
-  concurrency: parseInt(process.env.TEST_CONCURRENCY) || 10,
-  duration: parseInt(process.env.TEST_DURATION) || 60, // seconds
-  rampUp: parseInt(process.env.TEST_RAMP_UP) || 10, // seconds
-  endpoints: [
-    { path: '/api/health', method: 'GET', weight: 10 },
-    { path: '/api/health/detailed', method: 'GET', weight: 2 },
-    { path: '/api/auth/user', method: 'GET', weight: 5 },
-    { path: '/api/assignments', method: 'GET', weight: 3 },
-    { path: '/api/submissions', method: 'GET', weight: 2 }
-  ]
-};
+import path from 'path';
 
 class PerformanceTest {
   constructor() {
-    this.results = {
-      totalRequests: 0,
-      successfulRequests: 0,
-      failedRequests: 0,
-      startTime: 0,
-      endTime: 0,
-      responseTimes: [],
-      errorCounts: {},
-      statusCodes: {},
-      throughput: 0,
-      averageResponseTime: 0,
-      p95ResponseTime: 0,
-      p99ResponseTime: 0,
-      concurrentUsers: 0,
-      endpointStats: {}
+    this.baseUrl = process.env.TEST_URL || 'http://localhost:5000';
+    this.results = [];
+    this.config = {
+      // Test configuration for scalability assessment
+      totalUsers: 100,           // Simulate 100 concurrent users
+      testDuration: 60000,       // Run for 1 minute
+      rampUpTime: 10000,         // Ramp up over 10 seconds
+      
+      // Endpoint weights (simulating real usage patterns)
+      endpoints: {
+        'GET /api/health': { weight: 5, method: 'GET' },
+        'GET /api/assignments': { weight: 20, method: 'GET', requiresAuth: true },
+        'GET /api/submissions': { weight: 15, method: 'GET', requiresAuth: true },
+        'POST /api/submissions': { weight: 10, method: 'POST', requiresAuth: true },
+        'GET /api/auth/user': { weight: 25, method: 'GET', requiresAuth: true },
+        'GET /api/csrf-token': { weight: 25, method: 'GET' }
+      }
     };
-    
-    this.activeRequests = 0;
-    this.isRunning = false;
   }
 
   /**
    * Makes an HTTP request and measures performance
    */
   async makeRequest(endpoint) {
-    const startTime = performance.now();
+    const startTime = Date.now();
     
-    return new Promise((resolve) => {
-      const url = new URL(endpoint.path, CONFIG.baseUrl);
-      const options = {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      
+      const response = await fetch(`${this.baseUrl}${endpoint.url}`, {
         method: endpoint.method,
         headers: {
-          'User-Agent': 'AIGrader-Performance-Test/1.0',
+          'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Connection': 'keep-alive'
+          ...(endpoint.requiresAuth && {
+            'Cookie': 'connect.sid=test-session'
+          })
         },
-        timeout: 30000
-      };
-
-      const client = url.protocol === 'https:' ? https : http;
+        body: endpoint.body ? JSON.stringify(endpoint.body) : undefined,
+        signal: controller.signal
+      });
       
-      const req = client.request(url, options, (res) => {
-        let data = '';
-        
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-        
-        res.on('end', () => {
-          const endTime = performance.now();
-          const responseTime = endTime - startTime;
-          
-          this.recordResult(endpoint, res.statusCode, responseTime, null);
-          resolve({ statusCode: res.statusCode, responseTime, data });
-        });
-      });
-
-      req.on('error', (error) => {
-        const endTime = performance.now();
-        const responseTime = endTime - startTime;
-        
-        this.recordResult(endpoint, 0, responseTime, error);
-        resolve({ statusCode: 0, responseTime, error });
-      });
-
-      req.on('timeout', () => {
-        const endTime = performance.now();
-        const responseTime = endTime - startTime;
-        
-        this.recordResult(endpoint, 0, responseTime, new Error('Request timeout'));
-        req.destroy();
-        resolve({ statusCode: 0, responseTime, error: new Error('Request timeout') });
-      });
-
-      req.end();
-    });
+      clearTimeout(timeoutId);
+      const responseTime = Date.now() - startTime;
+      
+      this.recordResult(endpoint.url, response.status, responseTime);
+      return { success: true, responseTime, status: response.status };
+      
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      this.recordResult(endpoint.url, 0, responseTime, error.message);
+      return { success: false, responseTime, error: error.message };
+    }
   }
 
   /**
    * Records test results
    */
   recordResult(endpoint, statusCode, responseTime, error) {
-    this.results.totalRequests++;
-    this.results.responseTimes.push(responseTime);
-    
-    if (error) {
-      this.results.failedRequests++;
-      const errorType = error.code || error.message || 'Unknown error';
-      this.results.errorCounts[errorType] = (this.results.errorCounts[errorType] || 0) + 1;
-    } else {
-      this.results.successfulRequests++;
-    }
-    
-    this.results.statusCodes[statusCode] = (this.results.statusCodes[statusCode] || 0) + 1;
-    
-    // Track per-endpoint stats
-    if (!this.results.endpointStats[endpoint.path]) {
-      this.results.endpointStats[endpoint.path] = {
-        requests: 0,
-        successfulRequests: 0,
-        failedRequests: 0,
-        responseTimes: [],
-        errors: {}
-      };
-    }
-    
-    const endpointStats = this.results.endpointStats[endpoint.path];
-    endpointStats.requests++;
-    endpointStats.responseTimes.push(responseTime);
-    
-    if (error) {
-      endpointStats.failedRequests++;
-      const errorType = error.code || error.message || 'Unknown error';
-      endpointStats.errors[errorType] = (endpointStats.errors[errorType] || 0) + 1;
-    } else {
-      endpointStats.successfulRequests++;
-    }
+    this.results.push({
+      endpoint,
+      statusCode,
+      responseTime,
+      timestamp: new Date().toISOString(),
+      error: error || null
+    });
   }
 
   /**
    * Selects a random endpoint based on weights
    */
   selectEndpoint() {
-    const totalWeight = CONFIG.endpoints.reduce((sum, ep) => sum + ep.weight, 0);
-    const random = Math.random() * totalWeight;
+    const endpoints = Object.entries(this.config.endpoints);
+    const totalWeight = endpoints.reduce((sum, [_, config]) => sum + config.weight, 0);
+    let random = Math.random() * totalWeight;
     
-    let currentWeight = 0;
-    for (const endpoint of CONFIG.endpoints) {
-      currentWeight += endpoint.weight;
-      if (random <= currentWeight) {
-        return endpoint;
+    for (const [url, config] of endpoints) {
+      random -= config.weight;
+      if (random <= 0) {
+        return { url, ...config };
       }
     }
     
-    return CONFIG.endpoints[0];
+    // Fallback to health check
+    return { url: '/api/health', method: 'GET', weight: 1 };
   }
 
   /**
    * Runs a single user simulation
    */
   async runUser(userId) {
-    const userStartTime = performance.now();
+    const startTime = Date.now();
+    const endTime = startTime + this.config.testDuration;
     
-    while (this.isRunning) {
+    console.log(`User ${userId} starting test simulation`);
+    
+    while (Date.now() < endTime) {
       const endpoint = this.selectEndpoint();
+      await this.makeRequest(endpoint);
       
-      this.activeRequests++;
-      
-      try {
-        await this.makeRequest(endpoint);
-      } catch (error) {
-        console.error(`User ${userId} error:`, error);
-      }
-      
-      this.activeRequests--;
-      
-      // Small delay between requests to simulate real user behavior
-      await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
+      // Random delay between requests (50-500ms)
+      const delay = Math.random() * 450 + 50;
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
+    
+    console.log(`User ${userId} completed simulation`);
   }
 
   /**
    * Calculates percentile from response times
    */
   calculatePercentile(responseTimes, percentile) {
-    const sorted = responseTimes.sort((a, b) => a - b);
+    const sorted = responseTimes.slice().sort((a, b) => a - b);
     const index = Math.ceil((percentile / 100) * sorted.length) - 1;
     return sorted[index] || 0;
   }
@@ -200,114 +130,112 @@ class PerformanceTest {
    * Calculates final statistics
    */
   calculateStats() {
-    const duration = (this.results.endTime - this.results.startTime) / 1000; // seconds
-    
-    this.results.throughput = this.results.totalRequests / duration;
-    this.results.averageResponseTime = this.results.responseTimes.reduce((sum, time) => sum + time, 0) / this.results.responseTimes.length;
-    this.results.p95ResponseTime = this.calculatePercentile(this.results.responseTimes, 95);
-    this.results.p99ResponseTime = this.calculatePercentile(this.results.responseTimes, 99);
-    
-    // Calculate per-endpoint stats
-    for (const [path, stats] of Object.entries(this.results.endpointStats)) {
-      stats.averageResponseTime = stats.responseTimes.reduce((sum, time) => sum + time, 0) / stats.responseTimes.length;
-      stats.p95ResponseTime = this.calculatePercentile(stats.responseTimes, 95);
-      stats.successRate = (stats.successfulRequests / stats.requests) * 100;
+    if (this.results.length === 0) {
+      return { error: 'No test results available' };
     }
+
+    const responseTimes = this.results.map(r => r.responseTime);
+    const successfulRequests = this.results.filter(r => r.statusCode >= 200 && r.statusCode < 400);
+    const errorRequests = this.results.filter(r => r.error || r.statusCode >= 400);
+    
+    return {
+      totalRequests: this.results.length,
+      successfulRequests: successfulRequests.length,
+      errorRequests: errorRequests.length,
+      successRate: (successfulRequests.length / this.results.length * 100).toFixed(2),
+      
+      // Response time statistics
+      avgResponseTime: (responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length).toFixed(2),
+      minResponseTime: Math.min(...responseTimes),
+      maxResponseTime: Math.max(...responseTimes),
+      p50ResponseTime: this.calculatePercentile(responseTimes, 50),
+      p95ResponseTime: this.calculatePercentile(responseTimes, 95),
+      p99ResponseTime: this.calculatePercentile(responseTimes, 99),
+      
+      // Throughput
+      requestsPerSecond: (this.results.length / (this.config.testDuration / 1000)).toFixed(2),
+      
+      // Error analysis
+      errorRate: (errorRequests.length / this.results.length * 100).toFixed(2),
+      timeoutErrors: errorRequests.filter(r => r.error && r.error.includes('timeout')).length,
+      
+      // Performance grades
+      performanceGrade: this.getPerformanceGrade(responseTimes)
+    };
+  }
+
+  /**
+   * Assigns performance grade based on response times
+   */
+  getPerformanceGrade(responseTimes) {
+    const p95 = this.calculatePercentile(responseTimes, 95);
+    
+    if (p95 < 100) return 'A+ (Excellent)';
+    if (p95 < 200) return 'A (Very Good)';
+    if (p95 < 500) return 'B (Good)';
+    if (p95 < 1000) return 'C (Acceptable)';
+    if (p95 < 2000) return 'D (Poor)';
+    return 'F (Unacceptable)';
   }
 
   /**
    * Prints test results
    */
   printResults() {
-    console.log('\n🚀 AIGrader Performance Test Results\n');
+    const stats = this.calculateStats();
+    
+    console.log('\n' + '='.repeat(60));
+    console.log('PERFORMANCE TEST RESULTS');
     console.log('='.repeat(60));
     
-    const duration = (this.results.endTime - this.results.startTime) / 1000;
-    const successRate = (this.results.successfulRequests / this.results.totalRequests) * 100;
+    console.log(`📊 Test Configuration:`);
+    console.log(`   Users: ${this.config.totalUsers}`);
+    console.log(`   Duration: ${this.config.testDuration / 1000}s`);
+    console.log(`   Target: Tens of thousands of students scalability`);
     
-    console.log(`Test Duration: ${duration.toFixed(2)}s`);
-    console.log(`Total Requests: ${this.results.totalRequests}`);
-    console.log(`Successful Requests: ${this.results.successfulRequests}`);
-    console.log(`Failed Requests: ${this.results.failedRequests}`);
-    console.log(`Success Rate: ${successRate.toFixed(2)}%`);
-    console.log(`Throughput: ${this.results.throughput.toFixed(2)} requests/second`);
-    console.log(`Average Response Time: ${this.results.averageResponseTime.toFixed(2)}ms`);
-    console.log(`95th Percentile: ${this.results.p95ResponseTime.toFixed(2)}ms`);
-    console.log(`99th Percentile: ${this.results.p99ResponseTime.toFixed(2)}ms`);
+    console.log(`\n📈 Request Statistics:`);
+    console.log(`   Total Requests: ${stats.totalRequests}`);
+    console.log(`   Success Rate: ${stats.successRate}%`);
+    console.log(`   Error Rate: ${stats.errorRate}%`);
+    console.log(`   Requests/sec: ${stats.requestsPerSecond}`);
     
-    console.log('\n📊 Status Code Distribution:');
-    for (const [code, count] of Object.entries(this.results.statusCodes)) {
-      const percentage = (count / this.results.totalRequests) * 100;
-      console.log(`  ${code}: ${count} (${percentage.toFixed(1)}%)`);
+    console.log(`\n⚡ Response Time Analysis:`);
+    console.log(`   Average: ${stats.avgResponseTime}ms`);
+    console.log(`   50th percentile: ${stats.p50ResponseTime}ms`);
+    console.log(`   95th percentile: ${stats.p95ResponseTime}ms`);
+    console.log(`   99th percentile: ${stats.p99ResponseTime}ms`);
+    console.log(`   Min/Max: ${stats.minResponseTime}ms / ${stats.maxResponseTime}ms`);
+    
+    console.log(`\n🎯 Performance Grade: ${stats.performanceGrade}`);
+    
+    if (stats.errorRate > 5) {
+      console.log(`\n⚠️  High Error Rate Warning: ${stats.errorRate}%`);
+      console.log(`   This indicates potential scalability issues`);
     }
     
-    if (Object.keys(this.results.errorCounts).length > 0) {
-      console.log('\n❌ Error Distribution:');
-      for (const [error, count] of Object.entries(this.results.errorCounts)) {
-        const percentage = (count / this.results.totalRequests) * 100;
-        console.log(`  ${error}: ${count} (${percentage.toFixed(1)}%)`);
-      }
+    if (stats.p95ResponseTime > 1000) {
+      console.log(`\n⚠️  Slow Response Warning: P95 = ${stats.p95ResponseTime}ms`);
+      console.log(`   This may not scale to tens of thousands of users`);
     }
     
-    console.log('\n🎯 Endpoint Performance:');
-    for (const [path, stats] of Object.entries(this.results.endpointStats)) {
-      console.log(`  ${path}:`);
-      console.log(`    Requests: ${stats.requests}`);
-      console.log(`    Success Rate: ${stats.successRate.toFixed(2)}%`);
-      console.log(`    Avg Response Time: ${stats.averageResponseTime.toFixed(2)}ms`);
-      console.log(`    95th Percentile: ${stats.p95ResponseTime.toFixed(2)}ms`);
+    console.log('\n📋 Scalability Assessment:');
+    if (stats.successRate > 95 && stats.p95ResponseTime < 500) {
+      console.log('   ✅ PASS - System shows good scalability potential');
+    } else if (stats.successRate > 90 && stats.p95ResponseTime < 1000) {
+      console.log('   ⚠️  PARTIAL - System needs optimization for full scale');
+    } else {
+      console.log('   ❌ FAIL - System requires significant improvements for scale');
     }
     
-    console.log('\n🏆 Performance Assessment:');
+    // Save detailed results
+    const filename = `performance-results-${new Date().toISOString()}.json`;
+    fs.writeFileSync(filename, JSON.stringify({
+      config: this.config,
+      stats,
+      detailedResults: this.results
+    }, null, 2));
     
-    // Performance benchmarks
-    const benchmarks = {
-      throughput: { good: 100, warning: 50 },
-      averageResponseTime: { good: 500, warning: 1000 },
-      p95ResponseTime: { good: 1000, warning: 2000 },
-      successRate: { good: 99, warning: 95 }
-    };
-    
-    const assessments = [
-      {
-        metric: 'Throughput',
-        value: this.results.throughput,
-        unit: 'req/s',
-        benchmark: benchmarks.throughput,
-        higher: true
-      },
-      {
-        metric: 'Average Response Time',
-        value: this.results.averageResponseTime,
-        unit: 'ms',
-        benchmark: benchmarks.averageResponseTime,
-        higher: false
-      },
-      {
-        metric: '95th Percentile',
-        value: this.results.p95ResponseTime,
-        unit: 'ms',
-        benchmark: benchmarks.p95ResponseTime,
-        higher: false
-      },
-      {
-        metric: 'Success Rate',
-        value: successRate,
-        unit: '%',
-        benchmark: benchmarks.successRate,
-        higher: true
-      }
-    ];
-    
-    for (const assessment of assessments) {
-      const status = assessment.higher
-        ? (assessment.value >= assessment.benchmark.good ? '✅ GOOD' : 
-           assessment.value >= assessment.benchmark.warning ? '⚠️ WARNING' : '❌ POOR')
-        : (assessment.value <= assessment.benchmark.good ? '✅ GOOD' : 
-           assessment.value <= assessment.benchmark.warning ? '⚠️ WARNING' : '❌ POOR');
-      
-      console.log(`  ${assessment.metric}: ${assessment.value.toFixed(2)}${assessment.unit} ${status}`);
-    }
+    console.log(`\n📁 Detailed results saved to: ${filename}`);
   }
 
   /**
@@ -315,47 +243,40 @@ class PerformanceTest {
    */
   async run() {
     console.log('🚀 Starting AIGrader Performance Test');
-    console.log(`Base URL: ${CONFIG.baseUrl}`);
-    console.log(`Concurrency: ${CONFIG.concurrency} users`);
-    console.log(`Duration: ${CONFIG.duration} seconds`);
-    console.log(`Ramp-up: ${CONFIG.rampUp} seconds`);
-    console.log('\nStarting test...\n');
+    console.log(`   Testing scalability for ${this.config.totalUsers} concurrent users`);
+    console.log(`   Target: Tens of thousands of students capacity\n`);
     
-    this.results.startTime = performance.now();
-    this.isRunning = true;
+    const startTime = Date.now();
     
-    // Start users with ramp-up
+    // Create user promises with staggered start times
     const userPromises = [];
-    for (let i = 0; i < CONFIG.concurrency; i++) {
-      setTimeout(() => {
-        userPromises.push(this.runUser(i + 1));
-      }, (i / CONFIG.concurrency) * CONFIG.rampUp * 1000);
+    for (let i = 0; i < this.config.totalUsers; i++) {
+      const delay = (i / this.config.totalUsers) * this.config.rampUpTime;
+      
+      const userPromise = new Promise(resolve => {
+        setTimeout(async () => {
+          await this.runUser(i + 1);
+          resolve();
+        }, delay);
+      });
+      
+      userPromises.push(userPromise);
     }
-    
-    // Run for specified duration
-    setTimeout(() => {
-      this.isRunning = false;
-      this.results.endTime = performance.now();
-    }, CONFIG.duration * 1000);
     
     // Wait for all users to complete
     await Promise.all(userPromises);
     
-    // Calculate final statistics
-    this.calculateStats();
+    const totalTime = Date.now() - startTime;
+    console.log(`\n✅ Test completed in ${(totalTime / 1000).toFixed(2)}s`);
     
-    // Print results
     this.printResults();
-    
-    // Save results to file
-    const resultsFile = `performance-results-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-    fs.writeFileSync(resultsFile, JSON.stringify(this.results, null, 2));
-    console.log(`\n📁 Results saved to: ${resultsFile}`);
   }
 }
 
-// Run the test
-const test = new PerformanceTest();
-test.run().catch(console.error);
+// Check if running directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const test = new PerformanceTest();
+  test.run().catch(console.error);
+}
 
 export default PerformanceTest;

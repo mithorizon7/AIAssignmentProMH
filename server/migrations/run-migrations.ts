@@ -13,14 +13,19 @@ export async function runMigrations() {
     
     // Run LMS table migrations only if tables don't exist
     try {
-      await addLmsTables();
-    } catch (error) {
-      // If tables already exist, this is expected - log and continue
-      if (error instanceof Error && error.message.includes('already exists')) {
-        logger.info('LMS tables already exist, skipping migration');
+      // Check if LMS tables already exist to avoid syntax errors
+      const result = await db.execute(`
+        SELECT table_name FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name LIKE 'lms_%'
+      `);
+      
+      if (result.rows.length === 0) {
+        await addLmsTables();
       } else {
-        logger.warn('LMS migration error (possibly already migrated)', { error: error.message });
+        logger.info('LMS tables already exist, skipping migration');
       }
+    } catch (error) {
+      logger.warn('LMS migration error (possibly already migrated)', { error: error.message });
     }
     
     console.log('All migrations completed successfully!');

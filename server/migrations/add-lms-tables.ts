@@ -16,9 +16,7 @@ export async function addLmsTables() {
   try {
     // Create lms_provider enum if it doesn't exist
     try {
-      await db.execute(sql`
-        CREATE TYPE lms_provider AS ENUM ('canvas', 'blackboard', 'moodle', 'd2l')
-      `);
+      await db.execute(sql`CREATE TYPE lms_provider AS ENUM ('canvas', 'blackboard', 'moodle', 'd2l')`);
       console.log('Created lms_provider enum');
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
@@ -30,9 +28,7 @@ export async function addLmsTables() {
     
     // Create sync_status enum if it doesn't exist
     try {
-      await db.execute(sql`
-        CREATE TYPE sync_status AS ENUM ('pending', 'in_progress', 'completed', 'failed')
-      `);
+      await db.execute(sql`CREATE TYPE sync_status AS ENUM ('pending', 'in_progress', 'completed', 'failed')`);
       console.log('Created sync_status enum');
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
