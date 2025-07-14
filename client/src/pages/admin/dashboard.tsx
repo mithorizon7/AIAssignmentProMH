@@ -64,12 +64,8 @@ const errorDistribution = [
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Show error state instead of hiding errors
-  if (statsError) {
-    throw new Error(`Failed to load admin dashboard: ${statsError.message}`);
-  }
-
   // Fetch real system stats
+  // Show error state instead of hiding errors
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: async () => {
@@ -94,6 +90,15 @@ export default function AdminDashboard() {
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
+
+  // Throw errors instead of hiding them
+  if (statsError) {
+    throw new Error(`Failed to load admin dashboard: ${statsError.message}`);
+  }
+  
+  if (alertsError) {
+    throw new Error(`Failed to load admin alerts: ${alertsError.message}`);
+  }
 
   return (
     <AdminShell>
