@@ -1,188 +1,222 @@
 /**
- * Safe storage utilities with error handling for localStorage and sessionStorage
- * Implements best practices for storage operations in production environments
+ * Safe Storage Operations
+ * Provides error-safe localStorage and sessionStorage operations
  */
 
-// Centralized storage keys to avoid magic strings
+// Centralized storage keys
 export const STORAGE_KEYS = {
   AUTH_TOKEN: 'authToken',
   AUTH_USER: 'authUser',
-  AUTH0_LOGOUT_REDIRECT: 'auth0LogoutRedirect',
-  HORIZON_LOGOUT_REDIRECT: 'horizonLogoutRedirect',
-  USER_PREFERENCES: 'userPreferences',
   THEME: 'theme',
+  PREFERENCES: 'userPreferences',
+  LAST_ACTIVITY: 'lastActivity',
+  FORM_DRAFT: 'formDraft'
 } as const;
 
-// Simple logger for storage operations
-const logger = {
-  info: (message: string, meta?: any) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.info(`[STORAGE] ${message}`, meta);
-    }
-  },
-  error: (message: string, meta?: any) => {
-    console.error(`[STORAGE] ${message}`, meta);
-  },
-  warn: (message: string, meta?: any) => {
-    console.warn(`[STORAGE] ${message}`, meta);
-  }
-};
+export type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];
 
 /**
  * Safe localStorage operations with error handling
  */
-export const safeLocalStorage = {
-  getItem: (key: string): string | null => {
+export class SafeStorage {
+  private static isStorageAvailable(storage: Storage): boolean {
     try {
-      if (typeof localStorage !== 'undefined') {
-        return localStorage.getItem(key);
-      }
-      return null;
-    } catch (error) {
-      logger.error('Failed to get item from localStorage', { key, error });
-      return null;
-    }
-  },
-  
-  setItem: (key: string, value: string): void => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(key, value);
-      }
-    } catch (error) {
-      logger.error('Failed to set item in localStorage', { key, error });
-    }
-  },
-  
-  removeItem: (key: string): void => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(key);
-      }
-    } catch (error) {
-      logger.error('Failed to remove item from localStorage', { key, error });
-    }
-  },
-  
-  getJSON: <T>(key: string): T | null => {
-    try {
-      const item = safeLocalStorage.getItem(key);
-      if (item) {
-        return JSON.parse(item) as T;
-      }
-      return null;
-    } catch (error) {
-      logger.error('Failed to parse JSON from localStorage', { key, error });
-      // Clear corrupted data
-      safeLocalStorage.removeItem(key);
-      return null;
-    }
-  },
-  
-  setJSON: (key: string, value: any): void => {
-    try {
-      const jsonString = JSON.stringify(value);
-      safeLocalStorage.setItem(key, jsonString);
-    } catch (error) {
-      logger.error('Failed to stringify JSON for localStorage', { key, error });
-    }
-  },
-  
-  clear: (): void => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.clear();
-      }
-    } catch (error) {
-      logger.error('Failed to clear localStorage', { error });
+      const test = '__storage_test__';
+      storage.setItem(test, test);
+      storage.removeItem(test);
+      return true;
+    } catch {
+      return false;
     }
   }
-};
 
-/**
- * Safe sessionStorage operations with error handling
- */
-export const safeSessionStorage = {
-  getItem: (key: string): string | null => {
+  private static getStorage(useSession = false): Storage | null {
     try {
-      if (typeof sessionStorage !== 'undefined') {
-        return sessionStorage.getItem(key);
-      }
+      const storage = useSession ? sessionStorage : localStorage;
+      return this.isStorageAvailable(storage) ? storage : null;
+    } catch {
       return null;
-    } catch (error) {
-      logger.error('Failed to get item from sessionStorage', { key, error });
-      return null;
-    }
-  },
-  
-  setItem: (key: string, value: string): void => {
-    try {
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem(key, value);
-      }
-    } catch (error) {
-      logger.error('Failed to set item in sessionStorage', { key, error });
-    }
-  },
-  
-  removeItem: (key: string): void => {
-    try {
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.removeItem(key);
-      }
-    } catch (error) {
-      logger.error('Failed to remove item from sessionStorage', { key, error });
-    }
-  },
-  
-  getJSON: <T>(key: string): T | null => {
-    try {
-      const item = safeSessionStorage.getItem(key);
-      if (item) {
-        return JSON.parse(item) as T;
-      }
-      return null;
-    } catch (error) {
-      logger.error('Failed to parse JSON from sessionStorage', { key, error });
-      // Clear corrupted data
-      safeSessionStorage.removeItem(key);
-      return null;
-    }
-  },
-  
-  setJSON: (key: string, value: any): void => {
-    try {
-      const jsonString = JSON.stringify(value);
-      safeSessionStorage.setItem(key, jsonString);
-    } catch (error) {
-      logger.error('Failed to stringify JSON for sessionStorage', { key, error });
-    }
-  },
-  
-  clear: (): void => {
-    try {
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.clear();
-      }
-    } catch (error) {
-      logger.error('Failed to clear sessionStorage', { error });
     }
   }
-};
 
-/**
- * Generic safe storage interface that works with both localStorage and sessionStorage
- */
-export interface SafeStorage {
-  getItem: (key: string) => string | null;
-  setItem: (key: string, value: string) => void;
-  removeItem: (key: string) => void;
-  getJSON: <T>(key: string) => T | null;
-  setJSON: (key: string, value: any) => void;
-  clear: () => void;
+  /**
+   * Safely get item from storage
+   */
+  static getItem(key: StorageKey, useSession = false): string | null {
+    try {
+      const storage = this.getStorage(useSession);
+      return storage?.getItem(key) ?? null;
+    } catch (error) {
+      console.warn(`Failed to get item ${key} from storage:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Safely set item in storage
+   */
+  static setItem(key: StorageKey, value: string, useSession = false): boolean {
+    try {
+      const storage = this.getStorage(useSession);
+      if (!storage) return false;
+      
+      storage.setItem(key, value);
+      return true;
+    } catch (error) {
+      console.warn(`Failed to set item ${key} in storage:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Safely remove item from storage
+   */
+  static removeItem(key: StorageKey, useSession = false): boolean {
+    try {
+      const storage = this.getStorage(useSession);
+      if (!storage) return false;
+      
+      storage.removeItem(key);
+      return true;
+    } catch (error) {
+      console.warn(`Failed to remove item ${key} from storage:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Safely clear all storage
+   */
+  static clear(useSession = false): boolean {
+    try {
+      const storage = this.getStorage(useSession);
+      if (!storage) return false;
+      
+      storage.clear();
+      return true;
+    } catch (error) {
+      console.warn('Failed to clear storage:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Safely get JSON object from storage
+   */
+  static getJSON<T>(key: StorageKey, useSession = false): T | null {
+    try {
+      const item = this.getItem(key, useSession);
+      if (!item) return null;
+      
+      return JSON.parse(item) as T;
+    } catch (error) {
+      console.warn(`Failed to parse JSON for ${key}:`, error);
+      // Clean up corrupted data
+      this.removeItem(key, useSession);
+      return null;
+    }
+  }
+
+  /**
+   * Safely set JSON object in storage
+   */
+  static setJSON<T>(key: StorageKey, value: T, useSession = false): boolean {
+    try {
+      const serialized = JSON.stringify(value);
+      return this.setItem(key, serialized, useSession);
+    } catch (error) {
+      console.warn(`Failed to serialize JSON for ${key}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Get available storage space (approximation)
+   */
+  static getAvailableSpace(useSession = false): number | null {
+    try {
+      const storage = this.getStorage(useSession);
+      if (!storage) return null;
+      
+      let used = 0;
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (key) {
+          used += key.length + (storage.getItem(key) || '').length;
+        }
+      }
+      
+      // Most browsers limit localStorage to 5-10MB
+      const limit = 5 * 1024 * 1024; // 5MB
+      return Math.max(0, limit - used);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Clean up expired or corrupted storage items
+   */
+  static cleanup(useSession = false): void {
+    try {
+      const storage = this.getStorage(useSession);
+      if (!storage) return;
+      
+      const keysToRemove: string[] = [];
+      
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (!key) continue;
+        
+        try {
+          const value = storage.getItem(key);
+          if (value) {
+            // Try to parse as JSON to check for corruption
+            JSON.parse(value);
+          }
+        } catch {
+          // Mark corrupted items for removal
+          keysToRemove.push(key);
+        }
+      }
+      
+      // Remove corrupted items
+      keysToRemove.forEach(key => {
+        try {
+          storage.removeItem(key);
+        } catch {
+          // Ignore errors during cleanup
+        }
+      });
+      
+      if (keysToRemove.length > 0) {
+        console.info(`Cleaned up ${keysToRemove.length} corrupted storage items`);
+      }
+    } catch (error) {
+      console.warn('Storage cleanup failed:', error);
+    }
+  }
 }
 
 /**
- * Default export for convenience - uses sessionStorage
+ * Hook for React components to use safe storage
  */
-export const safeStorage = safeSessionStorage;
+export function useStorage() {
+  return {
+    getItem: SafeStorage.getItem,
+    setItem: SafeStorage.setItem,
+    removeItem: SafeStorage.removeItem,
+    getJSON: SafeStorage.getJSON,
+    setJSON: SafeStorage.setJSON,
+    clear: SafeStorage.clear,
+    cleanup: SafeStorage.cleanup
+  };
+}
+
+// Initialize cleanup on module load
+try {
+  SafeStorage.cleanup(false); // localStorage
+  SafeStorage.cleanup(true);  // sessionStorage
+} catch {
+  // Ignore initialization errors
+}

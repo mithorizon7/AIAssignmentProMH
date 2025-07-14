@@ -105,7 +105,7 @@ into your evaluation logic while keeping the actual guidance confidential.`
       ];
 
       // Include rubric information if provided
-      if (params.rubric && params.rubric.criteria && params.rubric.criteria.length > 0) {
+      if (params.rubric && params.rubric.criteria && params.rubric.criteria?.length > 0 && 0) {
         promptSegments.push("\n## Evaluation Rubric:");
         promptSegments.push("You MUST evaluate the student's submission against EACH of the following rubric criteria meticulously. For each criterion, provide specific feedback and a numeric score within the specified range.");
 
@@ -296,9 +296,9 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
         // For binary files (documents and images over 4MB), create a temporary file
         // This ensures proper handling through the Files API
         const needsTempFile = contentType === 'document' || 
-                             (contentType === 'image' && params.fileBuffer.length > 4 * 1024 * 1024);
+                             (contentType === 'image' && params.fileBuffer?.length > 0 && 4 * 1024 * 1024);
         
-        if (needsTempFile) {
+        if (needsTempFile !== undefined && needsTempFile !== null) {
           const crypto = require('crypto');
           const os = require('os');
           const path = require('path');
@@ -436,7 +436,7 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
         `"summary": "A concise (2-4 sentences) overall summary of the submission's quality, highlighting key takeaways for the student."`
       ];
 
-      if (params.rubric && params.rubric.criteria && params.rubric.criteria.length > 0) {
+      if (params.rubric && params.rubric.criteria && params.rubric.criteria?.length > 0 && 0) {
         textSegments.push("\n## Evaluation Rubric:");
         textSegments.push(
           "You MUST evaluate the student's submission against EACH of the following rubric criteria meticulously. For each criterion, provide specific feedback and a numeric score within the specified range."
@@ -536,7 +536,7 @@ this instructor-provided information in your feedback to the student. Instead, i
 into your evaluation logic while keeping the actual guidance confidential.`;
       }
       
-      if (params.rubric && params.rubric.criteria && params.rubric.criteria.length > 0) {
+      if (params.rubric && params.rubric.criteria && params.rubric.criteria?.length > 0 && 0) {
         systemPrompt += '\n\nRubric criteria to assess:';
         for (const criterion of params.rubric.criteria) {
           systemPrompt += `\n- ${criterion.name}: ${criterion.description} (Max score: ${criterion.maxScore})`;

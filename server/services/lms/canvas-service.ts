@@ -99,7 +99,7 @@ export class CanvasService implements BaseLmsService {
         throw new Error(`Canvas API error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json() as any[];
+      const data = await response.json() as unknown[];
       
       return data.map(course => ({
         id: course.id.toString(),
@@ -131,7 +131,7 @@ export class CanvasService implements BaseLmsService {
         throw new Error(`Canvas API error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json() as any[];
+      const data = await response.json() as unknown[];
       
       return data.map(student => ({
         id: student.id.toString(),
@@ -162,7 +162,7 @@ export class CanvasService implements BaseLmsService {
         throw new Error(`Canvas API error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json() as any[];
+      const data = await response.json() as unknown[];
       
       return data.map(assignment => ({
         id: assignment.id.toString(),
@@ -194,7 +194,7 @@ export class CanvasService implements BaseLmsService {
         throw new Error(`Canvas API error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json() as any[];
+      const data = await response.json() as unknown[];
       const assignmentResponse = await fetch(
         `${this.apiBaseUrl}/courses/${courseId}/assignments/${assignmentId}`, 
         {
@@ -207,7 +207,7 @@ export class CanvasService implements BaseLmsService {
         throw new Error(`Canvas API error: ${assignmentResponse.status} ${assignmentResponse.statusText}`);
       }
       
-      const assignmentData = await assignmentResponse.json() as any;
+      const assignmentData = await assignmentResponse.json() as unknown;
       const maxScore = assignmentData.points_possible || 100;
       
       return data.map(submission => ({

@@ -23,7 +23,7 @@ export class OpenAIAdapter implements AIAdapter {
       const messages = [];
       
       // Add system prompt if provided
-      if (systemPrompt) {
+      if (systemPrompt !== undefined && systemPrompt !== null) {
         console.log(`[OPENAI] Using system prompt (${systemPrompt.length} chars)`);
         messages.push({ 
           role: "system" as const, 
@@ -62,7 +62,7 @@ export class OpenAIAdapter implements AIAdapter {
         modelName: this.model,
         tokenCount
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("OpenAI API error:", error);
       throw new Error(`AI generation failed: ${error.message || String(error)}`);
     }

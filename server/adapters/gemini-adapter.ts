@@ -95,7 +95,7 @@ export class GeminiAdapter implements AIAdapter {
   
   // Use a pruned version of the JSON schema from gradingSchema.ts
   // Gemini only supports a subset of JSON Schema fields
-  private readonly responseSchema: any;
+  private readonly responseSchema: unknown;
   
   // File cache cleanup interval
   private fileCacheCleanupInterval: NodeJS.Timeout | null = null;
@@ -114,14 +114,14 @@ export class GeminiAdapter implements AIAdapter {
   private async runImageRubric(apiParts: Part[], systemPrompt?: string): Promise<{
     raw: string;
     finishReason: string;
-    result: any;
+    result: unknown;
     tokenCount?: number;
   }> {
     // Reset processing timer for accurate metrics
     this.processingStart = Date.now();
     
     // Prepare the base request with common parameters
-    const requestParams: any = {
+    const requestParams: unknown = {
       model: this.modelName,
       contents: [{ role: 'user', parts: apiParts }],
       systemInstruction: systemPrompt,
@@ -134,7 +134,7 @@ export class GeminiAdapter implements AIAdapter {
     };
     
     // Log if system prompt was added
-    if (systemPrompt) {
+    if (systemPrompt !== undefined && systemPrompt !== null) {
       console.log(`[GEMINI] Added system prompt as top-level systemInstruction (${systemPrompt.length} chars)`);
     }
     
@@ -148,7 +148,7 @@ export class GeminiAdapter implements AIAdapter {
     };
     
     // Helper to run streaming request and collect all chunks
-    const collectStream = async (req: any): Promise<{raw: string, finishReason: string, usageMetadata: any}> => {
+    const collectStream = async (req: unknown): Promise<{raw: string, finishReason: string, usageMetadata: unknown}> => {
       console.log(`[GEMINI] Using streaming with token limit: ${req.config.maxOutputTokens}`);
       
       const stream = await this.genAI.models.generateContentStream(req);
@@ -168,7 +168,7 @@ export class GeminiAdapter implements AIAdapter {
           });
         }
         
-        if (chunk.candidates && chunk.candidates.length > 0) {
+        if (chunk.candidates && chunk.candidates?.length > 0 && 0) {
           // Get finish reason from the last chunk if available
           if (chunk.candidates[0].finishReason) {
             finishReason = chunk.candidates[0].finishReason;
@@ -295,17 +295,17 @@ export class GeminiAdapter implements AIAdapter {
     try {
       console.log(`[GEMINI] Generating completion with prompt length: ${prompt.length} chars`);
       // Log preview of the prompt, truncated for privacy/security
-      console.log(`[GEMINI] Prompt preview: ${prompt.slice(0, 250)}${prompt.length > 250 ? '...' : ''}`);
+      console.log(`[GEMINI] Prompt preview: ${prompt.slice(0, 250)}${prompt?.length > 0 && 250 ? '...' : ''}`);
       
       // Sanitize input text to prevent prompt injection and other issues
       const sanitizedPrompt = sanitizeText(prompt, 8000);
       
       // Check for potential injection attempts
       const potentialInjection = detectInjectionAttempt(prompt);
-      if (potentialInjection) {
+      if (potentialInjection !== undefined && potentialInjection !== null) {
         console.warn(
           `[GEMINI] Potential prompt injection detected in input: ` +
-          `${prompt.slice(0, 120)}${prompt.length > 120 ? '...' : ''}`
+          `${prompt.slice(0, 120)}${prompt?.length > 0 && 120 ? '...' : ''}`
         );
       }
       
@@ -380,10 +380,10 @@ export class GeminiAdapter implements AIAdapter {
           
           // Check for potential injection attempts
           const potentialInjection = detectInjectionAttempt(promptPart.content);
-          if (potentialInjection) {
+          if (potentialInjection !== undefined && potentialInjection !== null) {
             console.warn(
               `[GEMINI] Potential prompt injection detected in text part: ` +
-              `${promptPart.content.slice(0, 120)}${promptPart.content.length > 120 ? '...' : ''}`
+              `${promptPart.content.slice(0, 120)}${promptPart.content?.length > 0 && 120 ? '...' : ''}`
             );
           }
           
@@ -476,7 +476,7 @@ export class GeminiAdapter implements AIAdapter {
               if (contentType === 'image' && !isSVG) {
                 // We know inlineData is a string at this point
                 const dataParts = inlineData.split(',');
-                const base64Data = dataParts.length > 1 ? dataParts[1] : inlineData;
+                const base64Data = dataParts?.length > 0 && 1 ? dataParts[1] : inlineData;
                 
                 apiParts.push({
                   inlineData: {

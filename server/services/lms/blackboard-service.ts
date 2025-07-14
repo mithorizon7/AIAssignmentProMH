@@ -152,7 +152,7 @@ export class BlackboardService implements BaseLmsService {
         throw new Error(`Blackboard API error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json() as { results: any[] };
+      const data = await response.json() as { results: unknown[] };
       
       return data.results.map(course => ({
         id: course.id,
@@ -189,7 +189,7 @@ export class BlackboardService implements BaseLmsService {
         throw new Error(`Blackboard API error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json() as { results: any[] };
+      const data = await response.json() as { results: unknown[] };
       
       return data.results.map(user => ({
         id: user.id,
@@ -221,7 +221,7 @@ export class BlackboardService implements BaseLmsService {
         throw new Error(`Blackboard API error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json() as { results: any[] };
+      const data = await response.json() as { results: unknown[] };
       
       return data.results
         .filter(column => column.contentId && column.grading)
@@ -256,7 +256,7 @@ export class BlackboardService implements BaseLmsService {
         throw new Error(`Blackboard API error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json() as { results: any[] };
+      const data = await response.json() as { results: unknown[] };
       
       return data.results.map(entry => ({
         studentId: entry.userId,

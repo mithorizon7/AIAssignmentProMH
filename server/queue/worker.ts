@@ -35,7 +35,7 @@ class EnhancedSubmissionQueue extends EventEmitter {
    * @param jobName The name of the job
    * @param data The job data
    */
-  async add(jobName: string, data: any): Promise<void> {
+  async add(jobName: string, data: unknown): Promise<void> {
     try {
       if (jobName === 'process' && data.submissionId) {
         await queueApi.addSubmission(data.submissionId);

@@ -4,7 +4,7 @@ import { APP_ROUTES, API_ROUTES } from './constants';
 import { User } from './types';
 import { apiRequest } from './queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { safeStorage, safeLocalStorage, STORAGE_KEYS } from './safe-storage';
+import { SafeStorage, STORAGE_KEYS } from './safe-storage';
 
 // Simple logger for client-side logging
 const logger = {
@@ -44,16 +44,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleSSOLogoutRedirect = () => {
       try {
         // Check for Auth0 logout redirect
-        if (safeStorage.getItem(STORAGE_KEYS.AUTH0_LOGOUT_REDIRECT) === 'true') {
+        if (SafeStorage.getItem(STORAGE_KEYS.AUTH0_LOGOUT_REDIRECT) === 'true') {
           logger.info('Processing Auth0 logout redirect');
-          safeStorage.removeItem(STORAGE_KEYS.AUTH0_LOGOUT_REDIRECT);
+          SafeStorage.removeItem(STORAGE_KEYS.AUTH0_LOGOUT_REDIRECT);
           navigate(APP_ROUTES.LOGIN);
         }
         
         // Check for MIT Horizon OIDC logout redirect
-        if (safeStorage.getItem(STORAGE_KEYS.HORIZON_LOGOUT_REDIRECT) === 'true') {
+        if (SafeStorage.getItem(STORAGE_KEYS.HORIZON_LOGOUT_REDIRECT) === 'true') {
           logger.info('Processing MIT Horizon logout redirect');
-          safeStorage.removeItem(STORAGE_KEYS.HORIZON_LOGOUT_REDIRECT);
+          SafeStorage.removeItem(STORAGE_KEYS.HORIZON_LOGOUT_REDIRECT);
           navigate(APP_ROUTES.LOGIN);
         }
       } catch (error) {
