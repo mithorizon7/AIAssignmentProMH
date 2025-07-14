@@ -198,6 +198,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true, deletedCount });
   }));
 
+  // Queue management and monitoring endpoints (admin only)
+  app.get('/api/admin/queue/stats', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const stats = await queueApi.getStats();
+    res.json(stats);
+  }));
+
+  app.get('/api/admin/queue/performance', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const report = await queueApi.getPerformanceReport();
+    res.json(report);
+  }));
+
+  app.get('/api/admin/queue/timings', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+    const limit = parseInt(req.query.limit as string) || 20;
+    const timings = await queueApi.getRecentJobTimings(limit);
+    res.json(timings);
+  }));
+
+  app.post('/api/admin/queue/retry-failed', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
+    const retried = await queueApi.retryFailedSubmissions();
+    res.json({ 
+      message: `Retried ${retried} failed submissions`,
+      retried 
+    });
+  }));
+
   // Memory monitoring endpoints (admin only)
   app.get('/api/admin/memory-status', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
     const memoryTrend = memoryMonitor.getMemoryTrend();

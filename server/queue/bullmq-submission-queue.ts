@@ -9,6 +9,7 @@ import { StorageService } from '../services/storage-service';
 import { storage } from '../storage';
 import { redisClient } from './redis-client';
 import { queueLogger as logger } from '../lib/logger';
+import QueuePerformanceMonitor from '../lib/queue-performance-monitor';
 
 // Queue name
 const SUBMISSION_QUEUE_NAME = 'submission-processing';
@@ -20,17 +21,35 @@ logger.info(`BullMQ queue status`, {
   mode: process.env.NODE_ENV || 'development' 
 });
 
-// Create queue configuration using the centralized Redis client
+// Enhanced queue configuration optimized for Upstash Redis performance
 const queueConfig = {
   connection: redisClient,
   defaultJobOptions: {
     attempts: 3,              // Retry failed jobs up to 3 times
     backoff: {
       type: 'exponential',    // Exponential backoff between retries
-      delay: 5000             // Starting delay of 5 seconds
+      delay: 2000             // Reduced starting delay for faster retries
     },
-    removeOnComplete: 100,    // Keep the last 100 completed jobs
-    removeOnFail: 100         // Keep the last 100 failed jobs
+    removeOnComplete: 50,     // Reduced to optimize Redis memory usage
+    removeOnFail: 25,         // Reduced to optimize Redis memory usage
+    
+    // Performance optimizations for Upstash Redis
+    delay: 0,                 // No artificial delay for new jobs
+    priority: 0,              // Standard priority (lower numbers = higher priority)
+    
+    // Job timeout settings
+    jobTimeout: 5 * 60 * 1000,  // 5 minutes timeout for AI processing
+    stalledInterval: 30 * 1000,  // Check for stalled jobs every 30 seconds
+    maxStalledCount: 1           // Mark as failed after 1 stall
+  },
+  
+  // Advanced queue settings for performance
+  settings: {
+    stalledInterval: 30 * 1000,     // Check for stalled jobs every 30s
+    retryProcessDelay: 5000,        // Delay before retrying failed processing
+    backoffStrategies: {
+      exponential: (attemptsMade: number) => Math.min(Math.pow(2, attemptsMade) * 1000, 30000)
+    }
   }
 };
 
@@ -46,6 +65,16 @@ type SubmissionWorker = Worker | null;
 const queueEvents = queueActive 
   ? new QueueEvents(SUBMISSION_QUEUE_NAME, { connection: redisClient }) 
   : null;
+
+// Initialize performance monitoring
+let performanceMonitor: QueuePerformanceMonitor | null = null;
+if (submissionQueue && queueEvents) {
+  performanceMonitor = new QueuePerformanceMonitor(submissionQueue, queueEvents);
+  logger.info('Queue performance monitoring initialized', {
+    monitoringEnabled: true,
+    metricsInterval: '30s'
+  });
+}
 
 // Log queue events if active
 if (queueEvents) {
@@ -317,8 +346,26 @@ if (queueActive) {
     },
     { 
       connection: redisClient,
-      concurrency: 5,  // Process up to 5 jobs concurrently
-      autorun: true,   // Start processing jobs automatically
+      
+      // Optimized concurrency for Upstash Redis limits
+      concurrency: process.env.NODE_ENV === 'production' ? 10 : 3,  // Higher in production
+      
+      // Performance settings
+      autorun: true,              // Start processing jobs automatically
+      runRetryDelay: 15000,       // Wait 15s before retrying failed connections
+      
+      // Advanced worker settings for enterprise scale
+      settings: {
+        stalledInterval: 30 * 1000,     // Check for stalled jobs every 30s
+        maxStalledCount: 1,             // Mark as failed after 1 stall
+      },
+      
+      // Rate limiting to respect Upstash Redis limits
+      limiter: {
+        max: 100,                       // Max 100 jobs processed
+        duration: 60 * 1000,            // Per minute (respects Upstash limits)
+        bounceBack: false               // Don't bounce back to queue
+      }
     }
   );
 
@@ -430,14 +477,37 @@ export const queueApi = {
           submissionQueue.getDelayedCount()
         ]);
         
+        // Get performance metrics if monitor is available
+        const performanceMetrics = performanceMonitor ? performanceMonitor.getMetrics() : null;
+        const performanceReport = performanceMonitor ? performanceMonitor.generateReport() : null;
+
         return {
+          // Basic queue stats
           waiting,
           active,
           completed,
           failed,
           delayed,
           total: waiting + active + completed + failed + delayed,
-          mode: 'production'
+          mode: 'production',
+          
+          // Performance metrics
+          performance: performanceMetrics ? {
+            avgWaitTime: performanceMetrics.avgWaitTime,
+            avgProcessingTime: performanceMetrics.avgProcessingTime,
+            throughputPerMinute: performanceMetrics.throughputPerMinute,
+            health: performanceReport?.health || 'unknown'
+          } : null,
+          
+          // Health indicators
+          health: {
+            queueBacklog: waiting > 50 ? 'warning' : waiting > 100 ? 'critical' : 'good',
+            failureRate: completed + failed > 0 
+              ? ((failed / (completed + failed)) * 100).toFixed(1) + '%'
+              : '0%',
+            activeWorkers: active,
+            lastUpdate: new Date().toISOString()
+          }
         };
       } else {
         throw new Error('Queue methods not available');
@@ -455,6 +525,28 @@ export const queueApi = {
         mode: 'error'
       };
     }
+  },
+
+  /**
+   * Get detailed performance report
+   */
+  async getPerformanceReport() {
+    if (!performanceMonitor) {
+      return { error: 'Performance monitoring not available' };
+    }
+    
+    return performanceMonitor.generateReport();
+  },
+
+  /**
+   * Get recent job timing data
+   */
+  async getRecentJobTimings(limit: number = 20) {
+    if (!performanceMonitor) {
+      return { error: 'Performance monitoring not available' };
+    }
+    
+    return performanceMonitor.getRecentJobTimings(limit);
   },
   
   /**

@@ -29,17 +29,33 @@ export interface RedisConfig {
 }
 
 /**
- * Create Redis client configuration based on environment variables
+ * Create Redis client configuration optimized for Upstash and enterprise use
  */
 function createRedisConfig(): RedisConfig {
   const redisUrl = process.env.REDIS_URL;
   
   if (redisUrl) {
-    // Use REDIS_URL if provided
+    // Enhanced configuration for REDIS_URL
     const config: RedisConfig = {
-      maxRetriesPerRequest: null, // Required for BullMQ
+      maxRetriesPerRequest: null,    // Required for BullMQ
+      retryDelayOnFailover: 100,     // Fast failover
+      lazyConnect: true,             // Connect only when needed
+      
+      // Upstash Redis performance optimizations
+      keepAlive: 30000,              // Keep connections alive for 30s
+      connectTimeout: 10000,         // 10s connection timeout
+      lazyConnect: true,
+      maxRetriesPerRequest: null,
+      
+      // Connection pooling for enterprise scale
+      family: 4,                     // IPv4
+      enableAutoPipelining: true,    // Automatic command pipelining
+      maxLoadingTimeout: 5000,       // 5s max loading timeout
+      
+      // Upstash-specific optimizations
+      commandTimeout: 30000,         // 30s command timeout (increased for Upstash)
       retryDelayOnFailover: 100,
-      lazyConnect: true
+      enableOfflineQueue: false      // Disable offline queue for immediate errors
     };
     
     // Automatic TLS detection for cloud Redis services
@@ -47,23 +63,35 @@ function createRedisConfig(): RedisConfig {
         redisUrl.includes('redis.cloud') || 
         redisUrl.includes('redislabs.com') ||
         redisUrl.startsWith('rediss://')) {
-      config.tls = {};
-      logger.info('Redis TLS enabled (cloud service detected)');
+      config.tls = {
+        checkServerIdentity: () => undefined // Skip hostname verification for Upstash
+      };
+      logger.info('Redis TLS enabled with cloud optimizations', {
+        provider: redisUrl.includes('upstash.io') ? 'Upstash' : 'Cloud Redis',
+        optimizations: ['TLS', 'Auto-pipelining', 'Connection pooling']
+      });
     }
     
     return config;
   }
   
-  // Fallback to individual parameters
+  // Fallback to individual parameters with performance optimizations
   return {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379'),
     password: process.env.REDIS_PASSWORD,
     username: process.env.REDIS_USERNAME,
     db: parseInt(process.env.REDIS_DB || '0'),
-    maxRetriesPerRequest: null, // Required for BullMQ
+    
+    // Performance settings
+    maxRetriesPerRequest: null,
     retryDelayOnFailover: 100,
-    lazyConnect: true
+    lazyConnect: true,
+    keepAlive: 30000,
+    connectTimeout: 10000,
+    enableAutoPipelining: true,
+    commandTimeout: 30000,
+    enableOfflineQueue: false
   };
 }
 
