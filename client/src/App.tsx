@@ -26,6 +26,7 @@ import ProfilePage from "@/pages/instructor/profile";
 import SubmitAssignment from "@/pages/submit";
 import AdminDashboard from "@/pages/admin/dashboard";
 import UsersPage from "@/pages/admin/users";
+import DataProtection from "@/pages/admin/DataProtection";
 import SystemConfigPage from "@/pages/admin/system-config";
 import SystemStatusPage from "@/pages/admin/system-status";
 import LogsPage from "@/pages/admin/logs";
@@ -131,6 +132,9 @@ function Router() {
       </Route>
       <Route path="/admin/users">
         {() => <PrivateRoute component={UsersPage} requireRole="admin" />}
+      </Route>
+      <Route path="/admin/data-protection">
+        {() => <PrivateRoute component={DataProtection} requireRole="admin" />}
       </Route>
       <Route path="/admin/system-config">
         {() => <PrivateRoute component={SystemConfigPage} requireRole="admin" />}

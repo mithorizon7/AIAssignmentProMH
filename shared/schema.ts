@@ -90,6 +90,16 @@
   export const contentTypeEnum = pgEnum('content_type', ['text', 'image', 'audio', 'video', 'document']);
   export const lmsProviderEnum = pgEnum('lms_provider', ['canvas', 'blackboard', 'moodle', 'd2l']); // From main
   export const syncStatusEnum = pgEnum('sync_status', ['pending', 'in_progress', 'completed', 'failed']); // From main
+  
+  // Data protection and privacy enums
+  export const dataSubjectRequestTypeEnum = pgEnum("data_subject_request_type", 
+    ["access", "rectification", "erasure", "portability", "restriction", "objection"]);
+  export const dataSubjectRequestStatusEnum = pgEnum("data_subject_request_status", 
+    ["pending", "verified", "processing", "completed", "rejected"]);
+  export const consentPurposeEnum = pgEnum("consent_purpose", 
+    ["analytics", "marketing", "research", "improvement"]);
+  export const auditActionEnum = pgEnum("audit_action", 
+    ["create", "read", "update", "delete", "export", "anonymize"]);
 
   // Users (using main's version which includes MFA fields)
   export const users = pgTable("users", {
@@ -449,3 +459,125 @@
 
   export type LmsCourseMapping = typeof lmsCourseMappings.$inferSelect; // From main
   export type InsertLmsCourseMapping = z.infer<typeof insertLmsCourseMappingSchema>; // From main
+
+  // ============================================
+  // DATA PROTECTION AND PRIVACY TABLES
+  // ============================================
+
+  // Data subject requests (GDPR Article 15-22)
+  export const dataSubjectRequests = pgTable("data_subject_requests", {
+    id: serial("id").primaryKey(),
+    type: dataSubjectRequestTypeEnum("type").notNull(),
+    userId: integer("user_id").references(() => users.id).notNull(),
+    requesterEmail: text("requester_email").notNull(),
+    verificationToken: text("verification_token").notNull(),
+    details: text("details"),
+    status: dataSubjectRequestStatusEnum("status").notNull().default('pending'),
+    requestedAt: timestamp("requested_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+    adminNotes: text("admin_notes"),
+    exportData: json("export_data").$type<Record<string, unknown>>(),
+  }, (table) => {
+    return {
+      userIdIdx: index("idx_dsr_user_id").on(table.userId),
+      statusIdx: index("idx_dsr_status").on(table.status),
+      typeIdx: index("idx_dsr_type").on(table.type),
+      requestedAtIdx: index("idx_dsr_requested_at").on(table.requestedAt),
+    };
+  });
+
+  // User consent management
+  export const userConsents = pgTable("user_consents", {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id).notNull(),
+    purpose: consentPurposeEnum("purpose").notNull(),
+    granted: boolean("granted").notNull(),
+    grantedAt: timestamp("granted_at").defaultNow().notNull(),
+    withdrawnAt: timestamp("withdrawn_at"),
+    version: text("version").notNull().default('1.0'),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+  }, (table) => {
+    return {
+      userIdIdx: index("idx_consents_user_id").on(table.userId),
+      purposeIdx: index("idx_consents_purpose").on(table.purpose),
+      grantedIdx: index("idx_consents_granted").on(table.granted),
+      userPurposeIdx: index("idx_consents_user_purpose").on(table.userId, table.purpose),
+    };
+  });
+
+  // Data processing audit trail
+  export const dataAuditLog = pgTable("data_audit_log", {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id),
+    action: auditActionEnum("action").notNull(),
+    tableName: text("table_name").notNull(),
+    recordId: integer("record_id"),
+    details: json("details").$type<Record<string, unknown>>(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    performedBy: integer("performed_by").references(() => users.id),
+    timestamp: timestamp("timestamp").defaultNow().notNull(),
+  }, (table) => {
+    return {
+      userIdIdx: index("idx_audit_user_id").on(table.userId),
+      actionIdx: index("idx_audit_action").on(table.action),
+      tableIdx: index("idx_audit_table").on(table.tableName),
+      timestampIdx: index("idx_audit_timestamp").on(table.timestamp),
+      performedByIdx: index("idx_audit_performed_by").on(table.performedBy),
+    };
+  });
+
+  // Data retention tracking
+  export const dataRetentionLog = pgTable("data_retention_log", {
+    id: serial("id").primaryKey(),
+    tableName: text("table_name").notNull(),
+    recordId: integer("record_id").notNull(),
+    retentionPolicy: text("retention_policy").notNull(),
+    createdAt: timestamp("created_at").notNull(),
+    retentionDate: timestamp("retention_date").notNull(),
+    anonymizedAt: timestamp("anonymized_at"),
+    deletedAt: timestamp("deleted_at"),
+    status: text("status").notNull().default('active'), // active, anonymized, deleted
+  }, (table) => {
+    return {
+      tableRecordIdx: index("idx_retention_table_record").on(table.tableName, table.recordId),
+      retentionDateIdx: index("idx_retention_date").on(table.retentionDate),
+      statusIdx: index("idx_retention_status").on(table.status),
+    };
+  });
+
+  // Privacy policy acceptance tracking
+  export const privacyPolicyAcceptances = pgTable("privacy_policy_acceptances", {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id).notNull(),
+    policyVersion: text("policy_version").notNull(),
+    acceptedAt: timestamp("accepted_at").defaultNow().notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+  }, (table) => {
+    return {
+      userIdIdx: index("idx_policy_user_id").on(table.userId),
+      versionIdx: index("idx_policy_version").on(table.policyVersion),
+      acceptedAtIdx: index("idx_policy_accepted_at").on(table.acceptedAt),
+    };
+  });
+
+  // Privacy compliance schemas
+  export const insertDataSubjectRequestSchema = createInsertSchema(dataSubjectRequests).omit({ id: true, requestedAt: true });
+  export const insertUserConsentSchema = createInsertSchema(userConsents).omit({ id: true, grantedAt: true });
+  export const insertDataAuditLogSchema = createInsertSchema(dataAuditLog).omit({ id: true, timestamp: true });
+  export const insertDataRetentionLogSchema = createInsertSchema(dataRetentionLog).omit({ id: true });
+  export const insertPrivacyPolicyAcceptanceSchema = createInsertSchema(privacyPolicyAcceptances).omit({ id: true, acceptedAt: true });
+
+  // Privacy compliance types
+  export type DataSubjectRequest = typeof dataSubjectRequests.$inferSelect;
+  export type InsertDataSubjectRequest = z.infer<typeof insertDataSubjectRequestSchema>;
+  export type UserConsent = typeof userConsents.$inferSelect;
+  export type InsertUserConsent = z.infer<typeof insertUserConsentSchema>;
+  export type DataAuditLog = typeof dataAuditLog.$inferSelect;
+  export type InsertDataAuditLog = z.infer<typeof insertDataAuditLogSchema>;
+  export type DataRetentionLog = typeof dataRetentionLog.$inferSelect;
+  export type InsertDataRetentionLog = z.infer<typeof insertDataRetentionLogSchema>;
+  export type PrivacyPolicyAcceptance = typeof privacyPolicyAcceptances.$inferSelect;
+  export type InsertPrivacyPolicyAcceptance = z.infer<typeof insertPrivacyPolicyAcceptanceSchema>;

@@ -19,6 +19,7 @@ import { v4 as uuidv4 } from "uuid";
 import { defaultRateLimiter, submissionRateLimiter } from "./middleware/rate-limiter";
 import adminRoutes from "./routes/admin";
 import instructorRoutes from "./routes/instructor";
+import dataProtectionRouter from "./routes/data-protection";
 import errorReportingRoutes from "./routes/error-reporting";
 import { queueSecurityAudit } from "./queue/security-audit";
 import { determineContentType, isFileTypeAllowed, ContentType } from "./utils/file-type-settings";
@@ -83,6 +84,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Mount instructor routes
   app.use('/api/instructor', instructorRoutes);
+
+  // Data protection routes (GDPR/FERPA compliance) - require admin role
+  app.use('/api/data-protection', requireAuth, requireRole('admin'), dataProtectionRouter);
   
   // Mount error reporting routes
   app.use('/api', errorReportingRoutes);

@@ -17,6 +17,7 @@ import {
   LogOut,
   Menu,
   AlertCircle,
+  Shield,
 } from "lucide-react";
 
 interface AdminShellProps {
@@ -38,6 +39,11 @@ export function AdminShell({ children }: AdminShellProps) {
       name: "User Management",
       href: APP_ROUTES.ADMIN_USERS,
       icon: <Users size={18} />,
+    },
+    {
+      name: "Data Protection",
+      href: "/admin/data-protection",
+      icon: <Shield size={18} />,
     },
     {
       name: "System Configuration",
