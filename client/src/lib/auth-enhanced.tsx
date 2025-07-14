@@ -27,11 +27,11 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  persistUser: (user: User, token?: string) => void;
+  clearPersistedAuth: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-
-
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -60,12 +60,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logger.error('Error handling SSO logout redirect', { error });
       }
     };
+
+    // Load persisted user from localStorage with error handling
+    const loadPersistedUser = () => {
+      try {
+        const storedToken = safeLocalStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+        const storedUser = safeLocalStorage.getJSON<User>(STORAGE_KEYS.AUTH_USER);
+        
+        if (storedToken && storedUser) {
+          logger.info('Loading persisted user authentication');
+          setUser(storedUser);
+          return true; // User loaded from localStorage
+        }
+      } catch (error) {
+        logger.error('Error loading persisted user', { error });
+        // Clear potentially corrupted data
+        safeLocalStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+        safeLocalStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+      }
+      return false; // No persisted user
+    };
     
     async function loadUser() {
       try {
         // Check for SSO logout redirects first
         handleSSOLogoutRedirect();
         
+        // Try to load from localStorage first
+        const hasPersistedUser = loadPersistedUser();
+        
+        // Always verify with server, even if we have persisted data
         const response = await fetch(API_ROUTES.USER, {
           credentials: 'include',
         });
@@ -73,9 +97,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
+          
+          // Update localStorage with fresh data
+          persistUser(userData);
+        } else if (!hasPersistedUser) {
+          // No server session and no persisted user - clear state
+          setUser(null);
+          clearPersistedAuth();
         }
+        // If we have persisted user but no server session, keep the persisted user
+        // This handles cases where server session expires but we want to maintain login state
       } catch (error) {
         logger.error('Failed to load user', { error });
+        // On network error, keep persisted user if available
+        if (!user) {
+          loadPersistedUser();
+        }
       } finally {
         setIsLoading(false);
       }
@@ -83,6 +120,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     loadUser();
   }, [navigate]);
+
+  // Helper function to persist user data to localStorage
+  const persistUser = (userData: User, token?: string) => {
+    try {
+      safeLocalStorage.setJSON(STORAGE_KEYS.AUTH_USER, userData);
+      if (token) {
+        safeLocalStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+      }
+      logger.info('User authentication persisted');
+    } catch (error) {
+      logger.error('Failed to persist user authentication', { error });
+    }
+  };
+
+  // Helper function to clear persisted auth data
+  const clearPersistedAuth = () => {
+    try {
+      safeLocalStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+      safeLocalStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+      logger.info('Persisted authentication cleared');
+    } catch (error) {
+      logger.error('Failed to clear persisted authentication', { error });
+    }
+  };
 
   // Helper function to get the returnTo parameter from URL
   const getReturnToPath = () => {
@@ -108,11 +169,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       setUser(userData);
       
+      // Persist user data to localStorage
+      persistUser(userData);
+      
       // Check if there's a returnTo parameter in the URL
       const returnTo = getReturnToPath();
       if (returnTo) {
-        // Use the returnTo path for redirection after successful login
-        // Redirect logging removed for production
         navigate(returnTo);
       } else {
         // Default redirect based on user role
@@ -147,8 +209,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await apiRequest('POST', API_ROUTES.LOGOUT, {});
       const data = await response.json();
       
-      // Clear user from state
+      // Clear user from state and localStorage
       setUser(null);
+      clearPersistedAuth();
       
       // If the server indicates we need to redirect for SSO logout
       if (data.redirect && data.redirectUrl) {
@@ -188,6 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Even if logout fails on server, clear local state
       setUser(null);
+      clearPersistedAuth();
       navigate(APP_ROUTES.LOGIN);
     }
   };
@@ -198,6 +262,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     login,
     logout,
+    persistUser,
+    clearPersistedAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
