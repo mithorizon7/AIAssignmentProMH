@@ -1,0 +1,44 @@
+{
+  "recommendations": [
+    // Essential TypeScript and JavaScript support
+    "ms-vscode.vscode-typescript-next",
+    
+    // Code quality and formatting
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    
+    // Testing
+    "zixuanchen.vitest-explorer",
+    
+    // Git integration
+    "eamodio.gitlens",
+    "github.vscode-pull-request-github",
+    
+    // React development
+    "bradlc.vscode-tailwindcss",
+    "ms-vscode.vscode-json",
+    
+    // Database and SQL
+    "ms-mssql.mssql",
+    
+    // Docker support
+    "ms-azuretools.vscode-docker",
+    
+    // Markdown support
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint",
+    
+    // Additional utilities
+    "ms-vscode.vscode-json",
+    "redhat.vscode-yaml",
+    "ms-vscode.vscode-npm-script",
+    "christian-kohler.path-intellisense",
+    "bradlc.vscode-tailwindcss",
+    "formulahendry.auto-rename-tag",
+    "ms-vscode.vscode-eslint-language-server"
+  ],
+  "unwantedRecommendations": [
+    "ms-vscode.vscode-json-language-features",
+    "hookyqr.beautify"
+  ]
+}

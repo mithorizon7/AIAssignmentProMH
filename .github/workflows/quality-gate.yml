@@ -1,0 +1,251 @@
+# Quality Gate Workflow
+# Advanced code quality and compliance checking
+
+name: Quality Gate
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  quality-analysis:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for better analysis
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Code complexity analysis
+      run: |
+        echo "Running code complexity analysis..."
+        npx eslint . --ext .ts,.tsx,.js,.jsx --format json > eslint-report.json || true
+        
+        # Count high complexity issues
+        COMPLEXITY_ISSUES=$(cat eslint-report.json | grep -o '"complexity"' | wc -l || echo "0")
+        echo "Complexity issues found: $COMPLEXITY_ISSUES"
+        
+        if [ "$COMPLEXITY_ISSUES" -gt 10 ]; then
+          echo "⚠️ High code complexity detected ($COMPLEXITY_ISSUES issues)"
+          echo "Consider refactoring complex functions"
+        else
+          echo "✅ Code complexity is acceptable"
+        fi
+    
+    - name: Technical debt analysis
+      run: |
+        echo "Scanning for technical debt indicators..."
+        
+        # Count TODO/FIXME comments
+        TODO_COUNT=$(grep -r "TODO\|FIXME\|XXX\|HACK" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" . | wc -l || echo "0")
+        echo "Technical debt markers found: $TODO_COUNT"
+        
+        # Count console.log statements (should be minimal in production code)
+        CONSOLE_COUNT=$(grep -r "console\." --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" --exclude-dir=test --exclude-dir=scripts . | wc -l || echo "0")
+        echo "Console statements found: $CONSOLE_COUNT"
+        
+        if [ "$TODO_COUNT" -gt 20 ]; then
+          echo "⚠️ High technical debt detected ($TODO_COUNT markers)"
+        else
+          echo "✅ Technical debt is manageable"
+        fi
+    
+    - name: Dependency analysis
+      run: |
+        echo "Analyzing dependency health..."
+        
+        # Check for outdated packages
+        npm outdated --json > outdated.json || true
+        
+        if [ -s outdated.json ]; then
+          echo "📦 Outdated packages detected:"
+          cat outdated.json
+        else
+          echo "✅ All packages are up to date"
+        fi
+    
+    - name: Bundle size analysis
+      run: |
+        echo "Analyzing bundle size impact..."
+        npm run build
+        
+        if [ -d "dist" ]; then
+          echo "Bundle sizes:"
+          find dist -name "*.js" -exec ls -lh {} \; | awk '{print $5, $9}' | sort -hr
+          
+          # Calculate total bundle size
+          TOTAL_SIZE=$(find dist -name "*.js" -exec stat -c%s {} \; | awk '{sum+=$1} END {print sum}')
+          TOTAL_MB=$((TOTAL_SIZE / 1024 / 1024))
+          
+          echo "Total bundle size: ${TOTAL_MB}MB"
+          
+          if [ "$TOTAL_MB" -gt 5 ]; then
+            echo "⚠️ Large bundle size detected (${TOTAL_MB}MB)"
+            echo "Consider code splitting or dependency optimization"
+          else
+            echo "✅ Bundle size is reasonable"
+          fi
+        fi
+    
+    - name: Upload quality reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: quality-reports
+        path: |
+          eslint-report.json
+          outdated.json
+        retention-days: 30
+
+  performance-baseline:
+    name: Performance Baseline
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_aigrader
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_aigrader
+      SESSION_SECRET: test_session_secret_at_least_32_chars_long
+      CSRF_SECRET: test_csrf_secret_at_least_32_chars_long
+      GEMINI_API_KEY: test_key
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build application
+      run: npm run build
+    
+    - name: Performance benchmark
+      run: |
+        echo "Running performance benchmark..."
+        
+        # Start application in background
+        npm start &
+        APP_PID=$!
+        
+        # Wait for application to start
+        sleep 30
+        
+        # Run basic performance test
+        echo "Testing response times..."
+        for i in {1..10}; do
+          RESPONSE_TIME=$(curl -w "%{time_total}" -s -o /dev/null http://localhost:5000/api/health || echo "999")
+          echo "Response $i: ${RESPONSE_TIME}s"
+        done
+        
+        # Cleanup
+        kill $APP_PID 2>/dev/null || true
+        
+        echo "Performance baseline completed"
+
+  accessibility-check:
+    name: Accessibility Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build application
+      run: npm run build
+    
+    - name: Accessibility audit
+      run: |
+        echo "Running accessibility checks..."
+        
+        # Check for common accessibility issues in code
+        echo "Checking for accessibility patterns..."
+        
+        # Look for missing alt attributes (basic check)
+        ALT_ISSUES=$(grep -r "<img" --include="*.tsx" --include="*.jsx" client/ | grep -v "alt=" | wc -l || echo "0")
+        echo "Missing alt attributes: $ALT_ISSUES"
+        
+        # Look for proper semantic HTML usage
+        HEADING_USAGE=$(grep -r "<h[1-6]" --include="*.tsx" --include="*.jsx" client/ | wc -l || echo "0")
+        echo "Heading elements found: $HEADING_USAGE"
+        
+        # Check for ARIA labels
+        ARIA_USAGE=$(grep -r "aria-" --include="*.tsx" --include="*.jsx" client/ | wc -l || echo "0")
+        echo "ARIA attributes found: $ARIA_USAGE"
+        
+        if [ "$ALT_ISSUES" -gt 0 ]; then
+          echo "⚠️ Accessibility issues detected"
+          echo "Please add alt attributes to images"
+        else
+          echo "✅ Basic accessibility checks passed"
+        fi
+
+  quality-gate-summary:
+    name: Quality Gate Summary
+    runs-on: ubuntu-latest
+    needs: [quality-analysis, performance-baseline, accessibility-check]
+    if: always()
+    
+    steps:
+    - name: Quality Gate Results
+      run: |
+        echo "Quality Gate Summary:"
+        echo "===================="
+        echo "Quality Analysis: ${{ needs.quality-analysis.result }}"
+        echo "Performance Baseline: ${{ needs.performance-baseline.result }}"
+        echo "Accessibility Check: ${{ needs.accessibility-check.result }}"
+        
+        # Determine overall quality gate status
+        if [[ "${{ needs.quality-analysis.result }}" == "success" ]]; then
+          echo "✅ Quality gate passed"
+        else
+          echo "❌ Quality gate failed"
+          echo "Please address quality issues before merging"
+          exit 1
+        fi

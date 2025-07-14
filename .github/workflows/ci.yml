@@ -36,25 +36,16 @@ jobs:
       run: npm ci
     
     - name: TypeScript type checking
-      run: npm run check || npx tsc --noEmit
+      run: npx tsc --noEmit
     
-    - name: Code linting (if available)
-      run: |
-        if npm run lint >/dev/null 2>&1; then
-          npm run lint
-        else
-          echo "No lint script found, skipping linting"
-        fi
+    - name: ESLint code linting
+      run: npx eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0
     
-    - name: Code formatting check (if available)
-      run: |
-        if npm run format:check >/dev/null 2>&1; then
-          npm run format:check
-        elif command -v prettier >/dev/null 2>&1; then
-          npx prettier --check "**/*.{ts,tsx,js,jsx,json,md}"
-        else
-          echo "No formatting check available, skipping"
-        fi
+    - name: Prettier formatting check
+      run: npx prettier --check "**/*.{ts,tsx,js,jsx,json,md,yml,yaml}"
+    
+    - name: Package vulnerability check
+      run: npm audit --audit-level moderate
 
   # Job 2: Security Auditing
   security-audit:
@@ -172,39 +163,28 @@ jobs:
           echo "No database migration script found"
         fi
     
-    - name: Run unit tests
-      run: |
-        if npm test >/dev/null 2>&1; then
-          npm test
-        elif npm run test >/dev/null 2>&1; then
-          npm run test
-        else
-          echo "No test script found, running custom test validation..."
-          node -e "console.log('Basic Node.js validation passed')"
-        fi
+    - name: Run unit tests with coverage
+      run: npx vitest run --coverage --reporter=verbose --reporter=junit --outputFile.junit=./test-results.xml
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          ./test-results.xml
+          ./coverage/
+        retention-days: 30
     
     - name: Run integration tests
-      run: |
-        if npm run test:integration >/dev/null 2>&1; then
-          npm run test:integration
-        else
-          echo "Running basic integration validation..."
-          # Run basic health check test
-          node -e "
-            const http = require('http');
-            console.log('Testing basic HTTP server functionality...');
-            // Basic validation - ensuring the app can start
-            console.log('Integration validation passed');
-          "
-        fi
+      run: npx vitest run --config test/integration/vitest.config.ts
     
-    - name: Generate test coverage (if available)
-      run: |
-        if npm run test:coverage >/dev/null 2>&1; then
-          npm run test:coverage
-        else
-          echo "No coverage script available"
-        fi
+    - name: Comment test coverage on PR
+      uses: marocchino/sticky-pull-request-comment@v2
+      if: github.event_name == 'pull_request' && always()
+      with:
+        recreate: true
+        path: coverage/coverage-summary.json
 
   # Job 4: Build Validation
   build-validation:
@@ -226,14 +206,21 @@ jobs:
       run: npm ci
     
     - name: Build application
+      run: npm run build
+    
+    - name: Validate build size
       run: |
-        if npm run build >/dev/null 2>&1; then
-          npm run build
-          echo "Build completed successfully"
-        else
-          echo "No build script found, validating TypeScript compilation..."
-          npx tsc --noEmit
-          echo "TypeScript compilation successful"
+        echo "Checking build artifact sizes..."
+        if [ -d "dist" ]; then
+          find dist -type f -name "*.js" -exec ls -lh {} \; | awk '{print $5, $9}' | sort -hr
+          
+          # Check for oversized bundles (warning if any file > 1MB)
+          if find dist -type f -name "*.js" -size +1M | grep -q .; then
+            echo "⚠️ Warning: Large bundle files detected (>1MB)"
+            find dist -type f -name "*.js" -size +1M -exec ls -lh {} \;
+          else
+            echo "✅ All bundle sizes are reasonable"
+          fi
         fi
     
     - name: Validate build artifacts

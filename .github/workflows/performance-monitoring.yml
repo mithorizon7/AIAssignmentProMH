@@ -1,0 +1,263 @@
+# Performance Monitoring and Optimization Workflow
+# Tracks performance trends and prevents regressions
+
+name: Performance Monitoring
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Weekly performance baseline update
+    - cron: '0 2 * * 1'
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  performance-audit:
+    name: Performance Audit
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_aigrader
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_aigrader
+      SESSION_SECRET: test_session_secret_at_least_32_chars_long
+      CSRF_SECRET: test_csrf_secret_at_least_32_chars_long
+      GEMINI_API_KEY: test_key
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for trend analysis
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build application
+      run: npm run build
+    
+    - name: Bundle size analysis
+      run: |
+        echo "📦 Analyzing bundle sizes..."
+        
+        # Create bundle report
+        if [ -d "dist" ]; then
+          echo "Bundle Analysis Report" > bundle-report.txt
+          echo "======================" >> bundle-report.txt
+          echo "Generated: $(date)" >> bundle-report.txt
+          echo "" >> bundle-report.txt
+          
+          # List all bundle files with sizes
+          find dist -name "*.js" -exec ls -lh {} \; | awk '{print $5, $9}' | sort -hr >> bundle-report.txt
+          
+          # Calculate total bundle size
+          TOTAL_SIZE=$(find dist -name "*.js" -exec stat -c%s {} \; | awk '{sum+=$1} END {print sum}')
+          TOTAL_MB=$((TOTAL_SIZE / 1024 / 1024))
+          
+          echo "" >> bundle-report.txt
+          echo "Total bundle size: ${TOTAL_MB}MB" >> bundle-report.txt
+          
+          # Performance thresholds
+          if [ "$TOTAL_MB" -gt 10 ]; then
+            echo "❌ Bundle size too large: ${TOTAL_MB}MB (threshold: 10MB)"
+            echo "BUNDLE_SIZE_STATUS=FAILED" >> $GITHUB_ENV
+          elif [ "$TOTAL_MB" -gt 5 ]; then
+            echo "⚠️ Bundle size warning: ${TOTAL_MB}MB (warning: 5MB)"
+            echo "BUNDLE_SIZE_STATUS=WARNING" >> $GITHUB_ENV
+          else
+            echo "✅ Bundle size acceptable: ${TOTAL_MB}MB"
+            echo "BUNDLE_SIZE_STATUS=PASSED" >> $GITHUB_ENV
+          fi
+          
+          cat bundle-report.txt
+        fi
+    
+    - name: Application startup time
+      run: |
+        echo "⏱️ Testing application startup time..."
+        
+        # Start application and measure startup time
+        START_TIME=$(date +%s)
+        
+        # Start app in background
+        npm start &
+        APP_PID=$!
+        
+        # Wait for app to be ready (max 60 seconds)
+        for i in {1..60}; do
+          if curl -s http://localhost:5000/api/health >/dev/null; then
+            END_TIME=$(date +%s)
+            STARTUP_TIME=$((END_TIME - START_TIME))
+            echo "✅ Application started in ${STARTUP_TIME} seconds"
+            echo "STARTUP_TIME=${STARTUP_TIME}" >> $GITHUB_ENV
+            break
+          fi
+          sleep 1
+        done
+        
+        # Cleanup
+        kill $APP_PID 2>/dev/null || true
+        
+        # Performance threshold for startup time
+        if [ "${STARTUP_TIME:-60}" -gt 30 ]; then
+          echo "❌ Startup time too slow: ${STARTUP_TIME}s (threshold: 30s)"
+          echo "STARTUP_STATUS=FAILED" >> $GITHUB_ENV
+        elif [ "${STARTUP_TIME:-60}" -gt 15 ]; then
+          echo "⚠️ Startup time warning: ${STARTUP_TIME}s (warning: 15s)"
+          echo "STARTUP_STATUS=WARNING" >> $GITHUB_ENV
+        else
+          echo "✅ Startup time acceptable: ${STARTUP_TIME}s"
+          echo "STARTUP_STATUS=PASSED" >> $GITHUB_ENV
+        fi
+    
+    - name: Memory usage analysis
+      run: |
+        echo "💾 Analyzing memory usage patterns..."
+        
+        # Start application
+        npm start &
+        APP_PID=$!
+        
+        # Wait for startup
+        sleep 20
+        
+        # Monitor memory usage
+        echo "Memory Usage Analysis" > memory-report.txt
+        echo "====================" >> memory-report.txt
+        echo "Generated: $(date)" >> memory-report.txt
+        echo "" >> memory-report.txt
+        
+        # Get process memory info
+        if kill -0 $APP_PID 2>/dev/null; then
+          ps -p $APP_PID -o pid,rss,vsz,pmem,command >> memory-report.txt
+          
+          # Get RSS in MB
+          RSS_KB=$(ps -p $APP_PID -o rss --no-headers)
+          RSS_MB=$((RSS_KB / 1024))
+          
+          echo "" >> memory-report.txt
+          echo "Memory usage: ${RSS_MB}MB" >> memory-report.txt
+          
+          # Memory thresholds
+          if [ "$RSS_MB" -gt 500 ]; then
+            echo "❌ Memory usage too high: ${RSS_MB}MB (threshold: 500MB)"
+            echo "MEMORY_STATUS=FAILED" >> $GITHUB_ENV
+          elif [ "$RSS_MB" -gt 250 ]; then
+            echo "⚠️ Memory usage warning: ${RSS_MB}MB (warning: 250MB)"
+            echo "MEMORY_STATUS=WARNING" >> $GITHUB_ENV
+          else
+            echo "✅ Memory usage acceptable: ${RSS_MB}MB"
+            echo "MEMORY_STATUS=PASSED" >> $GITHUB_ENV
+          fi
+        fi
+        
+        # Cleanup
+        kill $APP_PID 2>/dev/null || true
+        
+        cat memory-report.txt
+    
+    - name: Database query performance
+      run: |
+        echo "🗄️ Testing database query performance..."
+        
+        # Start application
+        npm start &
+        APP_PID=$!
+        
+        # Wait for startup
+        sleep 20
+        
+        # Test key endpoints for performance
+        echo "Database Performance Report" > db-performance.txt
+        echo "==========================" >> db-performance.txt
+        echo "Generated: $(date)" >> db-performance.txt
+        echo "" >> db-performance.txt
+        
+        # Test health endpoint
+        HEALTH_TIME=$(curl -w "%{time_total}" -s -o /dev/null http://localhost:5000/api/health)
+        echo "Health endpoint: ${HEALTH_TIME}s" >> db-performance.txt
+        
+        # Test auth endpoint (if available)
+        AUTH_TIME=$(curl -w "%{time_total}" -s -o /dev/null http://localhost:5000/api/auth/user || echo "N/A")
+        echo "Auth endpoint: ${AUTH_TIME}s" >> db-performance.txt
+        
+        # Performance thresholds for health endpoint
+        HEALTH_MS=$(echo "$HEALTH_TIME * 1000" | bc)
+        if (( $(echo "$HEALTH_MS > 1000" | bc -l) )); then
+          echo "❌ Health endpoint too slow: ${HEALTH_MS}ms (threshold: 1000ms)"
+          echo "DB_PERFORMANCE_STATUS=FAILED" >> $GITHUB_ENV
+        elif (( $(echo "$HEALTH_MS > 500" | bc -l) )); then
+          echo "⚠️ Health endpoint warning: ${HEALTH_MS}ms (warning: 500ms)"
+          echo "DB_PERFORMANCE_STATUS=WARNING" >> $GITHUB_ENV
+        else
+          echo "✅ Health endpoint fast: ${HEALTH_MS}ms"
+          echo "DB_PERFORMANCE_STATUS=PASSED" >> $GITHUB_ENV
+        fi
+        
+        # Cleanup
+        kill $APP_PID 2>/dev/null || true
+        
+        cat db-performance.txt
+    
+    - name: Performance summary
+      run: |
+        echo "📊 Performance Summary"
+        echo "====================="
+        echo "Bundle Size: ${{ env.BUNDLE_SIZE_STATUS }}"
+        echo "Startup Time: ${{ env.STARTUP_STATUS }}"
+        echo "Memory Usage: ${{ env.MEMORY_STATUS }}"
+        echo "DB Performance: ${{ env.DB_PERFORMANCE_STATUS }}"
+        
+        # Overall performance status
+        if [[ "${{ env.BUNDLE_SIZE_STATUS }}" == "FAILED" ]] || \
+           [[ "${{ env.STARTUP_STATUS }}" == "FAILED" ]] || \
+           [[ "${{ env.MEMORY_STATUS }}" == "FAILED" ]] || \
+           [[ "${{ env.DB_PERFORMANCE_STATUS }}" == "FAILED" ]]; then
+          echo "❌ Performance audit FAILED"
+          echo "Please address performance issues before merging"
+          exit 1
+        elif [[ "${{ env.BUNDLE_SIZE_STATUS }}" == "WARNING" ]] || \
+             [[ "${{ env.STARTUP_STATUS }}" == "WARNING" ]] || \
+             [[ "${{ env.MEMORY_STATUS }}" == "WARNING" ]] || \
+             [[ "${{ env.DB_PERFORMANCE_STATUS }}" == "WARNING" ]]; then
+          echo "⚠️ Performance audit has WARNINGS"
+          echo "Consider optimizing performance"
+        else
+          echo "✅ Performance audit PASSED"
+          echo "All performance metrics within acceptable ranges"
+        fi
+    
+    - name: Upload performance reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-reports
+        path: |
+          bundle-report.txt
+          memory-report.txt
+          db-performance.txt
+        retention-days: 30

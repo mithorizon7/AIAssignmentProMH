@@ -1,0 +1,37 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks..."
+
+# Set exit on error
+set -e
+
+# Function to handle errors
+handle_error() {
+    echo "❌ Pre-commit check failed at: $1"
+    echo "Please fix the issues before committing."
+    exit 1
+}
+
+# Run type checking
+echo "📝 Type checking..."
+npx tsc --noEmit || handle_error "TypeScript compilation"
+
+# Run linting with auto-fix
+echo "🧹 Linting and fixing code..."
+npx eslint . --ext .ts,.tsx,.js,.jsx --fix --max-warnings 0 || handle_error "ESLint"
+
+# Run formatting with auto-fix
+echo "💅 Formatting code..."
+npx prettier --write "**/*.{ts,tsx,js,jsx,json,md,yml,yaml}" || handle_error "Prettier formatting"
+
+# Run quick tests (skip integration tests for speed)
+echo "🧪 Running unit tests..."
+npx vitest run --reporter=basic --exclude "**/integration/**" --exclude "**/e2e/**" || handle_error "Unit tests"
+
+# Security check
+echo "🔒 Security audit..."
+npm audit --audit-level high || echo "⚠️ Security issues found - review after commit"
+
+echo "✅ Pre-commit checks completed successfully!"
+echo "📝 Files have been automatically formatted and linted."

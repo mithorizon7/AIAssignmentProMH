@@ -1,0 +1,47 @@
+# Code Owners for AIGrader Repository
+# This file defines individuals or teams responsible for code in this repository
+
+# Global ownership - require review from core team
+* @core-team
+
+# Critical system files require additional review
+package.json @core-team @security-team
+package-lock.json @core-team @security-team
+tsconfig.json @core-team
+vite.config.ts @core-team
+vitest.config.ts @core-team
+
+# Server-side code requires backend team review
+server/ @backend-team @core-team
+shared/ @backend-team @frontend-team
+
+# Frontend code requires frontend team review
+client/ @frontend-team @core-team
+
+# Database and schema changes require database team review
+shared/schema.ts @database-team @backend-team @core-team
+drizzle.config.ts @database-team @backend-team
+
+# Security-sensitive files require security team review
+.github/workflows/ @security-team @core-team @devops-team
+Dockerfile @security-team @devops-team
+docker-compose.yml @security-team @devops-team
+nginx.conf @security-team @devops-team
+ecosystem.config.js @devops-team
+
+# Environment and configuration files
+.env.example @security-team @core-team
+.eslintrc.js @core-team
+.prettierrc @core-team
+
+# Documentation requires technical writing review
+README.md @core-team @tech-writers
+docs/ @tech-writers @core-team
+*.md @tech-writers
+
+# Test files require QA team review
+test/ @qa-team @core-team
+**/*.test.ts @qa-team
+**/*.test.tsx @qa-team
+**/*.spec.ts @qa-team
+**/*.spec.tsx @qa-team
