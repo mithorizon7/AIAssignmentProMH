@@ -208,10 +208,10 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
   
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+      <div className="flex justify-center items-center min-h-screen bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading assignment details...</p>
+          <p className="mt-4 text-muted-foreground">Loading assignment details...</p>
         </div>
       </div>
     );
@@ -219,7 +219,7 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
   
   if (error) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+      <div className="flex justify-center items-center min-h-screen bg-background">
         <Card className="w-full max-w-lg shadow-lg">
           <CardHeader className="bg-destructive/10">
             <CardTitle className="text-destructive">Assignment Not Found</CardTitle>
@@ -232,7 +232,7 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
               <p className="mb-6">
                 Please check the link and try again, or contact your instructor.
               </p>
-              <Button onClick={() => navigate('/')}>Go to Homepage</Button>
+              <Button onClick={() => navigate('/')} aria-label="Return to homepage">Go to Homepage</Button>
             </div>
           </CardContent>
         </Card>
@@ -242,10 +242,10 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
   
   if (submitted && assignment) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+      <div className="flex justify-center items-center min-h-screen bg-background">
         <Card className="w-full max-w-lg shadow-lg">
-          <CardHeader className="bg-green-50">
-            <CardTitle className="text-green-600">Submission Successful!</CardTitle>
+          <CardHeader className="bg-green-50 dark:bg-green-950">
+            <CardTitle className="text-green-600 dark:text-green-400">Submission Successful!</CardTitle>
             <CardDescription>
               Your work has been submitted successfully
             </CardDescription>
@@ -278,7 +278,7 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
   }
   
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-background py-12">
       <div className="container px-4 mx-auto max-w-4xl">
         <Card className="shadow-lg">
           <CardHeader className="bg-primary/5">
@@ -301,8 +301,8 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
             </div>
             
             {/* Authentication notification banner */}
-            <div className="mt-4 bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800 flex items-start gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+            <div className="mt-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded p-3 text-sm text-blue-800 dark:text-blue-200 flex items-start gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0 text-blue-500 dark:text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
               <span>

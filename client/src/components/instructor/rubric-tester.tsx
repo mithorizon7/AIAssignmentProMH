@@ -302,6 +302,7 @@ Please evaluate this submission according to the above rubric criteria.
                       variant="ghost"
                       size="sm"
                       onClick={handleReset}
+                      aria-label="Remove selected file"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -311,9 +312,12 @@ Please evaluate this submission according to the above rubric criteria.
                 <div
                   {...getRootProps()}
                   className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${
-                    isDragActive ? "border-primary bg-primary/5" : "border-border"
+                    isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
                   }`}
                   onClick={handleBrowseClick}
+                  role="button"
+                  tabIndex={0}
+                  aria-label="File upload area. Click to browse files or drag and drop files here"
                 >
                   <input {...getInputProps()} ref={fileInputRef} />
                   <div className="flex flex-col items-center space-y-2">
@@ -325,7 +329,7 @@ Please evaluate this submission according to the above rubric criteria.
                       or <span className="text-primary underline">click to select files</span>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      (Multiple files supported, Max size: 10MB each)
+                      (Max size: 10MB, supports code files, documents, and images)
                     </p>
                   </div>
                 </div>
@@ -338,6 +342,7 @@ Please evaluate this submission according to the above rubric criteria.
                 className="min-h-[300px] text-sm"
                 value={codeContent}
                 onChange={(e) => setCodeContent(e.target.value)}
+                aria-label="Text input area for assignment content"
               />
             </TabsContent>
           </Tabs>

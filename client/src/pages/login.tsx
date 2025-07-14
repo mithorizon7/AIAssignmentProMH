@@ -84,10 +84,10 @@ export default function Login() {
       <div className="w-full lg:w-1/2 flex flex-col justify-center px-6 py-12 lg:px-12">
         <div className="mx-auto w-full max-w-md slide-up">
           <div className="mb-8 fade-in" style={{animationDelay: "100ms"}}>
-            <h1 className="text-3xl font-bold tracking-tight text-mit-red mb-2">
+            <h1 className="text-3xl font-bold tracking-tight text-primary mb-2">
               AI Feedback Platform
             </h1>
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               Sign in to access the platform
             </p>
           </div>
@@ -101,21 +101,22 @@ export default function Login() {
                     name="username"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-800 font-medium">Username</FormLabel>
+                        <FormLabel className="text-foreground font-medium">Username</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-muted-foreground">
                               <User className="h-4 w-4" />
                             </div>
                             <Input 
                               placeholder="Enter your username" 
                               {...field} 
                               disabled={isLoading}
-                              className="border-gray-300 focus-ring pl-10 transition-all duration-200 focus:border-mit-red focus:ring-mit-red/20"
+                              className="pl-10 transition-all duration-200"
+                              aria-label="Username input field"
                             />
                           </div>
                         </FormControl>
-                        <FormMessage className="text-red-600" />
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -125,10 +126,10 @@ export default function Login() {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-800 font-medium">Password</FormLabel>
+                        <FormLabel className="text-foreground font-medium">Password</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-muted-foreground">
                               <Lock className="h-4 w-4" />
                             </div>
                             <Input 
@@ -136,22 +137,21 @@ export default function Login() {
                               placeholder="Enter your password" 
                               {...field} 
                               disabled={isLoading}
-                              className="border-gray-300 focus-ring pl-10 transition-all duration-200 focus:border-mit-red focus:ring-mit-red/20"
+                              className="pl-10 transition-all duration-200"
+                              aria-label="Password input field"
                             />
                           </div>
                         </FormControl>
-                        <FormMessage className="text-red-600" />
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
                   
                   <Button 
                     type="submit" 
-                    className={cn(
-                      "w-full bg-mit-red hover:bg-mit-red/90 text-white border-0 mt-4 btn-hover-effect transition-all",
-                      isLoading && "opacity-90"
-                    )}
+                    className="w-full mt-4"
                     disabled={isLoading}
+                    aria-label={isLoading ? "Logging in..." : "Sign in to your account"}
                   >
                     {isLoading ? (
                       <>
