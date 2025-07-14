@@ -113,7 +113,7 @@ export default function InstructorDashboard() {
         if (!isNaN(courseIdNum) && courseIdNum > 0) {
           params.append('courseId', courseIdNum.toString());
         } else {
-          console.warn('Invalid course ID detected:', selectedCourse);
+          // Course ID validation logging removed for production
         }
       }
       

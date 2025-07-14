@@ -99,7 +99,7 @@ export async function apiRequest<TData = unknown>(
     try {
       const errorData = await res.json();
       if (errorData.message === 'CSRF token validation failed') {
-        console.warn('CSRF token validation failed. Retrying with a new token.');
+        // CSRF token retry logging removed for production
         // Invalidate the token
         csrfToken = null;
         

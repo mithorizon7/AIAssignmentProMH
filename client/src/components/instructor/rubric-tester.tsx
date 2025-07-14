@@ -149,7 +149,7 @@ Please evaluate this submission according to the above rubric criteria.
       // Handle file upload differently based on file type
       if (file) {
         // Log the file details to help debug
-        console.log(`Uploading file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
+        // File upload logging removed for production
         
         // Create FormData for file uploads to preserve binary data
         const formData = new FormData();

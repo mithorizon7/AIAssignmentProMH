@@ -1,6 +1,7 @@
 import { storage } from '../storage';
 import { InsertSubmission, InsertFeedback, Submission, Feedback } from '@shared/schema';
 import { isGcsConfigured, uploadFile, uploadBuffer, generateSignedUrl } from '../utils/gcs-client';
+import { logger } from '../lib/logger';
 import path from 'path';
 import crypto from 'crypto';
 
@@ -11,7 +12,7 @@ export class StorageService {
       const result = await storage.createSubmission(submission);
       return result.id;
     } catch (error) {
-      console.error('Error saving submission:', error);
+      logger.error('Error saving submission', { error });
       throw new Error('Failed to save submission to database');
     }
   }
@@ -24,7 +25,7 @@ export class StorageService {
       // Update submission status to completed
       await storage.updateSubmissionStatus(feedback.submissionId, 'completed');
     } catch (error) {
-      console.error('Error saving feedback:', error);
+      logger.error('Error saving feedback', { error });
       throw new Error('Failed to save feedback to database');
     }
   }

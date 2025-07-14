@@ -112,7 +112,7 @@ export default function SystemStatusPage() {
       });
     },
     onError: (error: any, actionId) => {
-      console.error('Recovery trigger failed:', error);
+      // Error logging handled by toast notification in production
       toast({
         title: "Recovery Failed",
         description: `Failed to trigger recovery action "${actionId}": ${error?.message || 'Unknown error'}`,

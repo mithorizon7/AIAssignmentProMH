@@ -48,7 +48,7 @@ export function EnhancedFormExample() {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    console.log("Form submitted:", data);
+    // Form submission logging removed for production
     
     toast({
       title: "Form Submitted Successfully",

@@ -472,7 +472,11 @@ export function configureAuth(app: any) {
           try {
             // Log profile information during development to help with integration
             if (process.env.NODE_ENV !== 'production') {
-              console.log('[DEBUG] Auth0 profile:', JSON.stringify(profile, null, 2));
+              logger.debug('Auth0 profile received', { 
+                userId: profile.sub, 
+                email: profile.email,
+                profileKeys: Object.keys(profile)
+              });
             }
             
             // Extract user information from Auth0 profile
@@ -641,8 +645,15 @@ export function configureAuth(app: any) {
       try {
         // Log profile information during development to help with integration
         if (process.env.NODE_ENV !== 'production') {
-          console.log('[DEBUG] MIT Horizon OIDC profile:', JSON.stringify(profile, null, 2));
-          console.log('[DEBUG] MIT Horizon OIDC idProfile:', JSON.stringify(idProfile, null, 2));
+          logger.debug('MIT Horizon OIDC profile received', { 
+            userId: profile.sub, 
+            email: profile.email,
+            profileKeys: Object.keys(profile)
+          });
+          logger.debug('MIT Horizon OIDC idProfile received', { 
+            userId: idProfile?.sub,
+            idProfileKeys: Object.keys(idProfile || {})
+          });
         }
         
         // Extract user information from MIT Horizon profile
@@ -790,7 +801,7 @@ export function configureAuth(app: any) {
       console.error('[ERROR] Failed to serialize user - invalid user object:', user);
       return done(new Error('Invalid user object during serialization'));
     }
-    console.log('[DEBUG] Serializing user ID:', user.id);
+    logger.debug('Serializing user session', { userId: user.id });
     done(null, user.id);
   });
 
@@ -801,17 +812,20 @@ export function configureAuth(app: any) {
     }
 
     try {
-      console.log(`[DEBUG] Deserializing user ID: ${id}`);
+      logger.debug('Deserializing user session', { userId: id });
       const user = await storage.getUser(id);
       
       if (!user) {
-        console.error(`[ERROR] User with ID ${id} not found during deserialization`);
+        logger.error('Failed to deserialize user - user not found', { userId: id });
         return done(null, false);
       }
       
       // Remove password from the user object
       const { password: _, ...userWithoutPassword } = user;
-      console.log(`[DEBUG] Successfully deserialized user ${user.username} (ID: ${user.id})`);
+      logger.debug('User session deserialized successfully', { 
+        userId: user.id, 
+        username: user.username 
+      });
       done(null, userWithoutPassword);
     } catch (error) {
       console.error(`[ERROR] Error deserializing user ID ${id}:`, error);
@@ -821,7 +835,8 @@ export function configureAuth(app: any) {
 
   // Authentication middleware with enhanced logging
   const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-    console.log(`[DEBUG] Authentication check for path ${req.path}:`, {
+    logger.debug('Authentication check', {
+      path: req.path,
       isAuthenticated: req.isAuthenticated(),
       hasSession: !!req.session,
       hasUser: !!req.user,

@@ -28,14 +28,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (typeof sessionStorage !== 'undefined') {
           // Check for Auth0 logout redirect
           if (sessionStorage.getItem('auth0LogoutRedirect') === 'true') {
-            console.log('Detected return from Auth0 logout, redirecting to login page');
+            // Auth0 logout detection logging removed for production
             sessionStorage.removeItem('auth0LogoutRedirect');
             navigate(APP_ROUTES.LOGIN);
           }
           
           // Check for MIT Horizon OIDC logout redirect
           if (sessionStorage.getItem('horizonLogoutRedirect') === 'true') {
-            console.log('Detected return from MIT Horizon logout, redirecting to login page');
+            // MIT Horizon logout detection logging removed for production
             sessionStorage.removeItem('horizonLogoutRedirect');
             navigate(APP_ROUTES.LOGIN);
           }
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const returnTo = getReturnToPath();
       if (returnTo) {
         // Use the returnTo path for redirection after successful login
-        console.log('[INFO] Redirecting to returnTo URL after login:', returnTo);
+        // Redirect logging removed for production
         navigate(returnTo);
       } else {
         // Default redirect based on user role
@@ -141,17 +141,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const isMitHorizonRedirect = data.redirectUrl.includes('mit-horizon.auth0.com');
         
         if (isMitHorizonRedirect) {
-          console.log('Redirecting to MIT Horizon logout URL:', data.redirectUrl);
+          // MIT Horizon logout URL logging removed for production
           
           // Set a flag in sessionStorage to handle the redirect back
           sessionStorage.setItem('horizonLogoutRedirect', 'true');
         } else if (isAuth0Redirect) {
-          console.log('Redirecting to Auth0 logout URL:', data.redirectUrl);
+          // Auth0 logout URL logging removed for production
           
           // Set a flag in sessionStorage to handle the redirect back
           sessionStorage.setItem('auth0LogoutRedirect', 'true');
         } else {
-          console.log('Redirecting to SSO logout URL:', data.redirectUrl);
+          // SSO logout URL logging removed for production
           // Generic SSO logout - use auth0 flag as a fallback
           sessionStorage.setItem('auth0LogoutRedirect', 'true');
         }
