@@ -53,13 +53,9 @@ function PrivateRoute({ component: Component, requireRole, ...rest }: PrivateRou
       return <Component {...rest} />;
     }
     
-    // Instructors can access instructor and student routes
-    if (requireRole === "student" && user?.role === "instructor") {
-      return <Component {...rest} />;
-    }
-    
-    // Check exact role match for other cases
+    // Strict role-based access control - each role can only access their own routes
     if (user?.role !== requireRole) {
+      // Redirect to appropriate dashboard based on user role
       if (user?.role === 'admin') {
         return <Redirect to="/admin/dashboard" />;
       }
@@ -81,16 +77,16 @@ function Router() {
       
       {/* Student Routes */}
       <Route path="/dashboard">
-        {() => <PrivateRoute component={Dashboard} />}
+        {() => <PrivateRoute component={Dashboard} requireRole="student" />}
       </Route>
       <Route path="/assignments">
-        {() => <PrivateRoute component={Assignments} />}
+        {() => <PrivateRoute component={Assignments} requireRole="student" />}
       </Route>
       <Route path="/submission/:id">
-        {(params) => <PrivateRoute component={SubmissionDetail} id={params.id} />}
+        {(params) => <PrivateRoute component={SubmissionDetail} requireRole="student" id={params.id} />}
       </Route>
       <Route path="/history">
-        {() => <PrivateRoute component={SubmissionHistory} />}
+        {() => <PrivateRoute component={SubmissionHistory} requireRole="student" />}
       </Route>
       
       {/* Instructor Routes */}

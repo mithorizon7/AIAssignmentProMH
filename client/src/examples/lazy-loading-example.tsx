@@ -62,13 +62,16 @@ function PrivateRoute({ component: Component, requireRole, ...rest }: any) {
       return <Component {...rest} />;
     }
     
-    // Instructors can access instructor and student routes
-    if (requireRole === "student" && user?.role === "instructor") {
-      return <Component {...rest} />;
-    }
-    
-    // Check exact role match for other cases
+    // Strict role-based access control - each role can only access their own routes
     if (user?.role !== requireRole) {
+      // Redirect to appropriate dashboard based on user role
+      if (user?.role === 'admin') {
+        return <Redirect to="/admin/dashboard" />;
+      }
+      if (user?.role === 'instructor') {
+        return <Redirect to="/instructor/dashboard" />;
+      }
+      // Default redirect for students or other roles
       return <Redirect to="/dashboard" />;
     }
   }
