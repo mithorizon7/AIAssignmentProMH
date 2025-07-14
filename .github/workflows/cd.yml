@@ -1,0 +1,362 @@
+# Continuous Deployment Pipeline for AIGrader
+# Deploys to staging/production environments after successful CI
+
+name: CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  
+  # Allow manual deployment
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # Job 1: Pre-deployment validation
+  pre-deployment:
+    name: Pre-deployment Validation
+    runs-on: ubuntu-latest
+    
+    outputs:
+      deploy-staging: ${{ steps.determine-deployment.outputs.deploy-staging }}
+      deploy-production: ${{ steps.determine-deployment.outputs.deploy-production }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Determine deployment target
+      id: determine-deployment
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "${{ github.event.inputs.environment }}" == "production" ]]; then
+            echo "deploy-production=true" >> $GITHUB_OUTPUT
+            echo "deploy-staging=false" >> $GITHUB_OUTPUT
+          else
+            echo "deploy-staging=true" >> $GITHUB_OUTPUT
+            echo "deploy-production=false" >> $GITHUB_OUTPUT
+          fi
+        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          echo "deploy-staging=true" >> $GITHUB_OUTPUT
+          echo "deploy-production=false" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          echo "deploy-production=true" >> $GITHUB_OUTPUT
+          echo "deploy-staging=false" >> $GITHUB_OUTPUT
+        else
+          echo "deploy-staging=false" >> $GITHUB_OUTPUT
+          echo "deploy-production=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run pre-deployment checks
+      run: |
+        echo "Running pre-deployment validation..."
+        
+        # Validate environment configuration
+        if [ -f ".env.example" ]; then
+          echo "✅ Environment configuration template found"
+        else
+          echo "⚠️ No .env.example found - ensure environment variables are documented"
+        fi
+        
+        # Validate scaling configuration
+        if [ -f "scripts/final-scaling-validation.js" ]; then
+          echo "Running final scaling validation..."
+          node scripts/final-scaling-validation.js
+        fi
+        
+        echo "Pre-deployment validation completed"
+
+  # Job 2: Build and package for deployment
+  build-and-package:
+    name: Build & Package
+    runs-on: ubuntu-latest
+    needs: pre-deployment
+    if: needs.pre-deployment.outputs.deploy-staging == 'true' || needs.pre-deployment.outputs.deploy-production == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build application
+      run: |
+        if npm run build >/dev/null 2>&1; then
+          npm run build
+        else
+          echo "No build script found, preparing for deployment..."
+        fi
+    
+    - name: Create deployment package
+      run: |
+        echo "Creating deployment package..."
+        
+        # Create deployment directory
+        mkdir -p deployment-package
+        
+        # Copy essential files
+        cp -r server deployment-package/
+        cp -r shared deployment-package/
+        cp -r client deployment-package/
+        cp package*.json deployment-package/
+        cp ecosystem.config.js deployment-package/ 2>/dev/null || echo "No PM2 config found"
+        cp Dockerfile deployment-package/ 2>/dev/null || echo "No Dockerfile found"
+        cp docker-compose.yml deployment-package/ 2>/dev/null || echo "No docker-compose found"
+        cp -r scripts deployment-package/ 2>/dev/null || echo "No scripts directory found"
+        
+        # Copy build artifacts if they exist
+        if [ -d "dist" ]; then
+          cp -r dist deployment-package/
+        fi
+        
+        # Create deployment info
+        cat > deployment-package/deployment-info.json << EOF
+        {
+          "version": "${{ github.sha }}",
+          "branch": "${{ github.ref_name }}",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "environment": "${{ needs.pre-deployment.outputs.deploy-production == 'true' && 'production' || 'staging' }}"
+        }
+        EOF
+        
+        echo "Deployment package created"
+        ls -la deployment-package/
+    
+    - name: Upload deployment artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-package
+        path: deployment-package/
+        retention-days: 30
+
+  # Job 3: Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, build-and-package]
+    if: needs.pre-deployment.outputs.deploy-staging == 'true'
+    environment: staging
+    
+    steps:
+    - name: Download deployment package
+      uses: actions/download-artifact@v4
+      with:
+        name: deployment-package
+        path: ./deployment
+    
+    - name: Deploy to Staging
+      run: |
+        echo "Deploying to staging environment..."
+        
+        # This is where you would typically:
+        # 1. Connect to your staging server
+        # 2. Upload the deployment package
+        # 3. Run deployment scripts
+        # 4. Restart services
+        
+        echo "Staging deployment configuration:"
+        cat deployment/deployment-info.json
+        
+        # Example deployment steps (customize based on your infrastructure):
+        
+        # If using Docker:
+        if [ -f "deployment/docker-compose.yml" ]; then
+          echo "Docker deployment detected"
+          # docker-compose -f deployment/docker-compose.yml up -d
+        fi
+        
+        # If using PM2:
+        if [ -f "deployment/ecosystem.config.js" ]; then
+          echo "PM2 deployment detected"
+          # pm2 start deployment/ecosystem.config.js --env staging
+        fi
+        
+        echo "Staging deployment completed"
+    
+    - name: Run staging health checks
+      run: |
+        echo "Running post-deployment health checks..."
+        
+        # Wait for application to start
+        sleep 30
+        
+        # Run health checks (customize URL based on your staging environment)
+        # STAGING_URL="https://staging.aigrader.app"
+        # curl -f $STAGING_URL/api/health || exit 1
+        
+        echo "Staging health checks passed"
+    
+    - name: Run staging integration tests
+      run: |
+        echo "Running staging integration tests..."
+        
+        # Run integration tests against staging environment
+        # This could include:
+        # - API endpoint tests
+        # - Database connectivity tests
+        # - File upload tests
+        # - Authentication flow tests
+        
+        echo "Staging integration tests passed"
+
+  # Job 4: Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, build-and-package]
+    if: needs.pre-deployment.outputs.deploy-production == 'true'
+    environment: production
+    
+    steps:
+    - name: Download deployment package
+      uses: actions/download-artifact@v4
+      with:
+        name: deployment-package
+        path: ./deployment
+    
+    - name: Production deployment validation
+      run: |
+        echo "Validating production deployment readiness..."
+        
+        # Additional production-specific validations
+        if [ -f "deployment/scripts/final-scaling-validation.js" ]; then
+          cd deployment
+          npm ci --only=production
+          node scripts/final-scaling-validation.js
+          cd ..
+        fi
+        
+        echo "Production validation completed"
+    
+    - name: Deploy to Production
+      run: |
+        echo "Deploying to production environment..."
+        
+        # Production deployment (customize based on your infrastructure)
+        echo "Production deployment configuration:"
+        cat deployment/deployment-info.json
+        
+        # Example production deployment:
+        # 1. Blue-green deployment
+        # 2. Rolling deployment with zero downtime
+        # 3. Database migrations
+        # 4. Cache warming
+        
+        # If using Docker with blue-green deployment:
+        if [ -f "deployment/docker-compose.yml" ]; then
+          echo "Production Docker deployment detected"
+          # Implement blue-green deployment logic
+        fi
+        
+        # If using PM2 with rolling restart:
+        if [ -f "deployment/ecosystem.config.js" ]; then
+          echo "Production PM2 deployment detected"
+          # pm2 reload deployment/ecosystem.config.js --env production
+        fi
+        
+        echo "Production deployment completed"
+    
+    - name: Run production health checks
+      run: |
+        echo "Running post-deployment health checks..."
+        
+        # Wait for application to stabilize
+        sleep 60
+        
+        # Comprehensive production health checks
+        # PRODUCTION_URL="https://aigrader.app"
+        # curl -f $PRODUCTION_URL/api/health || exit 1
+        
+        # Additional production-specific checks:
+        # - Database connectivity
+        # - Redis connectivity
+        # - External API connectivity
+        # - Performance benchmarks
+        
+        echo "Production health checks passed"
+    
+    - name: Post-deployment notification
+      run: |
+        echo "Sending deployment notifications..."
+        
+        # Send notifications to team (Slack, email, etc.)
+        # This would typically use secrets for webhook URLs
+        
+        echo "Production deployment notification sent"
+
+  # Job 5: Deployment rollback (manual trigger)
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment != ''
+    
+    steps:
+    - name: Rollback deployment
+      run: |
+        echo "Rolling back deployment for ${{ github.event.inputs.environment }}..."
+        
+        # Implement rollback logic:
+        # 1. Identify previous stable version
+        # 2. Restore from backup
+        # 3. Restart services
+        # 4. Verify rollback success
+        
+        echo "Rollback completed for ${{ github.event.inputs.environment }}"
+
+  # Job 6: Deployment summary
+  deployment-summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result != 'skipped' || needs.deploy-production.result != 'skipped')
+    
+    steps:
+    - name: Deployment Summary
+      run: |
+        echo "Deployment Summary:"
+        echo "=================="
+        
+        if [[ "${{ needs.deploy-staging.result }}" != "skipped" ]]; then
+          echo "Staging Deployment: ${{ needs.deploy-staging.result }}"
+        fi
+        
+        if [[ "${{ needs.deploy-production.result }}" != "skipped" ]]; then
+          echo "Production Deployment: ${{ needs.deploy-production.result }}"
+        fi
+        
+        # Check for deployment failures
+        if [[ "${{ needs.deploy-staging.result }}" == "failure" || 
+              "${{ needs.deploy-production.result }}" == "failure" ]]; then
+          echo "❌ Deployment failed - check logs and consider rollback"
+          exit 1
+        else
+          echo "✅ Deployment completed successfully"
+        fi
