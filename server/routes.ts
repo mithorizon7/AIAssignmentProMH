@@ -24,6 +24,12 @@ import { determineContentType, isFileTypeAllowed, ContentType } from "./utils/fi
 import { processFileForMultimodal } from "./utils/multimodal-processor";
 import { asyncHandler } from "./lib/error-handler";
 import { generateSecret, verifyTotp, generateOtpAuthUrl } from "./utils/totp";
+import { performHealthCheck, quickHealthCheck } from "./lib/health-checker";
+import { validateProductionReadiness } from "./lib/production-validator";
+import { getDatabaseHealth } from "./lib/database-optimizer";
+import { getQueueHealthStatus } from "./lib/queue-manager";
+import { getSecurityHealth } from "./lib/security-enhancer";
+import { errorRecoverySystem, triggerManualRecovery, getRecoveryMetrics } from "./lib/error-recovery";
 
 // Helper function to generate a unique shareable code for assignments
 function generateShareableCode(length = 8): string {
@@ -68,9 +74,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/instructor', instructorRoutes);
 
   // Define API routes
-  app.get('/api/health', (req, res) => {
-    res.status(200).json({ status: 'ok' });
-  });
+  
+  // Basic health check endpoint
+  app.get('/api/health', asyncHandler(async (req, res) => {
+    const result = await quickHealthCheck();
+    res.status(result.status === 'ok' ? 200 : 503).json(result);
+  }));
+  
+  // Comprehensive health check endpoint
+  app.get('/api/health/detailed', asyncHandler(async (req, res) => {
+    const result = await performHealthCheck();
+    const statusCode = result.status === 'healthy' ? 200 : 
+                      result.status === 'degraded' ? 200 : 503;
+    res.status(statusCode).json(result);
+  }));
+  
+  // Production readiness check (admin only)
+  app.get('/api/admin/production-readiness', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+    const result = await validateProductionReadiness();
+    res.status(result.isValid ? 200 : 400).json(result);
+  }));
+
+  // Database health check (admin only)
+  app.get('/api/admin/database-health', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+    const result = await getDatabaseHealth();
+    res.json(result);
+  }));
+
+  // Queue health check (admin only)
+  app.get('/api/admin/queue-health', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+    const result = await getQueueHealthStatus();
+    res.json(result);
+  }));
+
+  // Security health check (admin only)
+  app.get('/api/admin/security-health', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+    const result = getSecurityHealth();
+    res.json(result);
+  }));
+
+  // Recovery system status (admin only)
+  app.get('/api/admin/recovery-status', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+    const status = errorRecoverySystem.getRecoveryStatus();
+    const metrics = getRecoveryMetrics();
+    res.json({ status, metrics });
+  }));
+
+  // Manual recovery trigger (admin only)
+  app.post('/api/admin/trigger-recovery', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+    const { actionId } = req.body;
+    if (!actionId) {
+      return res.status(400).json({ error: 'actionId is required' });
+    }
+    
+    try {
+      const result = await triggerManualRecovery(actionId);
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ 
+        error: 'Recovery failed', 
+        message: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    }
+  }));
 
   // System settings endpoints
   app.get('/api/admin/system-settings', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {

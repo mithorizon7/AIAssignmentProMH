@@ -7,6 +7,16 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { errorHandler, notFoundHandler, logger } from "./lib/error-handler";
 import { runMigrations } from "./migrations/run-migrations";
+import { validateAndExit } from "./lib/production-validator";
+import { loadConfig, isProduction, isDevelopment } from "./lib/env-config";
+import { initGracefulShutdown } from "./lib/graceful-shutdown";
+import { initializeDatabaseOptimization } from "./lib/database-optimizer";
+import { initializeQueueMonitoring } from "./lib/queue-manager";
+import { securityMonitoringMiddleware, initializeSecurityMonitoring } from "./lib/security-enhancer";
+import { errorRecoveryMiddleware, initializeErrorRecovery } from "./lib/error-recovery";
+
+// Load and validate configuration
+const config = loadConfig();
 
 const app = express();
 // Increase JSON payload limit to 10MB for handling large content like AI prompts
@@ -14,7 +24,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // Configure helmet security headers based on environment
-const isProduction = app.get("env") === "production";
+const isProductionEnv = isProduction();
 
 // Configure different CSP directives for production and development
 // Define type to accommodate the helmet CSP directive requirements
@@ -34,7 +44,7 @@ const productionDirectives: CSPDirectives = {
 };
 
 // Add upgrade-insecure-requests directive in production
-if (isProduction) {
+if (isProductionEnv) {
   (productionDirectives as any)["upgrade-insecure-requests"] = [];
 }
 
@@ -51,14 +61,14 @@ const developmentDirectives: CSPDirectives = {
   frameSrc: ["'none'"],
 };
 
-const cspDirectives = isProduction ? productionDirectives : developmentDirectives;
+const cspDirectives = isProductionEnv ? productionDirectives : developmentDirectives;
 
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: cspDirectives,
     },
-    strictTransportSecurity: isProduction
+    strictTransportSecurity: isProductionEnv
       ? {
           maxAge: 63072000, // 2 years in seconds
           includeSubDomains: true,
@@ -74,6 +84,9 @@ app.use(
     noSniff: true,
   })
 );
+
+// Add security monitoring middleware
+app.use(securityMonitoringMiddleware);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -106,21 +119,87 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Validate production readiness in production environment
+  if (isProductionEnv) {
+    try {
+      await validateAndExit();
+      console.log('✅ Production readiness validation passed');
+    } catch (error) {
+      console.error('[Startup] Production validation failed:', error);
+      process.exit(1);
+    }
+  }
+
   // Run database migrations to ensure all required columns exist
   try {
     await runMigrations();
     console.log('[Startup] Database migrations completed successfully');
   } catch (error) {
     console.error('[Startup] Error running database migrations:', error);
+    if (isProductionEnv) {
+      console.error('[Startup] Migration failure is critical in production');
+      process.exit(1);
+    }
     console.log('[Startup] Continuing application startup despite migration error');
+  }
+
+  // Initialize database optimization
+  try {
+    await initializeDatabaseOptimization();
+    console.log('[Startup] Database optimization initialized');
+  } catch (error) {
+    console.error('[Startup] Database optimization failed:', error);
+    if (isProductionEnv) {
+      console.error('[Startup] Database optimization failure is critical in production');
+      process.exit(1);
+    }
+  }
+
+  // Initialize queue monitoring
+  try {
+    await initializeQueueMonitoring();
+    console.log('[Startup] Queue monitoring initialized');
+  } catch (error) {
+    console.error('[Startup] Queue monitoring failed:', error);
+    if (isProductionEnv) {
+      console.error('[Startup] Queue monitoring failure is critical in production');
+      process.exit(1);
+    }
+  }
+
+  // Initialize security monitoring
+  try {
+    initializeSecurityMonitoring();
+    console.log('[Startup] Security monitoring initialized');
+  } catch (error) {
+    console.error('[Startup] Security monitoring failed:', error);
+    if (isProductionEnv) {
+      console.error('[Startup] Security monitoring failure is critical in production');
+      process.exit(1);
+    }
+  }
+
+  // Initialize error recovery system
+  try {
+    initializeErrorRecovery();
+    console.log('[Startup] Error recovery system initialized');
+  } catch (error) {
+    console.error('[Startup] Error recovery system failed:', error);
+    if (isProductionEnv) {
+      console.error('[Startup] Error recovery failure is critical in production');
+      process.exit(1);
+    }
   }
 
   const server = await registerRoutes(app);
 
+  // Setup graceful shutdown handling
+  initGracefulShutdown(server);
+
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  if (isDevelopment()) {
     await setupVite(app, server);
   } else {
     serveStatic(app);
@@ -129,18 +208,26 @@ app.use((req, res, next) => {
   // Register 404 handler for API routes only
   app.use('/api', notFoundHandler);
   
+  // Register error recovery middleware
+  app.use(errorRecoveryMiddleware);
+  
   // Register global error handler
   app.use(errorHandler);
 
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = 5000;
+  const port = config.PORT;
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    if (isProductionEnv) {
+      console.log('🚀 Production server started successfully');
+      console.log(`🌐 Server URL: http://0.0.0.0:${port}`);
+    }
   });
 })();
