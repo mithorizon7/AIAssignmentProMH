@@ -30,6 +30,7 @@ import { getDatabaseHealth } from "./lib/database-optimizer";
 import { getQueueHealthStatus } from "./lib/queue-manager";
 import { getSecurityHealth } from "./lib/security-enhancer";
 import { errorRecoverySystem, triggerManualRecovery, getRecoveryMetrics } from "./lib/error-recovery";
+import { cacheManager } from "./lib/cache-manager";
 
 // Helper function to generate a unique shareable code for assignments
 function generateShareableCode(length = 8): string {
@@ -136,6 +137,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: error instanceof Error ? error.message : 'Unknown error' 
       });
     }
+  }));
+
+  // Cache management endpoints (admin only)
+  app.get('/api/admin/cache-health', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+    const health = await cacheManager.getHealth();
+    res.json(health);
+  }));
+
+  app.post('/api/admin/cache-clear', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+    const { pattern, tags } = req.body;
+    
+    let deletedCount = 0;
+    if (pattern) {
+      deletedCount = await cacheManager.invalidateByPattern(pattern);
+    } else if (tags) {
+      deletedCount = await cacheManager.invalidateByTags(tags);
+    } else {
+      deletedCount = await cacheManager.clear();
+    }
+    
+    res.json({ success: true, deletedCount });
   }));
 
   // System settings endpoints

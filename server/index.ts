@@ -14,6 +14,7 @@ import { initializeDatabaseOptimization } from "./lib/database-optimizer";
 import { initializeQueueMonitoring } from "./lib/queue-manager";
 import { securityMonitoringMiddleware, initializeSecurityMonitoring } from "./lib/security-enhancer";
 import { errorRecoveryMiddleware, initializeErrorRecovery } from "./lib/error-recovery";
+import { initializeCacheManager } from "./lib/cache-manager";
 
 // Load and validate configuration
 const config = loadConfig();
@@ -187,6 +188,18 @@ app.use((req, res, next) => {
     console.error('[Startup] Error recovery system failed:', error);
     if (isProductionEnv) {
       console.error('[Startup] Error recovery failure is critical in production');
+      process.exit(1);
+    }
+  }
+
+  // Initialize cache manager
+  try {
+    initializeCacheManager();
+    console.log('[Startup] Cache manager initialized');
+  } catch (error) {
+    console.error('[Startup] Cache manager initialization failed:', error);
+    if (isProductionEnv) {
+      console.error('[Startup] Cache manager failure is critical in production');
       process.exit(1);
     }
   }

@@ -1,0 +1,16 @@
+{
+  "totalRequests": 0,
+  "successfulRequests": 0,
+  "failedRequests": 0,
+  "startTime": 71.138582,
+  "endTime": 0,
+  "responseTimes": [],
+  "errorCounts": {},
+  "statusCodes": {},
+  "throughput": 0,
+  "averageResponseTime": null,
+  "p95ResponseTime": 0,
+  "p99ResponseTime": 0,
+  "concurrentUsers": 0,
+  "endpointStats": {}
+}

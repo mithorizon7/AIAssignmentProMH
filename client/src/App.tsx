@@ -27,6 +27,7 @@ import SubmitAssignment from "@/pages/submit";
 import AdminDashboard from "@/pages/admin/dashboard";
 import UsersPage from "@/pages/admin/users";
 import SystemConfigPage from "@/pages/admin/system-config";
+import SystemStatusPage from "@/pages/admin/system-status";
 import LogsPage from "@/pages/admin/logs";
 import UXExamples from "@/pages/ux-examples";
 import { AuthProvider, useAuth } from "./lib/auth";
@@ -136,6 +137,9 @@ function Router() {
       </Route>
       <Route path="/admin/system-config">
         {() => <PrivateRoute component={SystemConfigPage} requireRole="admin" />}
+      </Route>
+      <Route path="/admin/system-status">
+        {() => <PrivateRoute component={SystemStatusPage} requireRole="admin" />}
       </Route>
       <Route path="/admin/logs">
         {() => <PrivateRoute component={LogsPage} requireRole="admin" />}
