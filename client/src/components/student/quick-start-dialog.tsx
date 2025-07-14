@@ -21,10 +21,9 @@ export function QuickStartDialog() {
           <p><strong>2.</strong> Submit your work to receive instant AI-powered feedback.</p>
           <p><strong>3.</strong> Review feedback anytime in your Submission History.</p>
           <p>
-            For more details, see our{' '}
-            <a href="/documentation" className="text-primary hover:underline">documentation</a>{' '}
-            or visit the{' '}
-            <a href="/help" className="text-primary hover:underline">help center</a>.
+            For more details, visit our{' '}
+            <a href="mailto:support@aigrader.com" className="text-primary hover:underline">help center</a>{' '}
+            or contact support for assistance.
           </p>
         </div>
         <DialogFooter className="pt-4">

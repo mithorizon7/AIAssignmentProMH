@@ -115,7 +115,7 @@ export default function Dashboard() {
                 <div className="border-t border-neutral-200 pt-5 text-sm text-neutral-500">
                   <p>
                     Need help? <QuickStartDialog /> or{' '}
-                    <span className="text-primary hover:underline cursor-pointer">contact support</span>.
+                    <a href="mailto:support@aigrader.com" className="text-primary hover:underline">contact support</a>.
                   </p>
                 </div>
               </div>

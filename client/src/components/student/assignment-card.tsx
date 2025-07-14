@@ -53,7 +53,7 @@ export function AssignmentCard({ assignment, latestSubmission }: AssignmentCardP
           </div>
           
           {isActive && !isSubmitted && (
-            <Link href={APP_ROUTES.SUBMISSION(assignment.id)} className="slide-in-right" style={{animationDelay: "250ms"}}>
+            <Link href={`/submission/${assignment.id}`} className="slide-in-right" style={{animationDelay: "250ms"}}>
               <Button size="sm" className="h-10 px-4 btn-hover-effect group relative overflow-hidden whitespace-nowrap">
                 <span className="relative z-10">Submit Assignment</span>
                 <ArrowRightCircle className="ml-2 h-4 w-4 relative z-10 group-hover:translate-x-0.5 transition-transform" />
@@ -63,7 +63,7 @@ export function AssignmentCard({ assignment, latestSubmission }: AssignmentCardP
           )}
           
           {isSubmitted && (
-            <Link href={APP_ROUTES.SUBMISSION(assignment.id)} className="slide-in-right" style={{animationDelay: "250ms"}}>
+            <Link href={`/submission/${assignment.id}`} className="slide-in-right" style={{animationDelay: "250ms"}}>
               <Button 
                 size="sm" 
                 variant="outline" 

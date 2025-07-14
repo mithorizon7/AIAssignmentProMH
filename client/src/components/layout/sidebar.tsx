@@ -23,8 +23,8 @@ interface SidebarLinkProps {
 const SidebarLink = ({ href, icon, label, active }: SidebarLinkProps) => (
   <li>
     <Link href={href}>
-      <a
-        className={`flex items-center p-3 rounded-md transition-colors duration-150 ${
+      <div
+        className={`flex items-center p-3 rounded-md transition-colors duration-150 cursor-pointer ${
           active
             ? "text-primary bg-blue-50 hover:bg-blue-100 dark:bg-sidebar-primary dark:text-sidebar-primary-foreground hover:dark:bg-primary/90"
             : "text-neutral-700 hover:bg-neutral-100 dark:text-sidebar-foreground/80 dark:hover:bg-sidebar-accent dark:hover:text-sidebar-accent-foreground"
@@ -32,7 +32,7 @@ const SidebarLink = ({ href, icon, label, active }: SidebarLinkProps) => (
       >
         <div className="mr-4 text-[#8a1a2c]" aria-hidden="true">{icon}</div>
         <span className="text-base font-medium">{label}</span>
-      </a>
+      </div>
     </Link>
   </li>
 );

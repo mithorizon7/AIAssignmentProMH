@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { AssignmentCard } from "@/components/student/assignment-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileText } from "lucide-react";
 
 export default function Assignments() {
   const { user } = useAuth();
@@ -22,7 +23,7 @@ export default function Assignments() {
     if (items.length === 0) {
       return (
         <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-8 text-center">
-          <span className="material-icons text-4xl text-neutral-400 mb-2">assignment</span>
+          <FileText className="h-12 w-12 text-neutral-400 mb-4 mx-auto" />
           <h3 className="text-lg font-medium text-neutral-700 mb-1">No assignments found</h3>
           <p className="text-neutral-600">There are no assignments in this category</p>
         </div>

@@ -30,6 +30,7 @@ import SystemConfigPage from "@/pages/admin/system-config";
 import SystemStatusPage from "@/pages/admin/system-status";
 import LogsPage from "@/pages/admin/logs";
 import UXExamples from "@/pages/ux-examples";
+import Settings from "@/pages/settings";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { getDashboardPath, hasRolePermission, getUnauthorizedRedirectPath, type UserRole } from "./utils/route-utils";
 import { RoleBasedRedirect } from "./components/RoleBasedRedirect";
@@ -84,6 +85,9 @@ function Router() {
       </Route>
       <Route path="/history">
         {() => <PrivateRoute component={SubmissionHistory} requireRole="student" />}
+      </Route>
+      <Route path="/settings">
+        {() => <PrivateRoute component={Settings} requireRole="student" />}
       </Route>
       
       {/* Instructor Routes */}
