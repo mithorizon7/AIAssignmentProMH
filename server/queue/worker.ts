@@ -12,8 +12,7 @@ import { queueApi } from './bullmq-submission-queue';
 class EnhancedSubmissionQueue extends EventEmitter {
   constructor() {
     super();
-    console.log('⚠️ Legacy queue adapter initialized - Using BullMQ implementation');
-    console.log('For production use, update code to import from bullmq-submission-queue.ts');
+    // This is now a compatibility wrapper around the consolidated BullMQ implementation
   }
   
   /**

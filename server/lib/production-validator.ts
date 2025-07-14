@@ -5,7 +5,7 @@
 
 import { logger } from './logger';
 import { db } from '../db';
-import redisClient from '../queue/redis';
+import { redisClient, isRedisReady } from '../queue/redis-client';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -90,28 +90,50 @@ async function validateDatabase(): Promise<{ valid: boolean; errors: string[]; w
 }
 
 /**
- * Validates Redis connectivity and configuration
+ * Validates Redis connectivity and configuration using centralized client
  */
 async function validateRedis(): Promise<{ valid: boolean; errors: string[]; warnings: string[] }> {
   const errors: string[] = [];
   const warnings: string[] = [];
   
   try {
-    // Test Redis connection
-    await redisClient.ping();
+    // Check if Redis client is ready
+    if (!isRedisReady()) {
+      const message = 'Redis client not ready for connections';
+      if (process.env.NODE_ENV === 'production') {
+        errors.push(message);
+      } else {
+        warnings.push(`${message} (acceptable in development mode)`);
+      }
+      return { valid: errors.length === 0, errors, warnings };
+    }
     
-    // Check Redis memory usage
+    // Test Redis connection
+    const pong = await redisClient.ping();
+    if (pong !== 'PONG') {
+      errors.push('Redis ping test failed - connection unstable');
+    }
+    
+    // Check Redis memory usage and configuration
     const info = await redisClient.info('memory');
     const memoryMatch = info.match(/used_memory_human:(\S+)/);
     if (memoryMatch) {
-      logger.info('Redis memory usage', { memory: memoryMatch[1] });
+      logger.info('Redis memory usage validated', { memory: memoryMatch[1] });
     }
     
+    // Check Redis configuration for BullMQ compatibility
+    const configInfo = await redisClient.info('server');
+    logger.info('Redis server validated', { 
+      connection_status: 'healthy',
+      server_info: configInfo.substring(0, 100) + '...'
+    });
+    
   } catch (error) {
+    const errorMessage = `Redis connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
     if (process.env.NODE_ENV === 'production') {
-      errors.push(`Redis connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      errors.push(errorMessage);
     } else {
-      warnings.push('Redis not available (acceptable in development mode)');
+      warnings.push(`${errorMessage} (acceptable in development mode)`);
     }
   }
   

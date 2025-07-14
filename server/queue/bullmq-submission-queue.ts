@@ -7,7 +7,7 @@ import { OpenAIAdapter } from '../adapters/openai-adapter';
 import { AIService } from '../services/ai-service';
 import { StorageService } from '../services/storage-service';
 import { storage } from '../storage';
-import redisClient from './redis';
+import { redisClient } from './redis-client';
 import { queueLogger as logger } from '../lib/logger';
 
 // Queue name

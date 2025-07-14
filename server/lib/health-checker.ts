@@ -5,7 +5,7 @@
 
 import { logger } from './logger';
 import { db } from '../db';
-import redisClient from '../queue/redis';
+import { redisClient, isRedisReady, getRedisStatus } from '../queue/redis-client';
 import { GeminiAdapter } from '../adapters/gemini-adapter';
 import { OpenAIAdapter } from '../adapters/openai-adapter';
 import { Storage } from '@google-cloud/storage';
@@ -75,19 +75,33 @@ async function checkDatabase(): Promise<HealthCheck> {
 }
 
 /**
- * Checks Redis connectivity and performance
+ * Checks Redis connectivity and performance using centralized client
  */
 async function checkRedis(): Promise<HealthCheck> {
   const start = Date.now();
   
   try {
+    // Check if Redis is ready
+    if (!isRedisReady()) {
+      return {
+        status: 'fail',
+        response_time: Date.now() - start,
+        message: 'Redis client not ready',
+        details: { 
+          redis_status: getRedisStatus(),
+          error: 'Client not in ready state'
+        }
+      };
+    }
+    
     // Test Redis connectivity
     const pong = await redisClient.ping();
     
-    // Get Redis info
+    // Get Redis info and status
     const info = await redisClient.info('memory');
     const memoryMatch = info.match(/used_memory:(\d+)/);
     const memoryUsage = memoryMatch ? parseInt(memoryMatch[1]) : 0;
+    const status = getRedisStatus();
     
     const responseTime = Date.now() - start;
     
@@ -98,7 +112,10 @@ async function checkRedis(): Promise<HealthCheck> {
       details: {
         memory_usage_bytes: memoryUsage,
         memory_usage_mb: Math.round(memoryUsage / 1024 / 1024),
-        response_time_ms: responseTime
+        response_time_ms: responseTime,
+        connection_status: status.status,
+        uptime: status.uptime,
+        command_queue_length: status.commandQueueLength
       }
     };
     
@@ -107,7 +124,10 @@ async function checkRedis(): Promise<HealthCheck> {
       status: 'fail',
       response_time: Date.now() - start,
       message: `Redis connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      details: { error: error instanceof Error ? error.message : 'Unknown error' }
+      details: { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        redis_status: getRedisStatus()
+      }
     };
   }
 }
