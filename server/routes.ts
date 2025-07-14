@@ -31,6 +31,7 @@ import { getQueueHealthStatus } from "./lib/queue-manager";
 import { getSecurityHealth } from "./lib/security-enhancer";
 import { errorRecoverySystem, triggerManualRecovery, getRecoveryMetrics } from "./lib/error-recovery";
 import { cacheManager } from "./lib/cache-manager";
+import { memoryMonitor } from "./lib/memory-monitor";
 
 // Helper function to generate a unique shareable code for assignments
 function generateShareableCode(length = 8): string {
@@ -158,6 +159,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     res.json({ success: true, deletedCount });
+  }));
+
+  // Memory monitoring endpoints (admin only)
+  app.get('/api/admin/memory-status', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+    const memoryTrend = memoryMonitor.getMemoryTrend();
+    const memoryHistory = memoryMonitor.getMemoryHistory();
+    
+    res.json({
+      current: memoryTrend.current,
+      trend: memoryTrend.trend,
+      averagePercentage: memoryTrend.averagePercentage,
+      peakPercentage: memoryTrend.peakPercentage,
+      suggestions: memoryTrend.suggestions,
+      history: memoryHistory.slice(-20) // Last 20 entries
+    });
+  }));
+
+  app.post('/api/admin/memory-gc', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+    const forced = memoryMonitor.forceGarbageCollection();
+    const statsAfter = memoryMonitor.getMemoryStats();
+    
+    res.json({
+      success: true,
+      forced,
+      memoryAfter: statsAfter
+    });
   }));
 
   // System settings endpoints

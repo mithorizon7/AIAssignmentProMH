@@ -30,13 +30,13 @@ export interface SecurityThreat {
 
 class SecurityEnhancer {
   private securityEvents: SecurityThreat[] = [];
-  private readonly maxEventHistory = 1000;
+  private readonly maxEventHistory = 100; // Reduced from 1000 to 100
   private blockedIPs = new Set<string>();
   private suspiciousPatterns = [
-    // SQL injection patterns (exclude file extensions)
-    /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b)(?![.\w]*\.(ts|tsx|js|jsx|css|html))/i,
-    /(\b(OR|AND)\s+\d+\s*=\s*\d+)(?![.\w]*\.(ts|tsx|js|jsx|css|html))/i,
-    /(';|--;|\/\*|\*\/)(?![.\w]*\.(ts|tsx|js|jsx|css|html))/,
+    // SQL injection patterns (exclude file extensions and development files)
+    /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b)(?![.\w]*\.(ts|tsx|js|jsx|css|html|md|json))/i,
+    /(\b(OR|AND)\s+\d+\s*=\s*\d+)(?![.\w]*\.(ts|tsx|js|jsx|css|html|md|json))/i,
+    /(';|--;|\/\*|\*\/)(?![.\w]*\.(ts|tsx|js|jsx|css|html|md|json))/,
     
     // XSS patterns (exclude legitimate development files)
     /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
@@ -110,6 +110,11 @@ class SecurityEnhancer {
   analyzeRequest(req: Request): SecurityThreat | null {
     const ip = req.ip || req.connection.remoteAddress || 'unknown';
     const userAgent = req.headers['user-agent'];
+    
+    // Skip security checking for development file requests
+    if (req.url.includes('/src/') || req.url.includes('/@') || req.url.includes('.tsx') || req.url.includes('.ts') || req.url.includes('.js') || req.url.includes('.jsx') || req.url.includes('.css') || req.url.includes('.html')) {
+      return null;
+    }
     
     // Check for suspicious patterns in URL
     for (const pattern of this.suspiciousPatterns) {

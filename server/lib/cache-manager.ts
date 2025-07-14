@@ -36,7 +36,7 @@ class CacheManager {
   };
 
   private responseTimeHistory: number[] = [];
-  private readonly maxHistorySize = 1000;
+  private readonly maxHistorySize = 100; // Reduced from 1000 to 100
 
   /**
    * Generates a cache key with optional namespace
@@ -389,12 +389,12 @@ export function initializeCacheManager(): void {
         logger.info('Cache statistics', stats);
         
         // Reset stats if they get too large
-        if (stats.totalOperations > 100000) {
+        if (stats.totalOperations > 50000) { // Reduced from 100000 to 50000
           cacheManager.resetStats();
         }
       } catch (error) {
         logger.error('Cache cleanup failed', { error });
       }
-    }, 60 * 60 * 1000); // Every hour
+    }, 30 * 60 * 1000); // Every 30 minutes instead of 60
   }
 }

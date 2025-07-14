@@ -239,9 +239,8 @@ function checkMemory(): HealthCheck {
   
   try {
     const memoryUsage = process.memoryUsage();
-    const totalMemory = memoryUsage.heapTotal + memoryUsage.external;
-    const usedMemory = memoryUsage.heapUsed;
-    const memoryPercent = (usedMemory / totalMemory) * 100;
+    // Calculate percentage based on heap usage vs heap total (more accurate)
+    const memoryPercent = (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100;
     
     let status: 'pass' | 'warn' | 'fail' = 'pass';
     let message = 'Memory usage normal';

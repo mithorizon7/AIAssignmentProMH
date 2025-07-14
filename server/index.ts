@@ -15,6 +15,7 @@ import { initializeQueueMonitoring } from "./lib/queue-manager";
 import { securityMonitoringMiddleware, initializeSecurityMonitoring } from "./lib/security-enhancer";
 import { errorRecoveryMiddleware, initializeErrorRecovery } from "./lib/error-recovery";
 import { initializeCacheManager } from "./lib/cache-manager";
+import { initializeMemoryMonitor } from "./lib/memory-monitor";
 
 // Load and validate configuration
 const config = loadConfig();
@@ -202,6 +203,15 @@ app.use((req, res, next) => {
       console.error('[Startup] Cache manager failure is critical in production');
       process.exit(1);
     }
+  }
+
+  // Initialize memory monitor
+  try {
+    initializeMemoryMonitor();
+    console.log('[Startup] Memory monitor initialized');
+  } catch (error) {
+    console.error('[Startup] Memory monitor initialization failed:', error);
+    // Not critical, continue without memory monitoring
   }
 
   const server = await registerRoutes(app);
