@@ -316,7 +316,7 @@ jobs:
         echo $APP_PID > app.pid
     
     - name: Run OWASP ZAP baseline scan
-      uses: zaproxy/action-baseline@v0.10.0
+      uses: zaproxy/action-baseline@v0.14.0
       with:
         target: 'http://localhost:5000'
         rules_file_name: '.zap/rules.tsv'
