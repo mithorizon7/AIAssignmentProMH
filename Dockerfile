@@ -2,7 +2,7 @@
 # Optimized for production deployment with minimal image size
 
 # Stage 1: Build stage
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -23,7 +23,7 @@ COPY . .
 RUN npm run build || echo "Build step completed"
 
 # Stage 2: Production stage
-FROM node:20-alpine AS production
+FROM node:24-alpine AS production
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs
