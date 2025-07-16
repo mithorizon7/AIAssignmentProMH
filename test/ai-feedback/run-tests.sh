@@ -62,7 +62,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Build vitest command
-VITEST_CMD="npx vitest run --config=vitest.ai-feedback.config.ts"
+VITEST_CMD="npx vitest run --config=../../vitest.ai-feedback.config.ts"
 
 if [ "$COVERAGE" = true ]; then
   VITEST_CMD="$VITEST_CMD --coverage"

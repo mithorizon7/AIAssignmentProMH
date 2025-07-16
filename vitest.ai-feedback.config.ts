@@ -4,7 +4,6 @@ import path from 'path';
 export default defineConfig({
   test: {
     name: 'ai-feedback',
-    root: './test/ai-feedback',
     environment: 'node',
     testTimeout: 120000, // 2 minutes for AI operations
     hookTimeout: 30000,  // 30 seconds for setup/teardown
@@ -37,8 +36,6 @@ export default defineConfig({
         }
       }
     },
-    setupFiles: ['./test/ai-feedback/setup.ts'],
-    globalSetup: ['./test/ai-feedback/global-setup.ts'],
     env: {
       NODE_ENV: 'test',
       LOG_LEVEL: 'error'
