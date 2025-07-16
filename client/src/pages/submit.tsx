@@ -168,10 +168,6 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
         formData.append('shareableCode', assignment.shareableCode);
       }
       
-      if (notes) formData.append('notes', notes);
-      if (submitType === 'code') formData.append('code', codeContent);
-      if (submitType === 'file' && file) formData.append('file', file);
-      
       // Get CSRF token first
       const csrfResponse = await fetch('/api/csrf-token', {
         credentials: 'include',
@@ -182,11 +178,21 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
       }
       
       const { csrfToken } = await csrfResponse.json();
+      console.log(`[SUBMIT] Got CSRF token: ${csrfToken?.substring(0, 10)}...`);
+      
+      // Add CSRF token to form data as fallback
+      formData.append('csrfToken', csrfToken);
+      
+      if (notes) formData.append('notes', notes);
+      if (submitType === 'code') formData.append('code', codeContent);
+      if (submitType === 'file' && file) formData.append('file', file);
       
       // Determine which endpoint to use based on authentication status
       const submissionEndpoint = isAuthenticated ? '/api/submissions' : '/api/anonymous-submissions';
+      console.log(`[SUBMIT] Using endpoint: ${submissionEndpoint}`);
+      console.log(`[SUBMIT] Authentication status: ${isAuthenticated}`);
       
-      // Send submission with CSRF token
+      // Send submission with CSRF token in both header and body
       const response = await fetch(submissionEndpoint, {
         method: 'POST',
         headers: {
