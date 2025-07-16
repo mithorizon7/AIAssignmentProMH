@@ -171,7 +171,7 @@ export function FileUpload({
             )}
             {!disabled && (
               <p className="text-xs text-muted-foreground font-medium mt-2 text-primary/80">
-                Multimodal file types coming soon!
+                Supports images, videos, audio, documents, and code files
               </p>
             )}
           </div>
