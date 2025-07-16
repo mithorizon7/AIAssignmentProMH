@@ -6,6 +6,7 @@ import { AssignmentWithSubmissions, SubmissionWithFeedback } from "@/lib/types";
 import { AppShell } from "@/components/layout/app-shell";
 import { AssignmentCard } from "@/components/student/assignment-card";
 import { SubmissionHistory } from "@/components/student/submission-history";
+import { SubmissionHistoryByAssignment } from "@/components/student/submission-history-by-assignment";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -135,9 +136,9 @@ export default function Dashboard() {
         </div>
         
         <div className="mb-8">
-          <SubmissionHistory 
-            submissions={recentSubmissions} 
-            loading={submissionsLoading} 
+          <SubmissionHistoryByAssignment 
+            assignments={assignments || []} 
+            loading={assignmentsLoading} 
           />
         </div>
       </div>

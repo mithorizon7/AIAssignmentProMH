@@ -739,49 +739,55 @@ export class DatabaseStorage implements IStorage {
   async listAssignmentsWithSubmissionsForUser(userId: number): Promise<any[]> {
     console.log(`[PERFORMANCE] Using optimized assignments with submissions query for user ${userId}`);
     
-    const result = await db.select({
-      assignment: assignments,
-      submission: submissions,
-      course: courses
-    })
-    .from(enrollments)
-    .innerJoin(assignments, eq(enrollments.courseId, assignments.courseId))
-    .innerJoin(courses, eq(assignments.courseId, courses.id))
-    .leftJoin(submissions, and(
-      eq(submissions.assignmentId, assignments.id),
-      eq(submissions.userId, userId)
-    ))
-    .where(eq(enrollments.userId, userId))
-    .orderBy(desc(assignments.dueDate));
+    try {
+      const result = await db.select({
+        assignment: assignments,
+        submission: submissions,
+        course: courses
+      })
+      .from(enrollments)
+      .innerJoin(assignments, eq(enrollments.courseId, assignments.courseId))
+      .innerJoin(courses, eq(assignments.courseId, courses.id))
+      .leftJoin(submissions, and(
+        eq(submissions.assignmentId, assignments.id),
+        eq(submissions.userId, userId)
+      ))
+      .where(eq(enrollments.userId, userId))
+      .orderBy(desc(assignments.dueDate));
 
-    // Group by assignment
-    const assignmentMap = new Map();
-    
-    result.forEach(row => {
-      const assignmentId = row.assignment.id;
+      // Group by assignment
+      const assignmentMap = new Map();
       
-      if (!assignmentMap.has(assignmentId)) {
-        assignmentMap.set(assignmentId, {
-          ...row.assignment,
-          course: row.course,
-          submissions: []
-        });
-      }
-      
-      if (row.submission) {
-        assignmentMap.get(assignmentId).submissions.push(row.submission);
-      }
-    });
+      result.forEach(row => {
+        const assignmentId = row.assignment.id;
+        
+        if (!assignmentMap.has(assignmentId)) {
+          assignmentMap.set(assignmentId, {
+            ...row.assignment,
+            course: row.course,
+            submissions: []
+          });
+        }
+        
+        if (row.submission) {
+          assignmentMap.get(assignmentId).submissions.push(row.submission);
+        }
+      });
 
-    // Sort submissions by creation date (newest first) for each assignment
-    const assignments = Array.from(assignmentMap.values());
-    assignments.forEach(assignment => {
-      assignment.submissions.sort((a, b) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-    });
+      // Sort submissions by creation date (newest first) for each assignment
+      const assignments = Array.from(assignmentMap.values());
+      assignments.forEach(assignment => {
+        assignment.submissions.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      });
 
-    return assignments;
+      return assignments;
+    } catch (error) {
+      console.error(`Error in listAssignmentsWithSubmissionsForUser for user ${userId}:`, error);
+      // Return empty array as fallback
+      return [];
+    }
   }
 
   async listSubmissionsForAssignment(assignmentId: number): Promise<Submission[]> {
