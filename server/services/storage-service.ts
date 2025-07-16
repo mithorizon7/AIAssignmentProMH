@@ -31,11 +31,11 @@ export class StorageService {
   }
 
   /**
-   * Store submission file in Google Cloud Storage or generate a mock URL if GCS not configured
+   * Store submission file in Google Cloud Storage or locally for development
    * @param file The uploaded file from multer
    * @param userId User ID of the submitter
    * @param assignmentId Assignment ID
-   * @returns Object path in GCS (to be used with generateSignedUrl when needed)
+   * @returns File path for processing (GCS path or local path)
    */
   async storeSubmissionFile(file: Express.Multer.File, userId: number, assignmentId: number): Promise<string> {
     try {
@@ -45,12 +45,11 @@ export class StorageService {
       const originalExtension = path.extname(file.originalname);
       const safeFileName = `${path.basename(file.originalname, originalExtension)}-${randomString}${originalExtension}`;
       
-      // Construct GCS object path
-      const gcsPath = `submissions/${userId}/${assignmentId}/${timestamp}/${safeFileName}`;
-      
       // Upload to GCS if configured
       if (isGcsConfigured()) {
-        console.log(`[StorageService] Uploading submission file to GCS: ${gcsPath}`);
+        console.log(`[StorageService] Uploading submission file to GCS`);
+        const gcsPath = `submissions/${userId}/${assignmentId}/${timestamp}/${safeFileName}`;
+        
         // If using multer's memoryStorage, use file.buffer
         if (file.buffer) {
           return await uploadBuffer(file.buffer, gcsPath, file.mimetype);
@@ -59,9 +58,27 @@ export class StorageService {
           return await uploadFile(file.path, gcsPath, file.mimetype);
         }
       } else {
-        console.warn('[StorageService] GCS not configured, using mock path');
-        // Return the GCS path (for database storage) - actual URL will be generated when needed
-        return gcsPath;
+        console.warn('[StorageService] GCS not configured, storing file locally for development');
+        // In development mode, store file temporarily on disk for processing
+        const tempDir = '/tmp/aigrader-dev-files';
+        const fs = require('fs');
+        const pathModule = require('path');
+        
+        // Create temp directory if it doesn't exist
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        
+        // Create full path for the temporary file
+        const tempFilePath = pathModule.join(tempDir, `${Date.now()}-${safeFileName}`);
+        
+        // Write the file buffer to temporary location
+        fs.writeFileSync(tempFilePath, file.buffer);
+        
+        console.log(`[StorageService] File stored temporarily at: ${tempFilePath}`);
+        
+        // Return the local file path for processing
+        return tempFilePath;
       }
     } catch (error) {
       console.error('Error storing file:', error);
@@ -70,12 +87,12 @@ export class StorageService {
   }
   
   /**
-   * Store anonymous submission file in Google Cloud Storage or generate a mock path if GCS not configured
+   * Store anonymous submission file in Google Cloud Storage or locally for development
    * @param file The uploaded file from multer
    * @param assignmentId Assignment ID
    * @param name Submitter's name
    * @param email Submitter's email (used to create a unique path)
-   * @returns Object path in GCS (to be used with generateSignedUrl when needed)
+   * @returns File path for processing (GCS path or local path)
    */
   async storeAnonymousSubmissionFile(file: Express.Multer.File, assignmentId: number, name: string, email: string): Promise<string> {
     try {
@@ -85,15 +102,13 @@ export class StorageService {
       const originalExtension = path.extname(file.originalname);
       const safeFileName = `${path.basename(file.originalname, originalExtension)}-${randomString}${originalExtension}`;
       
-      // Create a safe email-derived path component
-      const safeEmail = email.replace('@', '-at-').replace(/[^\w-]/g, '_');
-      
-      // Construct GCS object path
-      const gcsPath = `anonymous-submissions/${assignmentId}/${safeEmail}/${timestamp}/${safeFileName}`;
-      
       // Upload to GCS if configured
       if (isGcsConfigured()) {
-        console.log(`[StorageService] Uploading anonymous submission file to GCS: ${gcsPath}`);
+        console.log(`[StorageService] Uploading anonymous submission file to GCS`);
+        // Create a safe email-derived path component
+        const safeEmail = email.replace('@', '-at-').replace(/[^\w-]/g, '_');
+        const gcsPath = `anonymous-submissions/${assignmentId}/${safeEmail}/${timestamp}/${safeFileName}`;
+        
         // If using multer's memoryStorage, use file.buffer
         if (file.buffer) {
           return await uploadBuffer(file.buffer, gcsPath, file.mimetype);
@@ -102,9 +117,27 @@ export class StorageService {
           return await uploadFile(file.path, gcsPath, file.mimetype);
         }
       } else {
-        console.warn('[StorageService] GCS not configured, using mock path');
-        // Return the GCS path (for database storage) - actual URL will be generated when needed
-        return gcsPath;
+        console.warn('[StorageService] GCS not configured, storing file locally for development');
+        // In development mode, store file temporarily on disk for processing
+        const tempDir = '/tmp/aigrader-dev-files';
+        const fs = require('fs');
+        const pathModule = require('path');
+        
+        // Create temp directory if it doesn't exist
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        
+        // Create full path for the temporary file
+        const tempFilePath = pathModule.join(tempDir, `${Date.now()}-${safeFileName}`);
+        
+        // Write the file buffer to temporary location
+        fs.writeFileSync(tempFilePath, file.buffer);
+        
+        console.log(`[StorageService] File stored temporarily at: ${tempFilePath}`);
+        
+        // Return the local file path for processing
+        return tempFilePath;
       }
     } catch (error) {
       console.error('Error storing anonymous file:', error);

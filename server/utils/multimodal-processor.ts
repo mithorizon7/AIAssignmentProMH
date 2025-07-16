@@ -595,9 +595,10 @@ export async function processFileForMultimodal(
         filePath = `gs://${gcsClient.bucketName}/${filePath}`;
         console.log(`[MULTIMODAL] Converted to GCS URI format for direct download: ${filePath}`);
       } else {
-        console.warn(`[MULTIMODAL] GCS not configured. Check GOOGLE_APPLICATION_CREDENTIALS and GCS_BUCKET_NAME environment variables.`);
-        // Log diagnostics about available environment variables
-        console.log(`[MULTIMODAL] Checking for GCS credentials: GOOGLE_APPLICATION_CREDENTIALS ${process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'exists' : 'missing'}, GCS_BUCKET_NAME ${process.env.GCS_BUCKET_NAME ? 'exists' : 'missing'}`);
+        console.warn(`[MULTIMODAL] GCS not configured in development mode. Cannot process file from GCS path: ${filePath}`);
+        // In development mode without GCS, we cannot process files that were "uploaded" to GCS paths
+        // This is expected behavior - we need either proper GCS setup or file content available elsewhere
+        throw new Error(`Cannot process GCS path ${filePath} - GCS not configured`);
       }
     }
 
