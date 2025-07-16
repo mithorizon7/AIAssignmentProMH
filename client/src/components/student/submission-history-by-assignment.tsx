@@ -118,10 +118,10 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
               </div>
             </div>
             
-            <h3 className="text-xl font-semibold text-neutral-800 mb-3">Your submission history awaits</h3>
+            <h3 className="text-xl font-semibold text-neutral-800 mb-3">Your submission journey starts here</h3>
             <p className="text-neutral-600 mb-6 max-w-md">
               Submit your first assignment to see your work organized by assignment. 
-              Track your progress and review AI feedback for each assignment.
+              Track your progress and review detailed AI feedback for each submission.
             </p>
             
             <Button 
@@ -162,10 +162,10 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                 }}
               >
                 <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors">
+                  <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors group">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <div className="flex items-center">
+                        <div className="flex items-center transition-transform group-hover:translate-x-1">
                           {expandedAssignments[assignment.id] ? (
                             <ChevronDown className="h-5 w-5 text-gray-500" />
                           ) : (
@@ -175,7 +175,9 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                         <div>
                           <div className="flex items-center space-x-2">
                             <BookOpen className="h-5 w-5 text-primary" />
-                            <CardTitle className="text-lg">{assignment.title}</CardTitle>
+                            <CardTitle className="text-lg group-hover:text-primary transition-colors">
+                              {assignment.title}
+                            </CardTitle>
                           </div>
                           <CardDescription className="flex items-center space-x-4 mt-1">
                             <span className="flex items-center">
@@ -190,7 +192,7 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Badge variant="outline">
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                           {assignment.submissions.length} submission{assignment.submissions.length !== 1 ? 's' : ''}
                         </Badge>
                         <Badge variant={assignment.status === 'active' ? 'default' : 'secondary'}>
@@ -237,8 +239,8 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                           </div>
                           
                           {/* Submission Content */}
-                          <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
+                          <div className="mb-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+                            <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center">
                                 {submission.fileName && getSubmissionFileIcon(submission.mimeType || '', submission.fileName)}
                                 <span className="text-sm font-medium text-neutral-700">
@@ -246,16 +248,31 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                                 </span>
                               </div>
                               {submission.fileSize && (
-                                <span className="text-xs text-neutral-500">
-                                  {formatSize(submission.fileSize)}
-                                </span>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <span className="text-xs text-neutral-500 bg-white px-2 py-1 rounded">
+                                        {formatSize(submission.fileSize)}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>File size: {formatSize(submission.fileSize)}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               )}
                             </div>
                             
                             {submission.content && (
-                              <div className="text-sm text-neutral-600 bg-white p-3 rounded border max-h-32 overflow-y-auto">
-                                {submission.content.substring(0, 200)}
-                                {submission.content.length > 200 && '...'}
+                              <div className="text-sm text-neutral-600 bg-white p-3 rounded border border-gray-200 max-h-32 overflow-y-auto shadow-inner">
+                                <div className="font-mono text-xs">
+                                  {submission.content.substring(0, 200)}
+                                  {submission.content.length > 200 && (
+                                    <span className="text-primary ml-1">
+                                      ... ({submission.content.length - 200} more characters)
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -263,25 +280,31 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                           {/* Feedback Section */}
                           {submission.feedback ? (
                             <div className="mb-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="font-medium text-neutral-800">AI Feedback</h4>
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="font-medium text-neutral-800 flex items-center">
+                                  <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                                  AI Feedback
+                                </h4>
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => toggleFeedback(submission.id)}
-                                  className="text-primary hover:text-primary-dark"
+                                  className="text-primary hover:text-primary-dark hover:bg-primary/10 transition-colors"
                                 >
                                   {expandedFeedbacks[submission.id] ? 'Hide' : 'Show'} Details
                                 </Button>
                               </div>
                               
-                              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
                                 {submission.feedback.score !== null && (
                                   <div className="flex items-center justify-between mb-3">
                                     <span className="text-sm font-medium text-blue-800">Score:</span>
                                     <div className="flex items-center space-x-2">
-                                      <Progress value={submission.feedback.score} className="w-24 h-2" />
-                                      <span className="text-sm font-bold text-blue-800">
+                                      <Progress 
+                                        value={submission.feedback.score} 
+                                        className="w-24 h-2" 
+                                      />
+                                      <span className="text-sm font-bold text-blue-800 bg-white px-2 py-1 rounded">
                                         {submission.feedback.score}%
                                       </span>
                                     </div>
@@ -289,9 +312,11 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                                 )}
                                 
                                 {submission.feedback.summary && (
-                                  <p className="text-sm text-blue-700 mb-2">
-                                    <strong>Summary:</strong> {submission.feedback.summary}
-                                  </p>
+                                  <div className="bg-white p-3 rounded border border-blue-200 mb-3">
+                                    <p className="text-sm text-blue-700">
+                                      <strong className="text-blue-800">Summary:</strong> {submission.feedback.summary}
+                                    </p>
+                                  </div>
                                 )}
                                 
                                 {expandedFeedbacks[submission.id] && (
@@ -303,10 +328,13 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                               </div>
                             </div>
                           ) : (
-                            <div className="mb-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                              <p className="text-sm text-amber-700">
-                                Feedback is being generated. Please check back shortly.
-                              </p>
+                            <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200">
+                              <div className="flex items-center">
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-amber-600 border-t-transparent mr-3"></div>
+                                <p className="text-sm text-amber-700">
+                                  <strong>Feedback is being generated.</strong> Please check back shortly.
+                                </p>
+                              </div>
                             </div>
                           )}
                           
@@ -315,8 +343,9 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                               variant="outline"
                               size="sm"
                               onClick={() => navigate(`/submission/${assignment.id}`)}
-                              className="text-primary border-primary hover:bg-primary/5"
+                              className="text-primary border-primary hover:bg-primary/5 hover:border-primary/70 transition-all duration-200"
                             >
+                              <FileText className="h-4 w-4 mr-2" />
                               View Full Details
                             </Button>
                           </div>

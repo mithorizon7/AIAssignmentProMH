@@ -775,14 +775,14 @@ export class DatabaseStorage implements IStorage {
       });
 
       // Sort submissions by creation date (newest first) for each assignment
-      const assignments = Array.from(assignmentMap.values());
-      assignments.forEach(assignment => {
+      const assignmentsList = Array.from(assignmentMap.values());
+      assignmentsList.forEach(assignment => {
         assignment.submissions.sort((a, b) => 
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
       });
 
-      return assignments;
+      return assignmentsList;
     } catch (error) {
       console.error(`Error in listAssignmentsWithSubmissionsForUser for user ${userId}:`, error);
       // Return empty array as fallback
