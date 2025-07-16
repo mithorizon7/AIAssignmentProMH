@@ -378,13 +378,13 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
                   className="w-full"
                 >
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="code">Code</TabsTrigger>
+                    <TabsTrigger value="code">Paste Text/Code</TabsTrigger>
                     <TabsTrigger value="file">File Upload</TabsTrigger>
                   </TabsList>
                   <TabsContent value="code" className="space-y-4 pt-4">
                     <Textarea
-                      placeholder="Paste your code here"
-                      className="font-mono min-h-[200px]"
+                      placeholder="Paste your text, essay, or code here"
+                      className="min-h-[200px]"
                       value={codeContent}
                       onChange={(e) => setCodeContent(e.target.value)}
                       disabled={submitting}
