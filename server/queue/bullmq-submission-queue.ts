@@ -348,22 +348,22 @@ if (queueActive) {
     { 
       connection: redisClient,
       
-      // Optimized concurrency for efficient processing
-      concurrency: 2,  // Balanced concurrency for efficiency
+      // Minimal concurrency to reduce Redis load
+      concurrency: 1,  // Single worker to minimize Redis requests
       
       // Performance settings
       autorun: true,              // Start processing jobs automatically
       runRetryDelay: 15000,       // Wait 15s before retrying failed connections
       
-      // Advanced worker settings for enterprise scale
+      // Advanced worker settings optimized for Redis efficiency
       settings: {
-        stalledInterval: 30 * 1000,     // Check for stalled jobs every 30s
-        maxStalledCount: 1,             // Mark as failed after 1 stall
+        stalledInterval: 5 * 60 * 1000,  // Check for stalled jobs every 5 minutes
+        maxStalledCount: 1,              // Mark as failed after 1 stall
       },
       
-      // Balanced rate limiting for steady processing
+      // Conservative rate limiting to stay within Redis limits
       limiter: {
-        max: 10,                        // Max 10 jobs processed
+        max: 5,                         // Max 5 jobs processed
         duration: 60 * 1000,            // Per minute
         bounceBack: false               // Don't bounce back to queue
       }
