@@ -46,9 +46,10 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // Check if token matches session token
   const sessionToken = req.session?.csrfToken;
   if (!sessionToken || sessionToken !== csrfToken) {
+    console.log(`[CSRF] Token mismatch - Session: ${sessionToken?.substring(0, 10)}..., Request: ${csrfToken?.substring(0, 10)}...`);
     return res.status(403).json({
       error: 'Invalid CSRF token',
-      message: 'CSRF token does not match session token'
+      message: 'CSRF token validation failed'
     });
   }
 
