@@ -69,7 +69,9 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
         setLoading(true);
         setError(null);
         
-        const response = await fetch(`${API_ROUTES.ASSIGNMENTS}/code/${assignmentCode}`);
+        const response = await fetch(`${API_ROUTES.ASSIGNMENTS}/code/${assignmentCode}`, {
+          credentials: 'include',
+        });
         
         if (!response.ok) {
           if (response.status === 404) {
@@ -165,10 +167,25 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
       if (submitType === 'code') formData.append('code', codeContent);
       if (submitType === 'file' && file) formData.append('file', file);
       
-      // Send submission (now using authenticated endpoint)
+      // Get CSRF token first
+      const csrfResponse = await fetch('/api/csrf-token', {
+        credentials: 'include',
+      });
+      
+      if (!csrfResponse.ok) {
+        throw new Error('Failed to get security token');
+      }
+      
+      const { csrfToken } = await csrfResponse.json();
+      
+      // Send submission with CSRF token
       const response = await fetch('/api/submissions', {
         method: 'POST',
+        headers: {
+          'X-CSRF-Token': csrfToken,
+        },
         body: formData,
+        credentials: 'include',
       });
       
       if (!response.ok) {
