@@ -455,21 +455,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let assignments;
 
     if (user.role === 'student') {
-      assignments = await storage.listAssignmentsForUser(user.id);
-
-      // For each assignment, get the latest submission
-      const assignmentsWithSubmissions = await Promise.all(
-        assignments.map(async (assignment) => {
-          const submission = await storage.getLatestSubmission(user.id, assignment.id);
-          const course = await storage.getCourse(assignment.courseId);
-          return {
-            ...assignment,
-            submissions: submission ? [submission] : [],
-            course
-          };
-        })
-      );
-
+      // Use optimized single query to get assignments with submissions and courses
+      console.log(`[PERFORMANCE] Using optimized assignments with submissions query for student ${user.id}`);
+      const assignmentsWithSubmissions = await storage.listAssignmentsWithSubmissionsForUser(user.id);
       res.json(assignmentsWithSubmissions);
     } else {
       // For instructors, use optimized assignment stats with single query
@@ -968,17 +956,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user as any;
       const assignmentId = req.query.assignmentId ? parseInt(req.query.assignmentId as string) : undefined;
 
-      const submissions = await storage.listSubmissionsForUser(user.id, assignmentId);
-
-      const submissionsWithFeedback = await Promise.all(
-        submissions.map(async (submission) => {
-          const feedbackItem = await storage.getFeedbackBySubmissionId(submission.id);
-          return {
-            ...submission,
-            feedback: feedbackItem
-          };
-        })
-      );
+      // Use optimized single query to get submissions with feedback
+      console.log(`[PERFORMANCE] Using optimized submissions with feedback query for user ${user.id}`);
+      const submissionsWithFeedback = await storage.listSubmissionsWithFeedbackForUser(user.id, assignmentId);
 
       res.json(submissionsWithFeedback);
   }));
@@ -986,24 +966,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/submissions/recent', requireAuth, asyncHandler(async (req: Request, res: Response) => {
       const user = req.user as any;
 
-      const userSubmissions = await storage.listSubmissionsForUser(user.id);
-
-      const recentSubmissions = userSubmissions
+      // Use optimized single query to get submissions with feedback, then slice
+      console.log(`[PERFORMANCE] Using optimized submissions with feedback query for recent submissions for user ${user.id}`);
+      const submissionsWithFeedback = await storage.listSubmissionsWithFeedbackForUser(user.id);
+      
+      const recentSubmissions = submissionsWithFeedback
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 5);
 
-      const submissionsWithFeedback = await Promise.all(
-        recentSubmissions.map(async (submission) => {
-          const feedbackItem = await storage.getFeedbackBySubmissionId(submission.id);
-
-          return {
-            ...submission,
-            feedback: feedbackItem
-          };
-        })
-      );
-
-      res.json(submissionsWithFeedback);
+      res.json(recentSubmissions);
   }));
 
   app.get('/api/assignments/:id/submissions', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
@@ -1014,18 +985,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Assignment not found' });
       }
 
-      const submissions = await storage.listSubmissionsForAssignment(assignmentId);
-
-      const submissionsWithFeedback = await Promise.all(
-        submissions.map(async (submission) => {
-          const feedback = await storage.getFeedbackBySubmissionId(submission.id);
-
-          return {
-            ...submission,
-            feedback
-          };
-        })
-      );
+      // Use optimized single query to get submissions with feedback
+      console.log(`[PERFORMANCE] Using optimized submissions with feedback query for assignment ${assignmentId}`);
+      const submissionsWithFeedback = await storage.listSubmissionsWithFeedbackForAssignment(assignmentId);
 
       res.json(submissionsWithFeedback);
   }));
@@ -1286,208 +1248,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn('Error parsing course/assignment IDs:', e);
       }
 
-      let allAssignments = await storage.listAssignments();
-      console.log(`Total assignments before filtering: ${allAssignments.length}`);
-
-      if (courseId) {
-        allAssignments = allAssignments.filter(a => a.courseId === courseId);
-        console.log(`Assignments after filtering by courseId ${courseId}: ${allAssignments.length}`);
-      }
-
-      let targetAssignment = undefined;
+      // Use optimized single-query method for assignment statistics
       if (assignmentId) {
-        try {
-          if (typeof assignmentId === 'number' && !isNaN(assignmentId) && assignmentId > 0 && Number.isInteger(assignmentId)) {
-            console.log(`Attempting to fetch assignment with ID: ${assignmentId} (type: ${typeof assignmentId})`);
-            targetAssignment = await storage.getAssignment(assignmentId);
-            console.log("Target assignment found:", targetAssignment ? "Yes" : "No");
-
-            if (!targetAssignment) {
-              console.warn(`Assignment with ID ${assignmentId} not found - returning default stats`);
-              return res.json({
-                totalStudents: 0,
-                submittedCount: 0,
-                notStartedCount: 0,
-                submissionRate: 0,
-                totalSubmissions: 0,
-                pendingReviews: 0,
-                averageScore: 0,
-                feedbackGenerated: 0,
-                feedbackViewed: 0,
-                feedbackViewRate: 0,
-                submissionsIncrease: 0,
-                scoreDistribution: { high: 0, medium: 0, low: 0 },
-                feedbackViewLast30Days: Array(30).fill(0),
-                submissionsLast30Days: Array(30).fill(0),
-                notStartedPercentage: 0,
-                submittedPercentage: 0,
-                feedbackViewPercentage: 0
-              });
-            }
-          } else {
-            console.error(`Invalid assignmentId detected: ${assignmentId}, type: ${typeof assignmentId}`);
-          }
-        } catch (error) {
-          console.error("Error fetching target assignment:", error);
-        }
+        console.log(`[PERFORMANCE] Using optimized assignment stats for assignment ${assignmentId}`);
+        const stats = await storage.getAssignmentStats(assignmentId, courseId);
+        return res.json(stats);
       }
 
-      let submissionsQuery = await db.select().from(submissions);
+      // For course-level stats, we still need to aggregate across assignments
+      let allAssignments = await storage.listAssignments(courseId);
+      console.log(`Total assignments for courseId ${courseId}: ${allAssignments.length}`);
 
-      try {
-        if (assignmentId && typeof assignmentId === 'number' && !isNaN(assignmentId)) {
-          console.log(`Filtering submissions by assignmentId: ${assignmentId}`);
-          submissionsQuery = submissionsQuery.filter((s: any) => {
-            return s && s.assignmentId === assignmentId;
-          });
-          console.log(`Found ${submissionsQuery.length} submissions for assignment ID ${assignmentId}`);
-        } else if (courseId && typeof courseId === 'number' && !isNaN(courseId)) {
-          const assignmentIds = allAssignments.map(a => a.id);
-          console.log(`Filtering submissions by course-related assignments: [${assignmentIds.join(', ')}]`);
-
-          submissionsQuery = submissionsQuery.filter((s: any) => {
-            return s && s.assignmentId && assignmentIds.includes(s.assignmentId);
-          });
-          console.log(`Found ${submissionsQuery.length} submissions for course ID ${courseId}`);
-        } else {
-          console.log(`No filtering applied to submissions. Total: ${submissionsQuery.length}`);
-        }
-      } catch (error) {
-        console.error("Error while filtering submissions:", error);
+      if (allAssignments.length === 0) {
+        return res.json({
+          totalStudents: 0,
+          submittedCount: 0,
+          notStartedCount: 0,
+          submissionRate: 0,
+          totalSubmissions: 0,
+          pendingReviews: 0,
+          averageScore: 0,
+          feedbackGenerated: 0,
+          feedbackViewed: 0,
+          feedbackViewRate: 0,
+          submissionsIncrease: 0,
+          scoreDistribution: { high: 0, medium: 0, low: 0 },
+          submittedPercentage: 0,
+          notStartedPercentage: 0,
+          feedbackViewPercentage: 0
+        });
       }
 
-      let totalStudents = 0;
-      if (courseId) {
-        const students = await storage.listCourseEnrollments(courseId);
-        totalStudents = students.length;
-        console.log(`Students enrolled in course ${courseId}: ${totalStudents}`);
-      } else {
-        try {
-          const studentCountResult = await db.select({ count: countFn() })
-            .from(users)
-            .where(eq(users.role, 'student'));
+      // For course-level stats, use optimized query with assignment IDs
+      const assignmentIds = allAssignments.map(a => a.id);
+      console.log(`[PERFORMANCE] Using optimized course-level stats query for ${assignmentIds.length} assignments`);
 
-          console.log("Raw student count result:", studentCountResult);
+      const courseStatsQuery = sql`
+        WITH course_stats AS (
+          SELECT 
+            COUNT(DISTINCT s.user_id) as submitted_count,
+            COUNT(s.id) as total_submissions,
+            COUNT(DISTINCT CASE WHEN s.status = 'completed' THEN s.user_id END) as pending_reviews,
+            AVG(CASE WHEN f.score IS NOT NULL AND f.score >= 0 AND f.score <= 100 THEN f.score END) as average_score,
+            COUNT(f.id) as feedback_generated,
+            COUNT(CASE WHEN f.viewed = true THEN f.id END) as feedback_viewed,
+            COUNT(CASE WHEN f.score >= 80 THEN f.id END) as high_scores,
+            COUNT(CASE WHEN f.score >= 50 AND f.score < 80 THEN f.id END) as medium_scores,
+            COUNT(CASE WHEN f.score < 50 THEN f.id END) as low_scores,
+            COUNT(CASE WHEN s.created_at >= NOW() - INTERVAL '7 days' THEN s.id END) as submissions_last_week,
+            COUNT(CASE WHEN s.created_at >= NOW() - INTERVAL '14 days' AND s.created_at < NOW() - INTERVAL '7 days' THEN s.id END) as submissions_previous_week
+          FROM submissions s
+          LEFT JOIN feedback f ON s.id = f.submission_id
+          WHERE s.assignment_id = ANY(${assignmentIds})
+        ),
+        student_count AS (
+          SELECT 
+            COUNT(DISTINCT u.id) as total_students
+          FROM users u
+          INNER JOIN enrollments e ON u.id = e.user_id
+          WHERE e.course_id = ${courseId}
+          AND u.role = 'student'
+        )
+        SELECT 
+          sc.total_students,
+          COALESCE(cs.submitted_count, 0) as submitted_count,
+          COALESCE(cs.total_submissions, 0) as total_submissions,
+          COALESCE(cs.pending_reviews, 0) as pending_reviews,
+          COALESCE(ROUND(cs.average_score), 0) as average_score,
+          COALESCE(cs.feedback_generated, 0) as feedback_generated,
+          COALESCE(cs.feedback_viewed, 0) as feedback_viewed,
+          COALESCE(cs.high_scores, 0) as high_scores,
+          COALESCE(cs.medium_scores, 0) as medium_scores,
+          COALESCE(cs.low_scores, 0) as low_scores,
+          COALESCE(cs.submissions_last_week, 0) as submissions_last_week,
+          COALESCE(cs.submissions_previous_week, 0) as submissions_previous_week
+        FROM student_count sc
+        LEFT JOIN course_stats cs ON true
+      `;
 
-          if (studentCountResult && studentCountResult.length > 0) {
-            const countValue = studentCountResult[0].count;
-            if (typeof countValue === 'number') {
-              totalStudents = countValue;
-            } else if (typeof countValue === 'string') {
-              const parsedCount = parseInt(countValue, 10);
-              totalStudents = !isNaN(parsedCount) ? parsedCount : 0;
-            } else if (countValue !== null && countValue !== undefined) {
-               totalStudents = Number(countValue) || 0;
-            }
-          }
-          if (isNaN(totalStudents)) totalStudents = 0;
-          console.log(`Total students in system: ${totalStudents}`);
-        } catch (error) {
-          console.error("Error counting students:", error);
-          totalStudents = 0;
-        }
-      }
+      const result = await db.execute(courseStatsQuery);
+      const stats = result.rows[0] as any;
 
-      const totalSubmissions = submissionsQuery.length;
-      console.log(`Total submissions found: ${totalSubmissions}`);
-
-      const submittedStudentIds = new Set();
-      submissionsQuery.forEach((s: any) => {
-        if (s && s.userId) submittedStudentIds.add(s.userId);
-      });
-      const submittedCount = submittedStudentIds.size;
-      console.log(`Number of unique students who submitted: ${submittedCount}`);
+      const totalStudents = Number(stats.total_students) || 0;
+      const submittedCount = Number(stats.submitted_count) || 0;
+      const totalSubmissions = Number(stats.total_submissions) || 0;
+      const pendingReviews = Number(stats.pending_reviews) || 0;
+      const averageScore = Number(stats.average_score) || 0;
+      const feedbackGenerated = Number(stats.feedback_generated) || 0;
+      const feedbackViewed = Number(stats.feedback_viewed) || 0;
+      const submissionsLastWeek = Number(stats.submissions_last_week) || 0;
+      const submissionsPreviousWeek = Number(stats.submissions_previous_week) || 0;
 
       const notStartedCount = Math.max(0, totalStudents - submittedCount);
-      console.log(`Students who haven't started: ${notStartedCount}`);
-
       const submissionRate = totalStudents > 0 ? Math.round((submittedCount / totalStudents) * 100) : 0;
-
-      const pendingReviews = submissionsQuery.filter(
-        (s: { status: string }) => s.status === 'completed' // This might mean "graded", "pending review" could be different logic
-      ).length;
-
-      let feedbackItems = await db.select().from(feedback);
-      if (assignmentId) {
-        const submissionIds = submissionsQuery.map((s: any) => s.id);
-        feedbackItems = feedbackItems.filter((f: any) => submissionIds.includes(f.submissionId));
-      }
-
-      const scores: number[] = [];
-      for (const item of feedbackItems) {
-        if (item.score !== null && item.score !== undefined) {
-          const numericScore = Number(item.score);
-          if (!isNaN(numericScore) && numericScore >= 0 && numericScore <= 100) {
-            scores.push(numericScore);
-          } else {
-            console.warn(`Invalid score found in feedback: ${item.score}, converted to: ${numericScore}`);
-          }
-        }
-      }
-
-      let averageScore = 0;
-      if (scores.length > 0) {
-        try {
-          const sum = scores.reduce((a, b) => {
-            if (typeof a !== 'number' || typeof b !== 'number' || isNaN(a) || isNaN(b)) {
-              console.warn(`Invalid values in score reduction: a=${a}, b=${b}`);
-              return 0; // Or handle error appropriately
-            }
-            return a + b;
-          }, 0);
-
-          averageScore = Math.round(sum / scores.length);
-
-          if (isNaN(averageScore) || averageScore < 0 || averageScore > 100) {
-            console.warn(`Calculated average score out of bounds: ${averageScore}, resetting to 0`);
-            averageScore = 0;
-          }
-        } catch (error) {
-          console.error("Error calculating average score:", error);
-          averageScore = 0;
-        }
-      }
-
-      let scoreDistribution = { high: 0, medium: 0, low: 0 };
-      try {
-        if (scores.length > 0) {
-          for (const score of scores) {
-            if (score >= 80) {
-              scoreDistribution.high++;
-            } else if (score >= 50) {
-              scoreDistribution.medium++;
-            } else {
-              scoreDistribution.low++;
-            }
-          }
-          console.log("Score distribution calculated:", scoreDistribution);
-        }
-      } catch (error) {
-        console.error("Error calculating score distribution:", error);
-        scoreDistribution = { high: 0, medium: 0, low: 0 };
-      }
-
-      const feedbackGenerated = feedbackItems.length;
-      const feedbackViewed = feedbackItems.filter((f: any) => f.viewed).length;
       const feedbackViewRate = feedbackGenerated > 0 ? Math.round((feedbackViewed / feedbackGenerated) * 100) : 0;
-
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-      const submissionsLastWeek = submissionsQuery.filter(
-        (s: { createdAt: string | Date }) => new Date(s.createdAt) >= oneWeekAgo
-      ).length;
-
-      const previousWeekStart = new Date(oneWeekAgo);
-      previousWeekStart.setDate(previousWeekStart.getDate() - 7);
-
-      const submissionsPreviousWeek = submissionsQuery.filter(
-        (s: { createdAt: string | Date }) => new Date(s.createdAt) >= previousWeekStart && new Date(s.createdAt) < oneWeekAgo
-      ).length;
-
-      const submissionsIncrease = submissionsPreviousWeek > 0
+      const submissionsIncrease = submissionsPreviousWeek > 0 
         ? Math.round((submissionsLastWeek - submissionsPreviousWeek) / submissionsPreviousWeek * 100)
-        : (submissionsLastWeek > 0 ? 100 : 0); // If prev week was 0, any submission is an "infinite" or 100% increase
+        : (submissionsLastWeek > 0 ? 100 : 0);
+
+      const scoreDistribution = {
+        high: Number(stats.high_scores) || 0,
+        medium: Number(stats.medium_scores) || 0,
+        low: Number(stats.low_scores) || 0
+      };
 
       res.json({
         totalStudents,

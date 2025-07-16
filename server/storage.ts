@@ -385,6 +385,7 @@ export class DatabaseStorage implements IStorage {
 
   async getAssignmentByShareableCode(code: string): Promise<Assignment | undefined> {
     try {
+      console.log(`[PERFORMANCE] Using optimized shareable code lookup for: ${code}`);
       const [assignment] = await db.select()
         .from(assignments)
         .where(eq(assignments.shareableCode, code))
@@ -393,6 +394,138 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`[ERROR] Error getting assignment by shareable code ${code}:`, error);
       throw new Error(`Failed to get assignment by shareable code: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  // OPTIMIZED: Get comprehensive assignment statistics with single query
+  async getAssignmentStats(assignmentId: number, courseId?: number): Promise<{
+    totalStudents: number;
+    submittedCount: number;
+    notStartedCount: number;
+    submissionRate: number;
+    totalSubmissions: number;
+    pendingReviews: number;
+    averageScore: number;
+    feedbackGenerated: number;
+    feedbackViewed: number;
+    feedbackViewRate: number;
+    submissionsIncrease: number;
+    scoreDistribution: { high: number; medium: number; low: number };
+    submittedPercentage: number;
+    notStartedPercentage: number;
+    feedbackViewPercentage: number;
+  }> {
+    console.log(`[PERFORMANCE] Using optimized assignment stats query for assignment ${assignmentId}`);
+    
+    try {
+      // Single comprehensive query with all statistics
+      const statsQuery = sql`
+        WITH assignment_stats AS (
+          SELECT 
+            COUNT(DISTINCT s.user_id) as submitted_count,
+            COUNT(s.id) as total_submissions,
+            COUNT(DISTINCT CASE WHEN s.status = 'completed' THEN s.user_id END) as pending_reviews,
+            AVG(CASE WHEN f.score IS NOT NULL AND f.score >= 0 AND f.score <= 100 THEN f.score END) as average_score,
+            COUNT(f.id) as feedback_generated,
+            COUNT(CASE WHEN f.viewed = true THEN f.id END) as feedback_viewed,
+            COUNT(CASE WHEN f.score >= 80 THEN f.id END) as high_scores,
+            COUNT(CASE WHEN f.score >= 50 AND f.score < 80 THEN f.id END) as medium_scores,
+            COUNT(CASE WHEN f.score < 50 THEN f.id END) as low_scores,
+            COUNT(CASE WHEN s.created_at >= NOW() - INTERVAL '7 days' THEN s.id END) as submissions_last_week,
+            COUNT(CASE WHEN s.created_at >= NOW() - INTERVAL '14 days' AND s.created_at < NOW() - INTERVAL '7 days' THEN s.id END) as submissions_previous_week
+          FROM submissions s
+          LEFT JOIN feedback f ON s.id = f.submission_id
+          WHERE s.assignment_id = ${assignmentId}
+        ),
+        student_count AS (
+          SELECT 
+            COUNT(DISTINCT u.id) as total_students
+          FROM users u
+          INNER JOIN enrollments e ON u.id = e.user_id
+          INNER JOIN assignments a ON e.course_id = a.course_id
+          WHERE a.id = ${assignmentId}
+          AND u.role = 'student'
+        )
+        SELECT 
+          sc.total_students,
+          COALESCE(ast.submitted_count, 0) as submitted_count,
+          COALESCE(ast.total_submissions, 0) as total_submissions,
+          COALESCE(ast.pending_reviews, 0) as pending_reviews,
+          COALESCE(ROUND(ast.average_score), 0) as average_score,
+          COALESCE(ast.feedback_generated, 0) as feedback_generated,
+          COALESCE(ast.feedback_viewed, 0) as feedback_viewed,
+          COALESCE(ast.high_scores, 0) as high_scores,
+          COALESCE(ast.medium_scores, 0) as medium_scores,
+          COALESCE(ast.low_scores, 0) as low_scores,
+          COALESCE(ast.submissions_last_week, 0) as submissions_last_week,
+          COALESCE(ast.submissions_previous_week, 0) as submissions_previous_week
+        FROM student_count sc
+        LEFT JOIN assignment_stats ast ON true
+      `;
+
+      const result = await db.execute(statsQuery);
+      const stats = result.rows[0] as any;
+
+      const totalStudents = Number(stats.total_students) || 0;
+      const submittedCount = Number(stats.submitted_count) || 0;
+      const totalSubmissions = Number(stats.total_submissions) || 0;
+      const pendingReviews = Number(stats.pending_reviews) || 0;
+      const averageScore = Number(stats.average_score) || 0;
+      const feedbackGenerated = Number(stats.feedback_generated) || 0;
+      const feedbackViewed = Number(stats.feedback_viewed) || 0;
+      const submissionsLastWeek = Number(stats.submissions_last_week) || 0;
+      const submissionsPreviousWeek = Number(stats.submissions_previous_week) || 0;
+
+      const notStartedCount = Math.max(0, totalStudents - submittedCount);
+      const submissionRate = totalStudents > 0 ? Math.round((submittedCount / totalStudents) * 100) : 0;
+      const feedbackViewRate = feedbackGenerated > 0 ? Math.round((feedbackViewed / feedbackGenerated) * 100) : 0;
+      const submissionsIncrease = submissionsPreviousWeek > 0 
+        ? Math.round((submissionsLastWeek - submissionsPreviousWeek) / submissionsPreviousWeek * 100)
+        : (submissionsLastWeek > 0 ? 100 : 0);
+
+      const scoreDistribution = {
+        high: Number(stats.high_scores) || 0,
+        medium: Number(stats.medium_scores) || 0,
+        low: Number(stats.low_scores) || 0
+      };
+
+      return {
+        totalStudents,
+        submittedCount,
+        notStartedCount,
+        submissionRate,
+        totalSubmissions,
+        pendingReviews,
+        averageScore,
+        feedbackGenerated,
+        feedbackViewed,
+        feedbackViewRate,
+        submissionsIncrease,
+        scoreDistribution,
+        submittedPercentage: submissionRate,
+        notStartedPercentage: totalStudents > 0 ? Math.round((notStartedCount / totalStudents) * 100) : 0,
+        feedbackViewPercentage: feedbackViewRate
+      };
+    } catch (error) {
+      console.error('Error in getAssignmentStats:', error);
+      // Return safe defaults
+      return {
+        totalStudents: 0,
+        submittedCount: 0,
+        notStartedCount: 0,
+        submissionRate: 0,
+        totalSubmissions: 0,
+        pendingReviews: 0,
+        averageScore: 0,
+        feedbackGenerated: 0,
+        feedbackViewed: 0,
+        feedbackViewRate: 0,
+        submissionsIncrease: 0,
+        scoreDistribution: { high: 0, medium: 0, low: 0 },
+        submittedPercentage: 0,
+        notStartedPercentage: 0,
+        feedbackViewPercentage: 0
+      };
     }
   }
 
@@ -447,6 +580,148 @@ export class DatabaseStorage implements IStorage {
         .where(eq(submissions.userId, userId))
         .orderBy(desc(submissions.createdAt));
     }
+  }
+
+  // OPTIMIZED: Get submissions with feedback in single query
+  async listSubmissionsWithFeedbackForUser(userId: number, assignmentId?: number): Promise<(Submission & { feedback: Feedback | null })[]> {
+    console.log(`[PERFORMANCE] Using optimized submissions with feedback query for user ${userId}`);
+    
+    let baseQuery = db.select({
+      id: submissions.id,
+      assignmentId: submissions.assignmentId,
+      userId: submissions.userId,
+      fileUrl: submissions.fileUrl,
+      fileName: submissions.fileName,
+      content: submissions.content,
+      notes: submissions.notes,
+      status: submissions.status,
+      mimeType: submissions.mimeType,
+      fileSize: submissions.fileSize,
+      contentType: submissions.contentType,
+      fileExtension: submissions.fileExtension,
+      createdAt: submissions.createdAt,
+      updatedAt: submissions.updatedAt,
+      feedback: feedback
+    })
+    .from(submissions)
+    .leftJoin(feedback, eq(submissions.id, feedback.submissionId))
+    .orderBy(desc(submissions.createdAt));
+
+    let query;
+    if (assignmentId) {
+      query = baseQuery.where(and(
+        eq(submissions.userId, userId),
+        eq(submissions.assignmentId, assignmentId)
+      ));
+    } else {
+      query = baseQuery.where(eq(submissions.userId, userId));
+    }
+
+    const result = await query;
+    
+    return result.map(row => ({
+      id: row.id,
+      assignmentId: row.assignmentId,
+      userId: row.userId,
+      fileUrl: row.fileUrl,
+      fileName: row.fileName,
+      content: row.content,
+      notes: row.notes,
+      status: row.status,
+      mimeType: row.mimeType,
+      fileSize: row.fileSize,
+      contentType: row.contentType,
+      fileExtension: row.fileExtension,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      feedback: row.feedback
+    }));
+  }
+
+  // OPTIMIZED: Get submissions with feedback for assignment (instructor view)
+  async listSubmissionsWithFeedbackForAssignment(assignmentId: number): Promise<(Submission & { feedback: Feedback | null })[]> {
+    console.log(`[PERFORMANCE] Using optimized submissions with feedback query for assignment ${assignmentId}`);
+    
+    const result = await db.select({
+      id: submissions.id,
+      assignmentId: submissions.assignmentId,
+      userId: submissions.userId,
+      fileUrl: submissions.fileUrl,
+      fileName: submissions.fileName,
+      content: submissions.content,
+      notes: submissions.notes,
+      status: submissions.status,
+      mimeType: submissions.mimeType,
+      fileSize: submissions.fileSize,
+      contentType: submissions.contentType,
+      fileExtension: submissions.fileExtension,
+      createdAt: submissions.createdAt,
+      updatedAt: submissions.updatedAt,
+      feedback: feedback
+    })
+    .from(submissions)
+    .leftJoin(feedback, eq(submissions.id, feedback.submissionId))
+    .where(eq(submissions.assignmentId, assignmentId))
+    .orderBy(desc(submissions.createdAt));
+
+    return result.map(row => ({
+      id: row.id,
+      assignmentId: row.assignmentId,
+      userId: row.userId,
+      fileUrl: row.fileUrl,
+      fileName: row.fileName,
+      content: row.content,
+      notes: row.notes,
+      status: row.status,
+      mimeType: row.mimeType,
+      fileSize: row.fileSize,
+      contentType: row.contentType,
+      fileExtension: row.fileExtension,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      feedback: row.feedback
+    }));
+  }
+
+  // OPTIMIZED: Get assignments with submissions for student
+  async listAssignmentsWithSubmissionsForUser(userId: number): Promise<any[]> {
+    console.log(`[PERFORMANCE] Using optimized assignments with submissions query for user ${userId}`);
+    
+    const result = await db.select({
+      assignment: assignments,
+      submission: submissions,
+      course: courses
+    })
+    .from(enrollments)
+    .innerJoin(assignments, eq(enrollments.courseId, assignments.courseId))
+    .innerJoin(courses, eq(assignments.courseId, courses.id))
+    .leftJoin(submissions, and(
+      eq(submissions.assignmentId, assignments.id),
+      eq(submissions.userId, userId)
+    ))
+    .where(eq(enrollments.userId, userId))
+    .orderBy(desc(assignments.dueDate));
+
+    // Group by assignment
+    const assignmentMap = new Map();
+    
+    result.forEach(row => {
+      const assignmentId = row.assignment.id;
+      
+      if (!assignmentMap.has(assignmentId)) {
+        assignmentMap.set(assignmentId, {
+          ...row.assignment,
+          course: row.course,
+          submissions: []
+        });
+      }
+      
+      if (row.submission) {
+        assignmentMap.get(assignmentId).submissions.push(row.submission);
+      }
+    });
+
+    return Array.from(assignmentMap.values());
   }
 
   async listSubmissionsForAssignment(assignmentId: number): Promise<Submission[]> {

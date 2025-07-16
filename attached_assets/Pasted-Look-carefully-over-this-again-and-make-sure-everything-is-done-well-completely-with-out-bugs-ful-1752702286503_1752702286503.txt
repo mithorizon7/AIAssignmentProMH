@@ -1,0 +1,39 @@
+Look carefully over this again and make sure everything is done well, completely, with out bugs, fully, bueatifully and in the best way possible. Include everything that is or would be effected by these changes. Full checklist. 
+
+Top Priority: Performance & Scalability Overhaul
+
+The application has critical performance bottlenecks that will cause significant slowdowns and likely fail under moderate load. The core issue is that we are treating the database like a simple key-value store and performing all the complex data processing in the application's memory.
+
+The Problem: Inefficient Data Fetching Patterns
+
+N+1 Queries: Several key API endpoints, such as GET /api/assignments, GET /api/courses (for instructors), and GET /api/assignments/:id/details, are fetching a list of items and then making separate database calls for each item in a loop to get related data. This floods the database with an excessive number of small, inefficient queries.
+
+In-Memory Processing: Endpoints like GET /api/assignments/stats and GET /api/students/progress are pulling massive, unfiltered datasets (e.g., all submissions or all students) into memory and then using JavaScript to filter, search, and aggregate the results. This is not scalable and will exhaust server memory.
+
+Full Table Scans: The GET /api/assignments/code/:code endpoint fetches every assignment from the database just to find one by its shareable code, which is highly inefficient.
+
+How to Fix It
+
+Refactor the data-heavy endpoints to push all aggregation, filtering, and joining logic down to the database.
+
+Use the Drizzle ORM's join capabilities to create single, efficient queries that fetch all necessary data at once. For example, when fetching assignments, join on the submissions and courses tables to get submission counts and course names in one go.
+
+For the shareableCode lookup, add a database index to the shareableCode column in the assignments table. Then, create a new getAssignmentByShareableCode(code) function in storage.ts that uses a WHERE clause to fetch only the specific record needed.
+
+High Priority: Stabilize the Data Access Layer
+
+Our storage layer (storage.ts) shows signs of instability and a lack of trust in our ORM (Drizzle). We are using raw SQL queries as workarounds, which is brittle and circumvents the type-safety benefits of the ORM.
+
+The Problem: Over-Reliance on Raw SQL
+
+The createSubmission function has abandoned the ORM entirely and uses only raw SQL, including a "final fallback" with fewer fields. This strongly suggests a fundamental mismatch between our Drizzle schema and the actual submissions table in the database.
+
+Other key functions like listSubmissionsForAssignment, updateSubmissionStatus, and upsertFileTypeSetting all contain complex raw SQL fallbacks, indicating that the ORM is failing or not trusted in these areas as well.
+
+How to Fix It
+
+The primary goal is to diagnose and fix the root cause of the ORM failures. Investigate why the ORM insert is failing for submissions. Validate all Drizzle schema definitions against the live database schema to find any discrepancies in column names, types, constraints, or default values.
+
+Once the root cause is fixed, refactor the storage methods to use the Drizzle ORM exclusively. Remove the raw SQL fallbacks. This will make our data access layer more robust, maintainable, and type-safe.
+
+
