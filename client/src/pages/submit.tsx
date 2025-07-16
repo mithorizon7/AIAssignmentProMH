@@ -353,13 +353,16 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
             )}
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="mb-6">
-              <h3 className="text-lg font-medium mb-2">Assignment Description</h3>
-              <QuillContent 
-                content={assignment.description || ''} 
-                className="text-muted-foreground text-sm" 
-              />
-            </div>
+            {/* Assignment Description - Only show if it's not just rubric/feedback formatting */}
+            {assignment.description && !assignment.description.includes('<h1>') && assignment.description.length > 10 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-medium mb-2">Assignment Description</h3>
+                <QuillContent 
+                  content={assignment.description || ''} 
+                  className="text-muted-foreground text-sm" 
+                />
+              </div>
+            )}
             
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Only show name and email fields for anonymous users */}
