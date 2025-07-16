@@ -422,7 +422,30 @@ export const queueApi = {
       
       // Process the submission directly with AI service
       const aiService = createAIService();
-      const result = await aiService.generateFeedback(submission, assignment);
+      
+      // Get submission content for AI analysis
+      let content = submission.content || '';
+      if (submission.contentType === 'image' || submission.contentType === 'document') {
+        content = submission.fileUrl || '';
+      }
+      
+      // Get assignment rubric
+      const rubric = assignment.rubric || assignment.description || 'Please provide feedback on this submission.';
+      
+      // Analyze the submission
+      const feedbackResult = await aiService.analyzeSubmission({
+        studentSubmissionContent: content,
+        assignmentTitle: assignment.title,
+        assignmentDescription: assignment.description || undefined,
+        instructorContext: assignment.instructorContext || undefined,
+        rubric: rubric
+      });
+      
+      // Prepare feedback for storage
+      const result = await aiService.prepareFeedbackForStorage(
+        submission.id,
+        feedbackResult
+      );
       
       // Update submission with results
       await storage.updateSubmission(submissionId, {

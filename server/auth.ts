@@ -331,13 +331,17 @@ export function configureAuth(app: any) {
     // In development, also skip these endpoints to aid testing
     const devSkipList = isProduction ? [] : [
       '/api/assignments', // Skip for assignment creation during development
-      '/api/courses', // Skip for course creation during development
+      '/api/courses' // Skip for course creation during development
+    ];
+    
+    // Always skip these endpoints regardless of environment - they have their own CSRF protection
+    const alwaysSkipList = [
       '/api/submissions', // Skip for submissions - handled by individual route middleware
       '/api/anonymous-submissions' // Skip for anonymous submissions - handled by individual route middleware
     ];
     
     // Combined list of routes to skip CSRF for
-    const skipCsrfForRoutes = [...baseSkipList, ...devSkipList];
+    const skipCsrfForRoutes = [...baseSkipList, ...devSkipList, ...alwaysSkipList];
     
     if (skipCsrfForRoutes.includes(req.path)) {
       return next();

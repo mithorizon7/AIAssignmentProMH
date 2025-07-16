@@ -299,10 +299,10 @@ Do not include explanatory text, comments, or markdown outside the JSON object.`
                              (contentType === 'image' && params.fileBuffer?.length > 0 && 4 * 1024 * 1024);
         
         if (needsTempFile !== undefined && needsTempFile !== null) {
-          const crypto = require('crypto');
-          const os = require('os');
-          const path = require('path');
-          const fs = require('fs').promises;
+          const crypto = await import('crypto');
+          const os = await import('os');
+          const path = await import('path');
+          const fs = await import('fs/promises');
           
           logger.info(`[AIService] Binary file detected (${contentType}), creating temporary file for processing`);
           
