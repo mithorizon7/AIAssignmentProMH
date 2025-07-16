@@ -773,7 +773,15 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    return Array.from(assignmentMap.values());
+    // Sort submissions by creation date (newest first) for each assignment
+    const assignments = Array.from(assignmentMap.values());
+    assignments.forEach(assignment => {
+      assignment.submissions.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    });
+
+    return assignments;
   }
 
   async listSubmissionsForAssignment(assignmentId: number): Promise<Submission[]> {
