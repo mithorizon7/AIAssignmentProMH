@@ -314,31 +314,13 @@ export class DatabaseStorage implements IStorage {
           : null
       };
 
-      // Use fully parameterized SQL to avoid type issues and prevent SQL injection
-      const sqlQuery = `
-        INSERT INTO assignments (
-          title, description, course_id, due_date, status,
-          shareable_code, rubric, instructor_context
-        )
-        VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8
-        )
-        RETURNING *;
-      `;
-
-      const params = [
-        assignmentData.title,
-        assignmentData.description || null,
-        assignmentData.courseId,
-        assignmentData.dueDate,
-        assignmentData.status || 'upcoming',
-        assignmentData.shareableCode || null,
-        assignmentData.rubric ? JSON.stringify(assignmentData.rubric) : null,
-        assignmentData.instructorContext ? JSON.stringify(assignmentData.instructorContext) : null
-      ];
-
-      const result = await db.execute(sqlQuery, params);
-      return result.rows[0] as Assignment; // Added type assertion
+      // Use Drizzle ORM insert instead of raw SQL
+      const [newAssignment] = await db
+        .insert(assignments)
+        .values(assignmentData)
+        .returning();
+      
+      return newAssignment;
     } catch (error) {
       console.error("[ERROR] Error creating assignment:", error);
       throw error;
