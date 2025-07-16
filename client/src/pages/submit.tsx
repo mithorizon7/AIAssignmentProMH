@@ -383,49 +383,124 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
                 </div>
               )}
               
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notes (Optional)</Label>
-                <QuillEditor
-                  value={notes}
-                  onChange={setNotes}
-                  placeholder="Add any notes or comments about your submission"
-                />
-              </div>
-              
-              <div className="space-y-4">
-                <Label>Submission</Label>
-                <Tabs
-                  value={submitType}
-                  onValueChange={(value) => setSubmitType(value as 'code' | 'file')}
-                  className="w-full"
-                >
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="code">Paste Text/Code</TabsTrigger>
-                    <TabsTrigger value="file">File Upload</TabsTrigger>
+              {/* Primary Submission Section with Enhanced Visual Hierarchy */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-lg p-6 border-2 border-blue-200 dark:border-blue-800 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100">Submit Your Work</h3>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">Choose your preferred submission method below</p>
+                  </div>
+                </div>
+                
+                <Tabs value={submitType} onValueChange={(value) => setSubmitType(value as 'code' | 'file')} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                    <TabsTrigger 
+                      value="code" 
+                      className="flex items-center gap-2 data-[state=active]:bg-blue-500 data-[state=active]:text-white"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                      Paste Text/Code
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="file"
+                      className="flex items-center gap-2 data-[state=active]:bg-blue-500 data-[state=active]:text-white"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      File Upload
+                    </TabsTrigger>
                   </TabsList>
-                  <TabsContent value="code" className="space-y-4 pt-4">
-                    <Textarea
-                      placeholder="Paste your text, essay, or code here"
-                      className="min-h-[200px]"
-                      value={codeContent}
-                      onChange={(e) => setCodeContent(e.target.value)}
-                      disabled={submitting}
-                    />
+                  
+                  <TabsContent value="code" className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="code" className="text-base font-medium text-gray-900 dark:text-gray-100">
+                          Your Content
+                        </Label>
+                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Required</span>
+                      </div>
+                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-1 hover:border-blue-400 dark:hover:border-blue-500 transition-colors">
+                        <Textarea
+                          placeholder="Paste your text, essay, or code here..."
+                          className="min-h-[200px] border-none focus:ring-0 resize-none"
+                          value={codeContent}
+                          onChange={(e) => setCodeContent(e.target.value)}
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
                   </TabsContent>
-                  <TabsContent value="file" className="space-y-4 pt-4">
-                    <FileUpload
-                      onValueChange={(files: File[]) => setFile(files[0] || null)}
-                      disabled={submitting}
-                      accept=".py,.java,.cpp,.ipynb,.zip,.js,.ts,.html,.css,.md,.txt,.pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.tiff,.mp3,.wav,.mp4,.mov,.avi,.json,.xml,.csv,.xlsx"
-                      maxSize={50 * 1024 * 1024} // 50MB for multimedia files
-                    />
+                  
+                  <TabsContent value="file" className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="file" className="text-base font-medium text-gray-900 dark:text-gray-100">
+                          Choose File
+                        </Label>
+                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Required</span>
+                      </div>
+                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 hover:border-blue-400 dark:hover:border-blue-500 transition-colors">
+                        <FileUpload
+                          onValueChange={(files: File[]) => setFile(files[0] || null)}
+                          disabled={submitting}
+                          accept=".py,.java,.cpp,.ipynb,.zip,.js,.ts,.html,.css,.md,.txt,.pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.tiff,.mp3,.wav,.mp4,.mov,.avi,.json,.xml,.csv,.xlsx"
+                          maxSize={50 * 1024 * 1024} // 50MB for multimedia files
+                        />
+                      </div>
+                    </div>
                   </TabsContent>
                 </Tabs>
               </div>
               
-              <div className="flex justify-end pt-4">
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? 'Submitting...' : 'Submit Assignment'}
+              {/* Notes Section - Positioned After Main Submission */}
+              <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="notes" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Additional Notes
+                    </Label>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Optional</span>
+                  </div>
+                  <QuillEditor
+                    value={notes}
+                    onChange={setNotes}
+                    placeholder="Add any notes or comments about your submission..."
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+              
+              {/* Enhanced Submit Button */}
+              <div className="flex justify-center pt-6">
+                <Button 
+                  type="submit" 
+                  disabled={submitting}
+                  className="px-8 py-3 text-lg font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  {submitting ? (
+                    <div className="flex items-center gap-2">
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Submitting...
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                      Submit Assignment
+                    </div>
+                  )}
                 </Button>
               </div>
             </form>
