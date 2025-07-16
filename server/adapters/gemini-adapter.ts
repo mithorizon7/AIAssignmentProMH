@@ -127,7 +127,7 @@ export class GeminiAdapter implements AIAdapter {
       systemInstruction: systemPrompt,
       config: {
         ...this.defaultConfig,
-        maxOutputTokens: BASE_MAX_TOKENS,
+        maxOutputTokens: 4000, // Increased from 2000 to prevent JSON truncation
         responseMimeType: "application/json",
         responseSchema: this.responseSchema
       }
@@ -168,7 +168,7 @@ export class GeminiAdapter implements AIAdapter {
           });
         }
         
-        if (chunk.candidates && chunk.candidates?.length > 0 && 0) {
+        if (chunk.candidates && chunk.candidates?.length > 0) {
           // Get finish reason from the last chunk if available
           if (chunk.candidates[0].finishReason) {
             finishReason = chunk.candidates[0].finishReason;
@@ -191,12 +191,12 @@ export class GeminiAdapter implements AIAdapter {
     const runOnce = async (cap: number) => collectStream(buildRequest(cap));
     
     // First try with base token limit
-    let { raw, finishReason, usageMetadata } = await runOnce(BASE_MAX_TOKENS);
+    let { raw, finishReason, usageMetadata } = await runOnce(4000);
     
     // If the model stopped early, retry with a higher token limit
     if (finishReason !== 'STOP') {
       console.warn(`[GEMINI] early stop ${finishReason} – retry ↑ tokens`);
-      ({ raw, finishReason, usageMetadata } = await runOnce(RETRY_MAX_TOKENS));
+      ({ raw, finishReason, usageMetadata } = await runOnce(8000));
     }
     
     // If still having issues, throw an error
@@ -529,24 +529,23 @@ export class GeminiAdapter implements AIAdapter {
       } catch (error) {
         console.error(`[GEMINI] Failed to parse response JSON: ${error instanceof Error ? error.message : String(error)}`);
         
-        // Try to repair JSON if it's truncated
+        // Try to repair JSON if it's truncated - the parseStrict function now handles this internally
         if (raw && (raw.includes('"criteriaScores":') || raw.includes('"overallFeedback":'))) {
           try {
             console.log('[GEMINI] Attempting to repair potentially truncated JSON');
-            const repairedJson = repairJson(raw);
-            parsedContent = await parseStrict(repairedJson);
+            parsedContent = await parseStrict(raw); // parseStrict now handles repair internally
             
-            // Create a properly formatted AIAdapterResponse with the repaired JSON
+            // Create a properly formatted AIAdapterResponse
             const response: AIAdapterResponse = {
               ...parsedContent,
               modelName: this.modelName,
-              rawResponse: JSON.parse(repairedJson),
+              rawResponse: parsedContent, // Use parsed content directly
               tokenCount: tokenCount ? tokenCount : 0,
               _promptTokens: result.usageMetadata?.promptTokenCount,
               _totalTokens: tokenCount ? tokenCount : 0
             };
             
-            console.log(`[GEMINI] Successfully repaired and parsed JSON response`);
+            console.log(`[GEMINI] Successfully parsed JSON response after repair attempt`);
             return response;
           } catch (repairError) {
             console.error(`[GEMINI] Repair attempt failed: ${repairError instanceof Error ? repairError.message : String(repairError)}`);

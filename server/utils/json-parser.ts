@@ -14,13 +14,19 @@ import { SchemaValidationError } from "./schema-errors";
  */
 export function parseStrict(raw: string) {
   // 1. quick fence strip for markdown code blocks
-  const jsonText = raw.trim().replace(/^```json|```$/g, "");
+  let jsonText = raw.trim().replace(/^```json|```$/g, "");
+  
+  // 2. Handle truncated JSON by attempting repair
+  if (!jsonText.endsWith('}') && (jsonText.includes('"criteriaScores":') || jsonText.includes('"overallFeedback":'))) {
+    console.log('[JSON-PARSER] Attempting to repair truncated JSON response');
+    jsonText = repairTruncatedJson(jsonText);
+  }
   
   try {
-    // 2. Parse JSON
+    // 3. Parse JSON
     const parsed = JSON.parse(jsonText);
     
-    // 3. Validate against schema
+    // 4. Validate against schema
     return GradingSchema.parse(parsed);
   } catch (error) {
     // Include the raw text in the error for debugging
@@ -33,6 +39,38 @@ export function parseStrict(raw: string) {
       raw
     );
   }
+}
+
+/**
+ * Repair truncated JSON by adding missing closing braces and quotes
+ */
+function repairTruncatedJson(jsonText: string): string {
+  let repaired = jsonText;
+  
+  // Count opening and closing braces to determine how many we need
+  const openBraces = (repaired.match(/\{/g) || []).length;
+  const closeBraces = (repaired.match(/\}/g) || []).length;
+  const missingBraces = openBraces - closeBraces;
+  
+  // Add missing closing braces
+  if (missingBraces > 0) {
+    repaired += '}'.repeat(missingBraces);
+  }
+  
+  // If the last character is a comma, remove it
+  if (repaired.endsWith(',')) {
+    repaired = repaired.slice(0, -1);
+  }
+  
+  // If we have an incomplete string, try to close it
+  const lastQuoteIndex = repaired.lastIndexOf('"');
+  const lastColonIndex = repaired.lastIndexOf(':');
+  if (lastColonIndex > lastQuoteIndex && !repaired.endsWith('"')) {
+    repaired += '"';
+  }
+  
+  console.log(`[JSON-PARSER] Repaired JSON: added ${missingBraces} closing braces`);
+  return repaired;
 }
 
 /**
