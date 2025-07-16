@@ -1,0 +1,59 @@
+{
+  "name": "ai-feedback-test-suite",
+  "version": "1.0.0",
+  "description": "Comprehensive test suite for AI feedback mechanisms",
+  "scripts": {
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest --watch",
+    
+    "test:unit": "vitest run --testNamePattern='unit|Unit'",
+    "test:integration": "vitest run --testNamePattern='integration|Integration'",
+    "test:e2e": "vitest run --testNamePattern='e2e|workflow|Workflow'",
+    "test:performance": "vitest run test/ai-feedback/performance-reliability.test.ts",
+    "test:security": "vitest run test/ai-feedback/security-compliance.test.ts",
+    
+    "test:gemini": "vitest run test/ai-feedback/gemini-adapter.test.ts",
+    "test:queue": "vitest run test/ai-feedback/queue-system.test.ts",
+    "test:instructor": "vitest run test/ai-feedback/instructor-workflow.test.ts",
+    "test:student": "vitest run test/ai-feedback/student-workflow.test.ts",
+    
+    "test:parallel": "vitest run --reporter=verbose --threads",
+    "test:ci": "vitest run --coverage --reporter=json --outputFile=test-results.json",
+    
+    "test:runner": "tsx test/ai-feedback/test-runner.ts",
+    "test:runner:parallel": "tsx test/ai-feedback/test-runner.ts --parallel",
+    "test:runner:coverage": "tsx test/ai-feedback/test-runner.ts --coverage",
+    "test:runner:high-priority": "tsx test/ai-feedback/test-runner.ts --priority=high",
+    
+    "report:generate": "tsx test/ai-feedback/test-runner.ts --coverage --verbose",
+    "report:view": "open test/reports/latest-report.html",
+    
+    "clean": "rimraf test/reports coverage",
+    "setup": "tsx test/ai-feedback/setup.ts",
+    "teardown": "tsx test/ai-feedback/teardown.ts"
+  },
+  "dependencies": {
+    "@vitest/coverage-v8": "^1.0.0",
+    "@vitest/ui": "^1.0.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "ai",
+    "feedback",
+    "testing",
+    "education",
+    "grading",
+    "gemini",
+    "queue",
+    "performance",
+    "security"
+  ],
+  "author": "AI Grader Team",
+  "license": "MIT"
+}
