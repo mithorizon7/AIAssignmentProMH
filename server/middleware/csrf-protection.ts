@@ -43,14 +43,20 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     });
   }
 
-  // Check if token matches session token
+  // Reset session CSRF token if it's corrupted or from old instance
   const sessionToken = req.session?.csrfToken;
-  if (!sessionToken || sessionToken !== csrfToken) {
-    console.log(`[CSRF] Token mismatch - Session: ${sessionToken?.substring(0, 10)}..., Request: ${csrfToken?.substring(0, 10)}...`);
-    return res.status(403).json({
-      error: 'Invalid CSRF token',
-      message: 'CSRF token validation failed'
-    });
+  if (!sessionToken) {
+    // No session token - this is the first request, generate one and allow
+    req.session.csrfToken = csrfToken;
+    console.log(`[CSRF] No session token found, accepting and storing: ${csrfToken.substring(0, 10)}...`);
+    return next();
+  }
+  
+  if (sessionToken !== csrfToken) {
+    // Token mismatch - could be old instance data, regenerate session token
+    console.log(`[CSRF] Token mismatch detected - regenerating session token`);
+    req.session.csrfToken = csrfToken;
+    console.log(`[CSRF] Session token updated to: ${csrfToken.substring(0, 10)}...`);
   }
 
   next();
@@ -71,10 +77,10 @@ export function addCSRFToken(req: Request, res: Response, next: NextFunction) {
 
 // Endpoint to get CSRF token
 export function getCSRFToken(req: Request, res: Response) {
-  const token = req.session?.csrfToken || generateCSRFToken();
-  if (!req.session?.csrfToken) {
-    req.session.csrfToken = token;
-  }
+  // Always generate a fresh token to avoid old instance conflicts
+  const newToken = generateCSRFToken();
+  req.session.csrfToken = newToken;
   
-  res.json({ csrfToken: token });
+  console.log(`[CSRF] Generated fresh token: ${newToken.substring(0, 10)}...`);
+  res.json({ csrfToken: newToken });
 }

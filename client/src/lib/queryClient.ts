@@ -1,6 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Variable to store our CSRF token
+// Variable to store our CSRF token - reset to null to clear old instance data
 let csrfToken: string | null = null;
 
 /**
@@ -33,14 +33,14 @@ async function throwIfResNotOk(res: Response): Promise<void> {
 }
 
 // Function to fetch CSRF token
-async function fetchCsrfToken(): Promise<string> {
-  // If we already have a token, return it
-  if (csrfToken) {
+async function fetchCsrfToken(forceRefresh = false): Promise<string> {
+  // If we already have a token and don't need to refresh, return it
+  if (csrfToken && !forceRefresh) {
     return csrfToken;
   }
   
   try {
-    // Fetch a new token from the server
+    // Fetch token from the server (this should return the session token)
     const res = await fetch('/api/csrf-token', {
       credentials: 'include',
     });
@@ -52,7 +52,7 @@ async function fetchCsrfToken(): Promise<string> {
     const data = await res.json();
     // Store the token for future requests
     csrfToken = data.csrfToken;
-    return data.csrfToken; // Return the actual token string, not the nullable variable
+    return data.csrfToken;
   } catch (error) {
     console.error('Error fetching CSRF token:', error);
     throw error;
@@ -78,7 +78,8 @@ export async function apiRequest<TData = unknown>(
     // Skip token for login/register
     if (!['/api/auth/login', '/api/auth/register'].includes(url)) {
       try {
-        const token = await fetchCsrfToken();
+        // Always fetch fresh token for the first request to avoid old instance conflicts
+        const token = await fetchCsrfToken(true);
         headers['X-CSRF-Token'] = token;
       } catch (error) {
         console.error('Failed to add CSRF token to request:', error);
@@ -98,15 +99,14 @@ export async function apiRequest<TData = unknown>(
   if (res.status === 403) {
     try {
       const errorData = await res.json();
-      if (errorData.message === 'CSRF token validation failed') {
-        // CSRF token retry logging removed for production
-        // Invalidate the token
+      if (errorData.message === 'CSRF token validation failed' || errorData.error === 'Invalid CSRF token') {
+        // Invalidate the token and force refresh
         csrfToken = null;
         
-        // Retry the request with a fresh token
-        const newToken = await fetchCsrfToken();
+        // Retry the request with a fresh token (force refresh)
+        const newToken = await fetchCsrfToken(true);
         const retryRes = await fetch(url, {
-          method, // HttpMethod type ensures this is valid
+          method,
           headers: {
             'Content-Type': 'application/json',
             'X-CSRF-Token': newToken,
