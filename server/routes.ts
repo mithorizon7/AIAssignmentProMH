@@ -472,26 +472,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(assignmentsWithSubmissions);
     } else {
-      // For instructors, return all assignments with submission counts
-      assignments = await storage.listAssignments();
-
-      const assignmentsWithStats = await Promise.all(
-        assignments.map(async (assignment) => {
-          const submissions = await storage.listSubmissionsForAssignment(assignment.id);
-          const course = await storage.getCourse(assignment.courseId);
-          const students = await storage.listCourseEnrollments(assignment.courseId);
-
-          const submittedCount = new Set(submissions.map(s => s.userId)).size;
-
-          return {
-            ...assignment,
-            submittedCount,
-            totalStudents: students.length,
-            submissionPercentage: students.length > 0 ? (submittedCount / students.length) * 100 : 0,
-            course
-          };
-        })
-      );
+      // For instructors, use optimized assignment stats with single query
+      const assignmentsWithStats = await storage.listAssignmentsWithStats();
+      console.log(`[PERFORMANCE] Using optimized assignments with stats query - eliminated N+1 queries`);
 
       res.json(assignmentsWithStats);
     }
@@ -615,68 +598,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
 
-  // Get assignment details for instructor
+  // Get assignment details for instructor - OPTIMIZED
   app.get('/api/assignments/:id/details', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
     const assignmentId = parseInt(req.params.id);
-    let assignment;
-    try {
-      assignment = await storage.getAssignment(assignmentId);
-    } catch (err) {
-      console.error('Error retrieving assignment:', err);
-      const assignments = await storage.listAssignments();
-      assignment = assignments.find(a => a.id === assignmentId);
 
-      if (!assignment) {
+    if (isNaN(assignmentId)) {
+      return res.status(400).json({ message: 'Invalid assignment ID' });
+    }
+
+    try {
+      // Use optimized method to get assignment with stats in single query
+      const assignmentWithDetails = await storage.getAssignmentWithDetails(assignmentId);
+      console.log(`[PERFORMANCE] Using optimized assignment details query with database-level aggregation for assignment ${assignmentId}`);
+      
+      if (!assignmentWithDetails) {
         return res.status(404).json({ message: 'Assignment not found' });
       }
-    }
 
-    if (!assignment) {
-      return res.status(404).json({ message: 'Assignment not found' });
-    }
-
-    let course = null;
-    let submissions: any[] = [];
-    let students: any[] = [];
-
-    try {
-      course = await storage.getCourse(assignment.courseId);
-    } catch (err) {
-      console.error('Error fetching course:', err);
-    }
-
-    try {
-      submissions = await storage.listSubmissionsForAssignment(assignment.id);
-    } catch (err) {
-      console.error('Error fetching submissions:', err);
-    }
-
-    try {
-      students = await storage.listCourseEnrollments(assignment.courseId);
-    } catch (err) {
-      console.error('Error fetching students:', err);
-    }
-
-    const submittedCount = submissions.length > 0 ? new Set(submissions.map(s => s.userId)).size : 0;
-
-    let shareableCode = assignment.shareableCode;
-    if (!shareableCode && assignment.id) {
-      shareableCode = generateShareableCode();
-      try {
-        await storage.updateAssignmentShareableCode(assignment.id, shareableCode);
-      } catch (err) {
-        console.error('Error updating assignment with shareable code:', err);
+      // Generate shareable code if missing
+      let shareableCode = assignmentWithDetails.shareableCode;
+      if (!shareableCode && assignmentWithDetails.id) {
+        shareableCode = generateShareableCode();
+        try {
+          await storage.updateAssignmentShareableCode(assignmentWithDetails.id, shareableCode);
+          assignmentWithDetails.shareableCode = shareableCode;
+        } catch (err) {
+          console.error('Error updating assignment with shareable code:', err);
+        }
       }
-    }
 
-    res.json({
-      ...assignment,
-      course,
-      submittedCount,
-      totalStudents: students.length,
-      submissionPercentage: students.length > 0 ? (submittedCount / students.length) * 100 : 0,
-      shareableCode: shareableCode || 'temp-' + assignment.id
-    });
+      res.json({
+        ...assignmentWithDetails,
+        submittedCount: assignmentWithDetails.submissionCount,
+        course: {
+          id: assignmentWithDetails.courseId,
+          name: assignmentWithDetails.courseName,
+          code: assignmentWithDetails.courseCode
+        },
+        shareableCode: shareableCode || `TEMP-${assignmentWithDetails.id}`
+      });
+    } catch (error) {
+      console.error('Error fetching assignment details:', error);
+      return res.status(500).json({ message: 'Failed to fetch assignment details' });
+    }
   }));
 
   app.patch('/api/assignments/:id/status', requireAuth, requireRole('instructor'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
@@ -717,16 +681,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: 'Invalid shareable code' });
     }
 
-    const assignments = await storage.listAssignments();
-    console.log(`Found ${assignments.length} assignments total`);
-
-    const allCodes = assignments
-      .filter(a => a.shareableCode)
-      .map(a => ({ id: a.id, code: a.shareableCode }));
-    console.log(`Available shareable codes:`, JSON.stringify(allCodes));
-
-    const assignment = assignments.find(a =>
-      a.shareableCode && a.shareableCode.toLowerCase() === code.toLowerCase());
+    // Use optimized database lookup instead of scanning all assignments
+    const assignment = await storage.getAssignmentByShareableCode(code);
+    console.log(`[PERFORMANCE] Using optimized shareable code lookup for: ${code}`);
 
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment not found with this code' });
@@ -810,14 +767,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: 'Invalid shareable code' });
     }
 
-    const userId = req.user ? (req.user as any).id : 0;
+    const userId = req.user ? (req.user as any).id : 1;  // Use user ID 1 for anonymous submissions
+    console.log(`[DEBUG] Anonymous submission userId: ${userId}, type: ${typeof userId}`);
 
     let submission: any = {
       assignmentId,
       userId,
       name,
       email,
-      status: 'submitted',
+      status: 'pending',
       notes,
       contentType: null,
       fileSize: null,
@@ -825,6 +783,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       fileExtension: null,
       submissionType
     };
+
+    console.log(`[DEBUG] Submission object before creation:`, JSON.stringify(submission, null, 2));
 
     if (submissionType === 'file') {
       if (!req.file) {
@@ -1078,18 +1038,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let courses;
 
       if (user.role === 'instructor') {
-        courses = await storage.listCourses();
-
-        courses = await Promise.all(courses.map(async (course: any) => {
-          const courseAssignments = await storage.listAssignments(course.id);
-          const enrolledStudents = await storage.listCourseEnrollments(course.id);
-
-          return {
-            ...course,
-            assignmentCount: courseAssignments.length,
-            studentCount: enrolledStudents.length
-          };
-        }));
+        // Use optimized method to get courses with stats in single query
+        courses = await storage.listCoursesWithStats();
+        console.log(`[PERFORMANCE] Using optimized course listing with database-level stats aggregation`);
       } else {
         courses = await storage.listUserEnrollments(user.id);
       }
@@ -1114,19 +1065,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const enrolledStudents = await storage.listCourseEnrollments(courseId);
       const studentCount = enrolledStudents.length;
 
-      const assignmentsWithStats = await Promise.all(
-        assignments.map(async (assignment) => {
-          const submissions = await storage.listSubmissionsForAssignment(assignment.id);
-          const submittedCount = new Set(submissions.map(s => s.userId)).size;
-
-          return {
-            ...assignment,
-            submittedCount,
-            totalStudents: studentCount,
-            submissionPercentage: studentCount > 0 ? (submittedCount / studentCount) * 100 : 0
-          };
-        })
-      );
+      // Use optimized method to get assignments with stats
+      const assignmentsWithStats = await storage.listAssignmentsWithStats(courseId);
+      console.log(`[PERFORMANCE] Using optimized assignment listing with database-level stats for course ${courseId}`);
 
       res.json({
         ...course,
@@ -1259,35 +1200,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         totalCount = students.length;
       } else {
-        const allStudents = await db.select().from(users).where(eq(users.role, 'student'));
-        totalCount = allStudents.length;
+        // Use optimized method to get student progress with database-level aggregation
+        const allStudentProgress = await storage.getStudentProgress();
+        console.log(`[PERFORMANCE] Using optimized student progress query with database-level aggregation`);
+        
+        totalCount = allStudentProgress.length;
 
-        const allSubmissions = await db.select().from(submissions);
-
-        students = allStudents.slice((page - 1) * pageSize, page * pageSize).map((student: User) => {
-          const studentSubmissions = allSubmissions.filter((sub: any) => sub.userId === student.id);
-          const latestSubmission = studentSubmissions.length > 0 ?
-            studentSubmissions.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] :
-            null;
-
-          let status: 'submitted' | 'not_submitted' | 'needs_review' = 'not_submitted';
-
-          if (latestSubmission) {
-            if (latestSubmission.status === 'completed') {
-              status = 'submitted';
-            } else if (['pending', 'processing'].includes(latestSubmission.status)) {
-              status = 'needs_review';
-            }
-          }
-
+        students = allStudentProgress.slice((page - 1) * pageSize, page * pageSize).map((progress: any) => {
+          let status: 'submitted' | 'not_submitted' | 'needs_review' = progress.submissionStatus === 'submitted' ? 'submitted' : 'not_submitted';
+          
           return {
-            id: student.id,
-            name: student.name,
-            email: student.email,
+            id: progress.userId,
+            name: progress.userName,
+            email: progress.userEmail,
             status,
-            lastSubmission: latestSubmission ? new Date(latestSubmission.createdAt).toLocaleString() : undefined,
-            attempts: studentSubmissions.length,
-            submissionId: latestSubmission ? latestSubmission.id : undefined
+            lastSubmission: progress.latestSubmissionDate ? new Date(progress.latestSubmissionDate).toLocaleString() : undefined,
+            attempts: progress.submissionCount || 0,
+            submissionId: undefined // Not available in aggregated query
           };
         });
       }

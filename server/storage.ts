@@ -74,6 +74,11 @@ export interface IStorage {
   listAssignmentsForUser(userId: number): Promise<Assignment[]>;
   updateAssignmentStatus(id: number, status: string): Promise<Assignment>;
   updateAssignmentShareableCode(id: number, shareableCode: string): Promise<Assignment>;
+  
+  // Optimized assignment operations with JOINs
+  getAssignmentWithDetails(id: number): Promise<any>;
+  listAssignmentsWithStats(courseId?: number): Promise<any[]>;
+  getAssignmentStats(): Promise<any[]>;
 
   // Submission operations
   getSubmission(id: number): Promise<Submission | undefined>;
@@ -81,7 +86,9 @@ export interface IStorage {
   listSubmissionsForUser(userId: number, assignmentId?: number): Promise<Submission[]>;
   listSubmissionsForAssignment(assignmentId: number): Promise<Submission[]>;
   updateSubmissionStatus(id: number, status: string): Promise<Submission>;
+  updateSubmission(id: number, updates: Partial<InsertSubmission>): Promise<Submission>;
   getLatestSubmission(userId: number, assignmentId: number): Promise<Submission | undefined>;
+  getAssignmentByShareableCode(code: string): Promise<Assignment | undefined>;
 
   // Feedback operations
   getFeedback(id: number): Promise<Feedback | undefined>;
@@ -101,6 +108,10 @@ export interface IStorage {
   // User Notification Settings operations
   getUserNotificationSettings(userId: number): Promise<UserNotificationSetting | undefined>;
   upsertUserNotificationSettings(setting: InsertUserNotificationSetting): Promise<UserNotificationSetting>;
+  
+  // Optimized data operations
+  getStudentProgress(assignmentId?: number): Promise<any[]>;
+  listCoursesWithStats(): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -372,6 +383,19 @@ export class DatabaseStorage implements IStorage {
     return assignment;
   }
 
+  async getAssignmentByShareableCode(code: string): Promise<Assignment | undefined> {
+    try {
+      const [assignment] = await db.select()
+        .from(assignments)
+        .where(eq(assignments.shareableCode, code))
+        .limit(1);
+      return assignment;
+    } catch (error) {
+      console.error(`[ERROR] Error getting assignment by shareable code ${code}:`, error);
+      throw new Error(`Failed to get assignment by shareable code: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   // Submission operations
   async getSubmission(id: number): Promise<Submission | undefined> {
     const [submission] = await db.select().from(submissions).where(eq(submissions.id, id));
@@ -379,70 +403,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSubmission(insertSubmission: InsertSubmission): Promise<Submission> {
+    console.log("[INFO] Creating submission with data:", JSON.stringify(insertSubmission, null, 2));
+    
     try {
-      // Check if the columns we need exist first
-      const columnsQuery = `
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_name = 'submissions'
-        AND column_name IN ('mime_type', 'file_size', 'content_type');
-      `;
-
-      const resultCols = await db.execute(columnsQuery); // Renamed 'result' to 'resultCols'
-      const existingColumns = resultCols.rows.map((row: { column_name: string }) => row.column_name);
-
-      // Create a new submissions insert object with required fields
-      const submissionData: InsertSubmission = {
-        assignmentId: insertSubmission.assignmentId,
-        userId: insertSubmission.userId,
-        fileUrl: insertSubmission.fileUrl || '',
-        fileName: insertSubmission.fileName || '',
-        content: insertSubmission.content || '',
-        notes: insertSubmission.notes || null,
-        status: insertSubmission.status || 'pending',
-        mimeType: existingColumns.includes('mime_type') ? (insertSubmission.mimeType || null) : null,
-        fileSize: existingColumns.includes('file_size') ? (insertSubmission.fileSize || null) : null,
-        contentType: existingColumns.includes('content_type') ? (insertSubmission.contentType || null) : null
-      };
-
-      const [submission] = await db.insert(submissions).values([submissionData]).returning();
+      // Use standard Drizzle ORM insert
+      const [submission] = await db.insert(submissions)
+        .values({
+          assignmentId: insertSubmission.assignmentId,
+          userId: insertSubmission.userId,
+          fileUrl: insertSubmission.fileUrl || '',
+          fileName: insertSubmission.fileName || '',
+          content: insertSubmission.content || '',
+          notes: insertSubmission.notes || null,
+          status: (insertSubmission.status || 'pending') as 'pending' | 'processing' | 'completed' | 'failed',
+          mimeType: insertSubmission.mimeType || null,
+          fileSize: insertSubmission.fileSize || null,
+          contentType: insertSubmission.contentType || null,
+          fileExtension: insertSubmission.fileExtension || null
+        })
+        .returning();
+      
       console.log(`[INFO] Submission created successfully: ${submission.id}`);
       return submission;
     } catch (error) {
       console.error("[ERROR] Error creating submission:", error);
-
-      // Fallback approach if there's a schema issue - using parameterized query
-      try {
-        // Define the parameterized SQL query
-        const parameterizedSql = `
-          INSERT INTO submissions (assignment_id, user_id, file_url, file_name, content, notes, status)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-          RETURNING *;
-        `;
-
-        // Define parameters with proper types
-        const params = [
-          insertSubmission.assignmentId,
-          insertSubmission.userId,
-          insertSubmission.fileUrl || null,
-          insertSubmission.fileName || null,
-          insertSubmission.content || null,
-          insertSubmission.notes || null,
-          insertSubmission.status || 'pending'
-        ];
-
-        console.log("[INFO] Using fallback parameterized SQL for submission creation");
-        const result = await db.execute(parameterizedSql, params);
-        const submission = result.rows[0] as Submission;
-        console.log(`[INFO] Submission created successfully with secure fallback: ${submission.id}`);
-        return submission;
-      } catch (fallbackError) {
-        console.error("[ERROR] Fallback submission creation also failed:", fallbackError);
-        const errorMessage = fallbackError instanceof Error
-          ? fallbackError.message
-          : String(fallbackError);
-        throw new Error(`Failed to create submission: ${errorMessage}`);
-      }
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create submission: ${errorMessage}`);
     }
   }
 
@@ -539,6 +525,27 @@ export class DatabaseStorage implements IStorage {
         console.error(`[ERROR] Fallback query for submission ${id} status update also failed:`, innerError);
         throw new Error(`Failed to update submission status: ${innerError.message}`);
       }
+    }
+  }
+
+  async updateSubmission(id: number, updates: Partial<InsertSubmission>): Promise<Submission> {
+    try {
+      const [submission] = await db.update(submissions)
+        .set({
+          ...updates,
+          updatedAt: new Date()
+        })
+        .where(eq(submissions.id, id))
+        .returning();
+
+      if (!submission) {
+        throw new Error(`Submission with ID ${id} not found`);
+      }
+
+      return submission;
+    } catch (error) {
+      console.error(`[ERROR] Error updating submission ${id}:`, error);
+      throw new Error(`Failed to update submission: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -996,6 +1003,167 @@ export class DatabaseStorage implements IStorage {
 
     const [inserted] = await db.insert(userNotificationSettings).values(setting).returning();
     return inserted;
+  }
+
+  // Performance-optimized methods with database-level JOINs and aggregations
+  
+  async getAssignmentWithDetails(id: number): Promise<any> {
+    try {
+      const result = await db
+        .select({
+          id: assignments.id,
+          title: assignments.title,
+          description: assignments.description,
+          instructions: assignments.instructions,
+          dueDate: assignments.dueDate,
+          maxScore: assignments.maxScore,
+          courseId: assignments.courseId,
+          shareableCode: assignments.shareableCode,
+          status: assignments.status,
+          courseName: courses.name,
+          courseCode: courses.code,
+          submissionCount: sql<number>`COUNT(DISTINCT ${submissions.id})`.as('submissionCount'),
+          completedCount: sql<number>`COUNT(DISTINCT CASE WHEN ${submissions.status} = 'completed' THEN ${submissions.id} END)`.as('completedCount'),
+          averageScore: sql<number>`AVG(CASE WHEN ${feedback.score} IS NOT NULL THEN ${feedback.score} END)`.as('averageScore')
+        })
+        .from(assignments)
+        .leftJoin(courses, eq(assignments.courseId, courses.id))
+        .leftJoin(submissions, eq(assignments.id, submissions.assignmentId))
+        .leftJoin(feedback, eq(submissions.id, feedback.submissionId))
+        .where(eq(assignments.id, id))
+        .groupBy(assignments.id, courses.id, courses.name, courses.code);
+
+      return result[0] || null;
+    } catch (error) {
+      console.error(`[ERROR] Error getting assignment with details for ID ${id}:`, error);
+      throw new Error(`Failed to get assignment details: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async listAssignmentsWithStats(courseId?: number): Promise<any[]> {
+    try {
+      let query = db
+        .select({
+          id: assignments.id,
+          title: assignments.title,
+          description: assignments.description,
+          dueDate: assignments.dueDate,
+          maxScore: assignments.maxScore,
+          courseId: assignments.courseId,
+          shareableCode: assignments.shareableCode,
+          status: assignments.status,
+          courseName: courses.name,
+          courseCode: courses.code,
+          submissionCount: sql<number>`COUNT(DISTINCT ${submissions.id})`.as('submissionCount'),
+          completedCount: sql<number>`COUNT(DISTINCT CASE WHEN ${submissions.status} = 'completed' THEN ${submissions.id} END)`.as('completedCount'),
+          averageScore: sql<number>`AVG(CASE WHEN ${feedback.score} IS NOT NULL THEN ${feedback.score} END)`.as('averageScore')
+        })
+        .from(assignments)
+        .leftJoin(courses, eq(assignments.courseId, courses.id))
+        .leftJoin(submissions, eq(assignments.id, submissions.assignmentId))
+        .leftJoin(feedback, eq(submissions.id, feedback.submissionId))
+        .groupBy(assignments.id, courses.id, courses.name, courses.code)
+        .orderBy(desc(assignments.createdAt));
+
+      if (courseId) {
+        query = query.where(eq(assignments.courseId, courseId));
+      }
+
+      return await query;
+    } catch (error) {
+      console.error(`[ERROR] Error listing assignments with stats:`, error);
+      throw new Error(`Failed to list assignments with stats: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async getAssignmentStats(): Promise<any[]> {
+    try {
+      return await db
+        .select({
+          id: assignments.id,
+          title: assignments.title,
+          courseName: courses.name,
+          totalSubmissions: sql<number>`COUNT(DISTINCT ${submissions.id})`.as('totalSubmissions'),
+          completedSubmissions: sql<number>`COUNT(DISTINCT CASE WHEN ${submissions.status} = 'completed' THEN ${submissions.id} END)`.as('completedSubmissions'),
+          pendingSubmissions: sql<number>`COUNT(DISTINCT CASE WHEN ${submissions.status} = 'pending' THEN ${submissions.id} END)`.as('pendingSubmissions'),
+          averageScore: sql<number>`AVG(CASE WHEN ${feedback.score} IS NOT NULL THEN ${feedback.score} END)`.as('averageScore'),
+          maxScore: assignments.maxScore,
+          dueDate: assignments.dueDate,
+          status: assignments.status
+        })
+        .from(assignments)
+        .leftJoin(courses, eq(assignments.courseId, courses.id))
+        .leftJoin(submissions, eq(assignments.id, submissions.assignmentId))
+        .leftJoin(feedback, eq(submissions.id, feedback.submissionId))
+        .groupBy(assignments.id, courses.id, courses.name, assignments.title, assignments.maxScore, assignments.dueDate, assignments.status)
+        .orderBy(desc(assignments.createdAt));
+    } catch (error) {
+      console.error(`[ERROR] Error getting assignment stats:`, error);
+      throw new Error(`Failed to get assignment stats: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async getStudentProgress(assignmentId?: number): Promise<any[]> {
+    try {
+      let query = db
+        .select({
+          userId: users.id,
+          userName: users.name,
+          userEmail: users.email,
+          assignmentId: assignments.id,
+          assignmentTitle: assignments.title,
+          courseName: courses.name,
+          submissionCount: sql<number>`COUNT(DISTINCT ${submissions.id})`.as('submissionCount'),
+          latestSubmissionDate: sql<Date>`MAX(${submissions.createdAt})`.as('latestSubmissionDate'),
+          submissionStatus: sql<string>`CASE WHEN COUNT(${submissions.id}) > 0 THEN 'submitted' ELSE 'not_submitted' END`.as('submissionStatus'),
+          score: sql<number>`MAX(${feedback.score})`.as('score'),
+          averageScore: sql<number>`AVG(${feedback.score})`.as('averageScore'),
+          maxScore: assignments.maxScore
+        })
+        .from(users)
+        .leftJoin(enrollments, eq(users.id, enrollments.userId))
+        .leftJoin(courses, eq(enrollments.courseId, courses.id))
+        .leftJoin(assignments, eq(courses.id, assignments.courseId))
+        .leftJoin(submissions, and(eq(assignments.id, submissions.assignmentId), eq(users.id, submissions.userId)))
+        .leftJoin(feedback, eq(submissions.id, feedback.submissionId))
+        .where(eq(users.role, 'student'))
+        .groupBy(users.id, users.name, users.email, assignments.id, assignments.title, assignments.maxScore, courses.name)
+        .orderBy(users.name, assignments.title);
+
+      if (assignmentId) {
+        query = query.where(eq(assignments.id, assignmentId));
+      }
+
+      return await query;
+    } catch (error) {
+      console.error(`[ERROR] Error getting student progress:`, error);
+      throw new Error(`Failed to get student progress: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async listCoursesWithStats(): Promise<any[]> {
+    try {
+      return await db
+        .select({
+          id: courses.id,
+          name: courses.name,
+          code: courses.code,
+          description: courses.description,
+          enrollmentCount: sql<number>`COUNT(DISTINCT ${enrollments.userId})`.as('enrollmentCount'),
+          assignmentCount: sql<number>`COUNT(DISTINCT ${assignments.id})`.as('assignmentCount'),
+          submissionCount: sql<number>`COUNT(DISTINCT ${submissions.id})`.as('submissionCount'),
+          avgCompletionRate: sql<number>`AVG(CASE WHEN ${submissions.status} = 'completed' THEN 1.0 ELSE 0.0 END) * 100`.as('avgCompletionRate')
+        })
+        .from(courses)
+        .leftJoin(enrollments, eq(courses.id, enrollments.courseId))
+        .leftJoin(assignments, eq(courses.id, assignments.courseId))
+        .leftJoin(submissions, eq(assignments.id, submissions.assignmentId))
+        .groupBy(courses.id, courses.name, courses.code, courses.description)
+        .orderBy(courses.name);
+    } catch (error) {
+      console.error(`[ERROR] Error listing courses with stats:`, error);
+      throw new Error(`Failed to list courses with stats: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }
 
