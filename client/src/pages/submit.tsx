@@ -116,23 +116,25 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
     try {
       setSubmitting(true);
       
-      // Form validation
-      if (!name.trim()) {
-        toast({
-          title: "Missing Information",
-          description: "Please enter your name.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (!email.trim() || !email.includes('@')) {
-        toast({
-          title: "Invalid Email",
-          description: "Please enter a valid email address.",
-          variant: "destructive",
-        });
-        return;
+      // Form validation (only for anonymous users)
+      if (!isAuthenticated) {
+        if (!name.trim()) {
+          toast({
+            title: "Missing Information",
+            description: "Please enter your name.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (!email.trim() || !email.includes('@')) {
+          toast({
+            title: "Invalid Email",
+            description: "Please enter a valid email address.",
+            variant: "destructive",
+          });
+          return;
+        }
       }
       
       if (submitType === 'code' && !codeContent.trim()) {
@@ -157,11 +159,14 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
       const formData = new FormData();
       formData.append('assignmentId', assignment.id.toString());
       formData.append('submissionType', submitType);
-      formData.append('name', name);
-      formData.append('email', email);
       
-      // Critical security parameter - include the shareable code for validation
-      formData.append('shareableCode', assignment.shareableCode);
+      // For anonymous submissions, include name and email
+      if (!isAuthenticated) {
+        formData.append('name', name);
+        formData.append('email', email);
+        // Critical security parameter - include the shareable code for validation
+        formData.append('shareableCode', assignment.shareableCode);
+      }
       
       if (notes) formData.append('notes', notes);
       if (submitType === 'code') formData.append('code', codeContent);
@@ -178,8 +183,11 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
       
       const { csrfToken } = await csrfResponse.json();
       
+      // Determine which endpoint to use based on authentication status
+      const submissionEndpoint = isAuthenticated ? '/api/submissions' : '/api/anonymous-submissions';
+      
       // Send submission with CSRF token
-      const response = await fetch('/api/anonymous-submissions', {
+      const response = await fetch(submissionEndpoint, {
         method: 'POST',
         headers: {
           'X-CSRF-Token': csrfToken,
@@ -318,14 +326,25 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
             </div>
             
             {/* Authentication notification banner */}
-            <div className="mt-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded p-3 text-sm text-blue-800 dark:text-blue-200 flex items-start gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0 text-blue-500 dark:text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-              <span>
-                <strong>Authentication Required:</strong> All submissions require user authentication to maintain academic integrity and track progress.
-              </span>
-            </div>
+            {isAuthenticated ? (
+              <div className="mt-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded p-3 text-sm text-green-800 dark:text-green-200 flex items-start gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0 text-green-500 dark:text-green-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>
+                  <strong>Authenticated Submission:</strong> Submitting as {user?.name || user?.username} - your submission will be automatically linked to your account.
+                </span>
+              </div>
+            ) : (
+              <div className="mt-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded p-3 text-sm text-blue-800 dark:text-blue-200 flex items-start gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0 text-blue-500 dark:text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <span>
+                  <strong>Anonymous Submission:</strong> Please provide your name and email for this submission.
+                </span>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="pt-6">
             <div className="mb-6">
@@ -337,29 +356,32 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Your Name</Label>
-                  <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    disabled={submitting}
-                  />
+              {/* Only show name and email fields for anonymous users */}
+              {!isAuthenticated && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Your Name</Label>
+                    <Input
+                      id="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={submitting}
-                  />
-                </div>
-              </div>
+              )}
               
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes (Optional)</Label>
