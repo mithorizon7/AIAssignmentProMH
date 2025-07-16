@@ -256,26 +256,50 @@ if (false) { // Disabled to prevent Redis usage
         // Analyze the submission with AI based on file type
         let feedbackResult;
         if (isMultimodal) {
-          // In production, fileUrl would be a path to cloud storage
-          // Here we use a server-local path for simplicity
-          const filePath = submission.fileUrl || '';
-          
           logger.info(`Processing multimodal submission`, {
             submissionId,
             type: submission.mimeType,
-            filename: submission.fileName
+            filename: submission.fileName,
+            fileUrl: submission.fileUrl
           });
           
-          feedbackResult = await aiService.analyzeMultimodalSubmission({
-            filePath: filePath,
-            fileName: submission.fileName || 'unknown',
-            mimeType: submission.mimeType || 'application/octet-stream',
-            textContent: submission.content || undefined, // Optional extracted text
-            assignmentTitle: assignment.title,
-            assignmentDescription: assignment.description || undefined,
-            instructorContext: assignment.instructorContext || undefined, // Instructor-only guidance
-            rubric: rubric
-          });
+          // For multimodal submissions, we need to handle the file content properly
+          // Check if we have content (for data URIs) or need to read from file path
+          if (submission.content && submission.content.startsWith('data:')) {
+            // If content is a data URI, use it directly
+            feedbackResult = await aiService.analyzeMultimodalSubmission({
+              fileDataUri: submission.content,
+              fileName: submission.fileName || 'unknown',
+              mimeType: submission.mimeType || 'application/octet-stream',
+              textContent: undefined, // Data URIs don't have separate text content
+              assignmentTitle: assignment.title,
+              assignmentDescription: assignment.description || undefined,
+              instructorContext: assignment.instructorContext || undefined,
+              rubric: rubric
+            });
+          } else if (submission.fileUrl) {
+            // If we have a file URL/path, use it
+            feedbackResult = await aiService.analyzeMultimodalSubmission({
+              filePath: submission.fileUrl,
+              fileName: submission.fileName || 'unknown',
+              mimeType: submission.mimeType || 'application/octet-stream',
+              textContent: submission.content || undefined, // Optional extracted text
+              assignmentTitle: assignment.title,
+              assignmentDescription: assignment.description || undefined,
+              instructorContext: assignment.instructorContext || undefined,
+              rubric: rubric
+            });
+          } else {
+            // Fallback to text analysis if no file content is available
+            logger.warn(`Multimodal submission ${submissionId} has no file content, falling back to text analysis`);
+            feedbackResult = await aiService.analyzeSubmission({
+              studentSubmissionContent: submission.content || 'No content provided',
+              assignmentTitle: assignment.title,
+              assignmentDescription: assignment.description || undefined,
+              instructorContext: assignment.instructorContext || undefined,
+              rubric: rubric
+            });
+          }
         } else {
           // Process as standard text submission
           const content = submission.content || '';
@@ -423,23 +447,62 @@ export const queueApi = {
       // Process the submission directly with AI service
       const aiService = createAIService();
       
-      // Get submission content for AI analysis
-      let content = submission.content || '';
-      if (submission.contentType === 'image' || submission.contentType === 'document') {
-        content = submission.fileUrl || '';
-      }
-      
       // Get assignment rubric
       const rubric = assignment.rubric || assignment.description || 'Please provide feedback on this submission.';
       
-      // Analyze the submission
-      const feedbackResult = await aiService.analyzeSubmission({
-        studentSubmissionContent: content,
-        assignmentTitle: assignment.title,
-        assignmentDescription: assignment.description || undefined,
-        instructorContext: assignment.instructorContext || undefined,
-        rubric: rubric
-      });
+      // Determine if this is a multimodal submission
+      const isMultimodal = submission.mimeType && 
+                           submission.mimeType !== 'text/plain' && 
+                           (submission.fileUrl || submission.content?.startsWith('data:'));
+      
+      // Analyze the submission based on its type
+      let feedbackResult;
+      if (isMultimodal) {
+        // Handle multimodal submissions (images, documents, etc.)
+        if (submission.content && submission.content.startsWith('data:')) {
+          // If content is a data URI, use it directly
+          feedbackResult = await aiService.analyzeMultimodalSubmission({
+            fileDataUri: submission.content,
+            fileName: submission.fileName || 'unknown',
+            mimeType: submission.mimeType || 'application/octet-stream',
+            textContent: undefined,
+            assignmentTitle: assignment.title,
+            assignmentDescription: assignment.description || undefined,
+            instructorContext: assignment.instructorContext || undefined,
+            rubric: rubric
+          });
+        } else if (submission.fileUrl) {
+          // If we have a file URL/path, use it
+          feedbackResult = await aiService.analyzeMultimodalSubmission({
+            filePath: submission.fileUrl,
+            fileName: submission.fileName || 'unknown',
+            mimeType: submission.mimeType || 'application/octet-stream',
+            textContent: submission.content || undefined,
+            assignmentTitle: assignment.title,
+            assignmentDescription: assignment.description || undefined,
+            instructorContext: assignment.instructorContext || undefined,
+            rubric: rubric
+          });
+        } else {
+          // Fallback to text analysis if no file content is available
+          feedbackResult = await aiService.analyzeSubmission({
+            studentSubmissionContent: submission.content || 'No content provided',
+            assignmentTitle: assignment.title,
+            assignmentDescription: assignment.description || undefined,
+            instructorContext: assignment.instructorContext || undefined,
+            rubric: rubric
+          });
+        }
+      } else {
+        // Handle text-only submissions
+        feedbackResult = await aiService.analyzeSubmission({
+          studentSubmissionContent: submission.content || '',
+          assignmentTitle: assignment.title,
+          assignmentDescription: assignment.description || undefined,
+          instructorContext: assignment.instructorContext || undefined,
+          rubric: rubric
+        });
+      }
       
       // Prepare feedback for storage
       const feedbackData = await aiService.prepareFeedbackForStorage(
