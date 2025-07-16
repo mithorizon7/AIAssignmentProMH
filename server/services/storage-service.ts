@@ -61,8 +61,8 @@ export class StorageService {
         console.warn('[StorageService] GCS not configured, storing file locally for development');
         // In development mode, store file temporarily on disk for processing
         const tempDir = '/tmp/aigrader-dev-files';
-        const fs = require('fs');
-        const pathModule = require('path');
+        const fs = await import('fs');
+        const pathModule = await import('path');
         
         // Create temp directory if it doesn't exist
         if (!fs.existsSync(tempDir)) {
@@ -120,8 +120,8 @@ export class StorageService {
         console.warn('[StorageService] GCS not configured, storing file locally for development');
         // In development mode, store file temporarily on disk for processing
         const tempDir = '/tmp/aigrader-dev-files';
-        const fs = require('fs');
-        const pathModule = require('path');
+        const fs = await import('fs');
+        const pathModule = await import('path');
         
         // Create temp directory if it doesn't exist
         if (!fs.existsSync(tempDir)) {
