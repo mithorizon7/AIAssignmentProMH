@@ -3,6 +3,7 @@ import { formatProcessingTime } from "@/lib/utils/format";
 import { Feedback } from "@/lib/types"; 
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { QuillContent } from "@/components/ui/quill-content";
 import { 
   CheckCircle, 
   AlertTriangle, 
@@ -231,7 +232,10 @@ export function FeedbackCard({ feedback, expanded = true, onToggle }: FeedbackCa
               </Button>
             )}
           </div>
-          <p className="text-sm text-gray-700 leading-relaxed">{truncatedSummary}</p>
+          <QuillContent 
+            content={truncatedSummary} 
+            className="text-sm text-gray-700 leading-relaxed"
+          />
         </div>
       )}
       
