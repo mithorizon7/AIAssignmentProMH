@@ -442,20 +442,13 @@ export const queueApi = {
       });
       
       // Prepare feedback for storage
-      const result = await aiService.prepareFeedbackForStorage(
+      const feedbackData = await aiService.prepareFeedbackForStorage(
         submission.id,
         feedbackResult
       );
       
-      // Update submission with results
-      await storage.updateSubmission(submissionId, {
-        status: 'completed',
-        feedback: result.feedback,
-        score: result.score,
-        rubricScores: result.rubricScores,
-        suggestions: result.suggestions,
-        processed: true
-      });
+      // Save feedback to database using the proper storage service
+      await storageService.saveFeedback(feedbackData);
       
       logger.info(`Submission processed directly (Redis fallback mode)`, { submissionId });
       return `direct-${submissionId}-${Date.now()}`;

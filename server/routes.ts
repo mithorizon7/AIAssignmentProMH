@@ -1474,7 +1474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validFeedback = feedbackItems.filter(f => f !== undefined) as any[];
 
       const avgFeedbackTime = validFeedback.length > 0
-        ? Math.round(validFeedback.reduce((sum, f) => sum + (f.processingTime || 0), 0) / validFeedback.length / 1000) // Added fallback for processingTime
+        ? Math.round(validFeedback.reduce((sum, f) => sum + (f.processingTime || 0), 0) / validFeedback.length / 1000)
         : 0;
 
       const submissionsByStudent = submissions.reduce((acc, sub) => {
