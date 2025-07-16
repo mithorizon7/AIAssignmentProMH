@@ -766,7 +766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
 
-  app.post('/api/anonymous-submissions', submissionRateLimiter, requireAuth, csrfProtection, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/anonymous-submissions', submissionRateLimiter, csrfProtection, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
     const submissionSchema = z.object({
       assignmentId: z.string().transform(val => parseInt(val)),
       submissionType: z.enum(['file', 'code']),

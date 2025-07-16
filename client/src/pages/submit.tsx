@@ -179,7 +179,7 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
       const { csrfToken } = await csrfResponse.json();
       
       // Send submission with CSRF token
-      const response = await fetch('/api/submissions', {
+      const response = await fetch('/api/anonymous-submissions', {
         method: 'POST',
         headers: {
           'X-CSRF-Token': csrfToken,
