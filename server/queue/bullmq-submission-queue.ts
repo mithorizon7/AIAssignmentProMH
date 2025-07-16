@@ -14,12 +14,12 @@ import QueuePerformanceMonitor from '../lib/queue-performance-monitor';
 // Queue name
 const SUBMISSION_QUEUE_NAME = 'submission-processing';
 
-// Enable BullMQ with optimized Redis usage
-const queueActive = true;
-logger.info(`BullMQ queue enabled with Redis optimizations`, { 
+// Disable BullMQ to prevent Redis request limit issues
+const queueActive = false;
+logger.info(`BullMQ queue disabled - using direct processing fallback`, { 
   active: queueActive, 
   mode: process.env.NODE_ENV || 'development',
-  reason: 'Redis usage optimized for efficiency'
+  reason: 'Redis request limit exceeded - using direct processing to maintain functionality'
 });
 
 // Optimized queue configuration to minimize Redis requests
@@ -67,15 +67,12 @@ const queueEvents = queueActive
   ? new QueueEvents(SUBMISSION_QUEUE_NAME, { connection: redisClient }) 
   : null;
 
-// Enable lightweight performance monitoring with reduced frequency
+// Disable performance monitoring to prevent Redis usage
 let performanceMonitor: QueuePerformanceMonitor | null = null;
-if (submissionQueue && queueEvents) {
-  performanceMonitor = new QueuePerformanceMonitor(submissionQueue, queueEvents);
-  logger.info('Queue performance monitoring enabled with reduced frequency', {
-    monitoringEnabled: true,
-    frequency: 'reduced'
-  });
-}
+logger.info('Queue performance monitoring disabled', {
+  monitoringEnabled: false,
+  reason: 'Redis request limit optimization'
+});
 
 // Log queue events if active
 if (queueEvents) {
@@ -132,9 +129,10 @@ function createAIService() {
 // Create storage service
 const storageService = new StorageService();
 
-// Create worker if queue is active
+// Skip BullMQ worker initialization - use direct processing instead
 let submissionWorker: SubmissionWorker = null;
-if (queueActive) {
+logger.info('BullMQ worker disabled to prevent Redis request limit issues');
+if (false) { // Disabled to prevent Redis usage
   submissionWorker = new Worker(
     SUBMISSION_QUEUE_NAME,
     async (job: Job) => {
@@ -404,33 +402,56 @@ export const queueApi = {
    */
   async addSubmission(submissionId: number): Promise<string> {
     try {
-      // First update the status in database
-      await storage.updateSubmissionStatus(submissionId, 'pending');
+      // Process submission directly without Redis/BullMQ to avoid request limits
+      logger.info('Processing submission directly (Redis queue disabled)', { submissionId });
       
-      // Ensure queue is active - no fallback processing allowed
-      if (!queueActive || !submissionQueue) {
-        throw new Error('Queue is not active - cannot process submissions without Redis/BullMQ');
+      // Update submission status to processing
+      await storage.updateSubmissionStatus(submissionId, 'processing');
+      
+      // Get submission data
+      const submission = await storage.getSubmission(submissionId);
+      if (!submission) {
+        throw new Error(`Submission not found: ${submissionId}`);
       }
       
-      // Add job to the queue
-      const job = await submissionQueue.add('processSubmission', { submissionId }, {
-        jobId: `submission-${submissionId}`,
-        // Job-specific options can override queue defaults here
+      // Get assignment data
+      const assignment = await storage.getAssignment(submission.assignmentId);
+      if (!assignment) {
+        throw new Error(`Assignment not found: ${submission.assignmentId}`);
+      }
+      
+      // Process the submission directly with AI service
+      const aiService = createAIService();
+      const result = await aiService.generateFeedback(submission, assignment);
+      
+      // Update submission with results
+      await storage.updateSubmission(submissionId, {
+        status: 'completed',
+        feedback: result.feedback,
+        score: result.score,
+        rubricScores: result.rubricScores,
+        suggestions: result.suggestions,
+        processed: true
       });
       
-      // BullMQ job.id can be undefined in some edge cases, provide fallback 
-      const jobId = job.id || `submission-${submissionId}-${Date.now()}`;
-      logger.info(`Submission queued for processing`, { 
-        submissionId, 
-        jobId,
-        status: 'queued'
-      });
-      return jobId;
+      logger.info(`Submission processed directly (Redis fallback mode)`, { submissionId });
+      return `direct-${submissionId}-${Date.now()}`;
     } catch (error) {
-      logger.error(`Error adding submission to queue`, { 
+      logger.error(`Error processing submission directly`, { 
         submissionId, 
         error: error instanceof Error ? error.message : String(error)
       });
+      
+      // Mark as failed
+      try {
+        await storage.updateSubmissionStatus(submissionId, 'failed');
+      } catch (updateError) {
+        logger.error(`Failed to update submission status to failed`, { 
+          submissionId, 
+          error: updateError instanceof Error ? updateError.message : String(updateError)
+        });
+      }
+      
       throw error;
     }
   },
@@ -462,81 +483,40 @@ export const queueApi = {
    * Get queue statistics
    */
   async getStats(): Promise<any> {
-    // Ensure queue is active
-    if (!queueActive || !submissionQueue) {
-      throw new Error('Queue is not active - cannot get statistics without Redis/BullMQ');
-    }
-    
-    try {
-      // In production mode with active queue
-      if ('getWaitingCount' in submissionQueue) {
-        const [waiting, active, completed, failed, delayed] = await Promise.all([
-          submissionQueue.getWaitingCount(),
-          submissionQueue.getActiveCount(),
-          submissionQueue.getCompletedCount(),
-          submissionQueue.getFailedCount(),
-          submissionQueue.getDelayedCount()
-        ]);
-        
-        // Get performance metrics if monitor is available
-        const performanceMetrics = performanceMonitor ? performanceMonitor.getMetrics() : null;
-        const performanceReport = performanceMonitor ? performanceMonitor.generateReport() : null;
+    // Return mock stats since Redis queue is disabled
+    return {
+      waiting: 0,
+      active: 0,
+      completed: 0,
+      failed: 0,
+      delayed: 0,
+      mode: 'direct_processing',
+      redis_disabled: true
+    };
+  },
 
-        return {
-          // Basic queue stats
-          waiting,
-          active,
-          completed,
-          failed,
-          delayed,
-          total: waiting + active + completed + failed + delayed,
-          mode: 'production',
-          
-          // Performance metrics
-          performance: performanceMetrics ? {
-            avgWaitTime: performanceMetrics.avgWaitTime,
-            avgProcessingTime: performanceMetrics.avgProcessingTime,
-            throughputPerMinute: performanceMetrics.throughputPerMinute,
-            health: performanceReport?.health || 'unknown'
-          } : null,
-          
-          // Health indicators
-          health: {
-            queueBacklog: waiting > 50 ? 'warning' : waiting > 100 ? 'critical' : 'good',
-            failureRate: completed + failed > 0 
-              ? ((failed / (completed + failed)) * 100).toFixed(1) + '%'
-              : '0%',
-            activeWorkers: active,
-            lastUpdate: new Date().toISOString()
-          }
-        };
-      } else {
-        throw new Error('Queue methods not available');
-      }
-    } catch (error: any) {
-      console.error('Error getting queue stats:', error);
-      return {
-        waiting: 0,
-        active: 0,
-        completed: 0,
-        failed: 0,
-        delayed: 0,
-        total: 0,
-        error: error?.message || 'Unknown error',
-        mode: 'error'
-      };
-    }
+  async getStatsDetailed(): Promise<any> {
+    // Return mock detailed stats since Redis queue is disabled
+    return {
+      waiting: 0,
+      active: 0,
+      completed: 0,
+      failed: 0,
+      delayed: 0,
+      mode: 'direct_processing',
+      redis_disabled: true,
+      note: 'Queue disabled - using direct processing to avoid Redis request limits'
+    };
   },
 
   /**
    * Get detailed performance report
    */
   async getPerformanceReport() {
-    if (!performanceMonitor) {
-      return { error: 'Performance monitoring not available' };
-    }
-    
-    return performanceMonitor.generateReport();
+    return { 
+      error: 'Performance monitoring disabled (Redis queue disabled)',
+      mode: 'direct_processing' 
+    };
   },
 
   /**
