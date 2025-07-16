@@ -587,6 +587,7 @@ export class DatabaseStorage implements IStorage {
     console.log(`[PERFORMANCE] Using optimized submissions with feedback query for user ${userId}`);
     
     let baseQuery = db.select({
+      // Submission fields (matching actual schema)
       id: submissions.id,
       assignmentId: submissions.assignmentId,
       userId: submissions.userId,
@@ -598,10 +599,22 @@ export class DatabaseStorage implements IStorage {
       mimeType: submissions.mimeType,
       fileSize: submissions.fileSize,
       contentType: submissions.contentType,
-      fileExtension: submissions.fileExtension,
       createdAt: submissions.createdAt,
       updatedAt: submissions.updatedAt,
-      feedback: feedback
+      // Feedback fields
+      feedbackId: feedback.id,
+      feedbackSubmissionId: feedback.submissionId,
+      feedbackStrengths: feedback.strengths,
+      feedbackImprovements: feedback.improvements,
+      feedbackSuggestions: feedback.suggestions,
+      feedbackSummary: feedback.summary,
+      feedbackScore: feedback.score,
+      feedbackCriteriaScores: feedback.criteriaScores,
+      feedbackProcessingTime: feedback.processingTime,
+      feedbackRawResponse: feedback.rawResponse,
+      feedbackModelName: feedback.modelName,
+      feedbackTokenCount: feedback.tokenCount,
+      feedbackCreatedAt: feedback.createdAt
     })
     .from(submissions)
     .leftJoin(feedback, eq(submissions.id, feedback.submissionId))
@@ -631,10 +644,23 @@ export class DatabaseStorage implements IStorage {
       mimeType: row.mimeType,
       fileSize: row.fileSize,
       contentType: row.contentType,
-      fileExtension: row.fileExtension,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      feedback: row.feedback
+      feedback: row.feedbackId ? {
+        id: row.feedbackId,
+        submissionId: row.feedbackSubmissionId!,
+        strengths: row.feedbackStrengths!,
+        improvements: row.feedbackImprovements!,
+        suggestions: row.feedbackSuggestions!,
+        summary: row.feedbackSummary,
+        score: row.feedbackScore,
+        criteriaScores: row.feedbackCriteriaScores,
+        processingTime: row.feedbackProcessingTime!,
+        rawResponse: row.feedbackRawResponse,
+        modelName: row.feedbackModelName,
+        tokenCount: row.feedbackTokenCount,
+        createdAt: row.feedbackCreatedAt!
+      } : null
     }));
   }
 
@@ -643,6 +669,7 @@ export class DatabaseStorage implements IStorage {
     console.log(`[PERFORMANCE] Using optimized submissions with feedback query for assignment ${assignmentId}`);
     
     const result = await db.select({
+      // Submission fields (matching actual schema)
       id: submissions.id,
       assignmentId: submissions.assignmentId,
       userId: submissions.userId,
@@ -654,10 +681,22 @@ export class DatabaseStorage implements IStorage {
       mimeType: submissions.mimeType,
       fileSize: submissions.fileSize,
       contentType: submissions.contentType,
-      fileExtension: submissions.fileExtension,
       createdAt: submissions.createdAt,
       updatedAt: submissions.updatedAt,
-      feedback: feedback
+      // Feedback fields
+      feedbackId: feedback.id,
+      feedbackSubmissionId: feedback.submissionId,
+      feedbackStrengths: feedback.strengths,
+      feedbackImprovements: feedback.improvements,
+      feedbackSuggestions: feedback.suggestions,
+      feedbackSummary: feedback.summary,
+      feedbackScore: feedback.score,
+      feedbackCriteriaScores: feedback.criteriaScores,
+      feedbackProcessingTime: feedback.processingTime,
+      feedbackRawResponse: feedback.rawResponse,
+      feedbackModelName: feedback.modelName,
+      feedbackTokenCount: feedback.tokenCount,
+      feedbackCreatedAt: feedback.createdAt
     })
     .from(submissions)
     .leftJoin(feedback, eq(submissions.id, feedback.submissionId))
@@ -676,10 +715,23 @@ export class DatabaseStorage implements IStorage {
       mimeType: row.mimeType,
       fileSize: row.fileSize,
       contentType: row.contentType,
-      fileExtension: row.fileExtension,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      feedback: row.feedback
+      feedback: row.feedbackId ? {
+        id: row.feedbackId,
+        submissionId: row.feedbackSubmissionId!,
+        strengths: row.feedbackStrengths!,
+        improvements: row.feedbackImprovements!,
+        suggestions: row.feedbackSuggestions!,
+        summary: row.feedbackSummary,
+        score: row.feedbackScore,
+        criteriaScores: row.feedbackCriteriaScores,
+        processingTime: row.feedbackProcessingTime!,
+        rawResponse: row.feedbackRawResponse,
+        modelName: row.feedbackModelName,
+        tokenCount: row.feedbackTokenCount,
+        createdAt: row.feedbackCreatedAt!
+      } : null
     }));
   }
 
