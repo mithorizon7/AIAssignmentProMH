@@ -47,15 +47,19 @@ function createRedisConfig(): RedisConfig {
       lazyConnect: true,
       maxRetriesPerRequest: null,
       
-      // Connection pooling for enterprise scale
+      // Connection pooling optimized for Redis request limits
       family: 4,                     // IPv4
-      enableAutoPipelining: true,    // Automatic command pipelining
-      maxLoadingTimeout: 5000,       // 5s max loading timeout
+      enableAutoPipelining: false,   // Disable auto-pipelining to reduce request count
+      maxLoadingTimeout: 10000,      // 10s max loading timeout
       
-      // Upstash-specific optimizations
-      commandTimeout: 30000,         // 30s command timeout (increased for Upstash)
-      retryDelayOnFailover: 100,
-      enableOfflineQueue: false      // Disable offline queue for immediate errors
+      // Upstash-specific optimizations for request efficiency
+      commandTimeout: 8000,          // 8s command timeout
+      retryDelayOnFailover: 2000,    // 2s retry delay to reduce frequency
+      enableOfflineQueue: false,     // Disable offline queue for immediate errors
+      maxRetriesPerRequest: null,    // Required for BullMQ blocking operations
+      connectTimeout: 8000,          // 8s connection timeout
+      lazyConnect: true,             // Only connect when needed
+      keepAlive: 60000,              // 60s keep-alive to reduce connection overhead
     };
     
     // Automatic TLS detection for cloud Redis services
@@ -83,15 +87,15 @@ function createRedisConfig(): RedisConfig {
     username: process.env.REDIS_USERNAME,
     db: parseInt(process.env.REDIS_DB || '0'),
     
-    // Performance settings
-    maxRetriesPerRequest: null,
-    retryDelayOnFailover: 100,
-    lazyConnect: true,
-    keepAlive: 30000,
-    connectTimeout: 10000,
-    enableAutoPipelining: true,
-    commandTimeout: 30000,
-    enableOfflineQueue: false
+    // Performance settings optimized for Redis request limits
+    maxRetriesPerRequest: null,    // Required for BullMQ
+    retryDelayOnFailover: 2000,    // 2s retry delay to reduce frequency
+    lazyConnect: true,             // Only connect when needed
+    keepAlive: 60000,              // 60s keep-alive to reduce connection overhead
+    connectTimeout: 8000,          // 8s connection timeout
+    enableAutoPipelining: false,   // Disable auto-pipelining to reduce request count
+    commandTimeout: 8000,          // 8s command timeout
+    enableOfflineQueue: false      // Disable offline queue for immediate errors
   };
 }
 

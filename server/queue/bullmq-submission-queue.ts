@@ -14,41 +14,42 @@ import QueuePerformanceMonitor from '../lib/queue-performance-monitor';
 // Queue name
 const SUBMISSION_QUEUE_NAME = 'submission-processing';
 
-// Enable BullMQ with proper Upstash Redis TLS configuration
+// Enable BullMQ with optimized Redis usage
 const queueActive = true;
-logger.info(`BullMQ queue status`, { 
+logger.info(`BullMQ queue enabled with Redis optimizations`, { 
   active: queueActive, 
-  mode: process.env.NODE_ENV || 'development' 
+  mode: process.env.NODE_ENV || 'development',
+  reason: 'Redis usage optimized for efficiency'
 });
 
-// Enhanced queue configuration optimized for Upstash Redis performance
+// Optimized queue configuration to minimize Redis requests
 const queueConfig = {
   connection: redisClient,
   defaultJobOptions: {
-    attempts: 3,              // Retry failed jobs up to 3 times
+    attempts: 2,              // Reduced attempts to minimize Redis usage
     backoff: {
       type: 'exponential',    // Exponential backoff between retries
-      delay: 2000             // Reduced starting delay for faster retries
+      delay: 5000             // Longer delay to reduce frequency
     },
-    removeOnComplete: 50,     // Reduced to optimize Redis memory usage
-    removeOnFail: 25,         // Reduced to optimize Redis memory usage
+    removeOnComplete: 1,      // Keep only 1 completed job
+    removeOnFail: 1,          // Keep only 1 failed job
     
-    // Performance optimizations for Upstash Redis
+    // Optimized settings
     delay: 0,                 // No artificial delay for new jobs
-    priority: 0,              // Standard priority (lower numbers = higher priority)
+    priority: 0,              // Standard priority
     
-    // Job timeout settings
-    jobTimeout: 5 * 60 * 1000,  // 5 minutes timeout for AI processing
-    stalledInterval: 30 * 1000,  // Check for stalled jobs every 30 seconds
+    // Extended timeout settings to reduce checking frequency
+    jobTimeout: 10 * 60 * 1000,  // 10 minutes timeout for AI processing
+    stalledInterval: 5 * 60 * 1000,  // Check for stalled jobs every 5 minutes
     maxStalledCount: 1           // Mark as failed after 1 stall
   },
   
-  // Advanced queue settings for performance
+  // Minimal queue settings to reduce Redis operations
   settings: {
-    stalledInterval: 30 * 1000,     // Check for stalled jobs every 30s
-    retryProcessDelay: 5000,        // Delay before retrying failed processing
+    stalledInterval: 5 * 60 * 1000,     // Check for stalled jobs every 5 minutes
+    retryProcessDelay: 30000,           // 30 second delay before retrying
     backoffStrategies: {
-      exponential: (attemptsMade: number) => Math.min(Math.pow(2, attemptsMade) * 1000, 30000)
+      exponential: (attemptsMade: number) => Math.min(Math.pow(2, attemptsMade) * 5000, 60000)
     }
   }
 };
@@ -66,13 +67,13 @@ const queueEvents = queueActive
   ? new QueueEvents(SUBMISSION_QUEUE_NAME, { connection: redisClient }) 
   : null;
 
-// Initialize performance monitoring
+// Enable lightweight performance monitoring with reduced frequency
 let performanceMonitor: QueuePerformanceMonitor | null = null;
 if (submissionQueue && queueEvents) {
   performanceMonitor = new QueuePerformanceMonitor(submissionQueue, queueEvents);
-  logger.info('Queue performance monitoring initialized', {
+  logger.info('Queue performance monitoring enabled with reduced frequency', {
     monitoringEnabled: true,
-    metricsInterval: '30s'
+    frequency: 'reduced'
   });
 }
 
@@ -347,8 +348,8 @@ if (queueActive) {
     { 
       connection: redisClient,
       
-      // Optimized concurrency for Upstash Redis limits
-      concurrency: process.env.NODE_ENV === 'production' ? 10 : 3,  // Higher in production
+      // Optimized concurrency for efficient processing
+      concurrency: 2,  // Balanced concurrency for efficiency
       
       // Performance settings
       autorun: true,              // Start processing jobs automatically
@@ -360,10 +361,10 @@ if (queueActive) {
         maxStalledCount: 1,             // Mark as failed after 1 stall
       },
       
-      // Rate limiting to respect Upstash Redis limits
+      // Balanced rate limiting for steady processing
       limiter: {
-        max: 100,                       // Max 100 jobs processed
-        duration: 60 * 1000,            // Per minute (respects Upstash limits)
+        max: 10,                        // Max 10 jobs processed
+        duration: 60 * 1000,            // Per minute
         bounceBack: false               // Don't bounce back to queue
       }
     }

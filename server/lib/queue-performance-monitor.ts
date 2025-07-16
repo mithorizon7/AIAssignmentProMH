@@ -133,7 +133,7 @@ class QueuePerformanceMonitor {
     // Collect metrics every 30 seconds
     this.metricsInterval = setInterval(async () => {
       await this.updateMetrics();
-    }, 30000);
+    }, 300000); // 5 minutes instead of 30 seconds
 
     // Initial metrics collection
     this.updateMetrics();
