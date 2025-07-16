@@ -353,8 +353,8 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
             )}
           </CardHeader>
           <CardContent className="pt-6">
-            {/* Assignment Description - Only show if it's not just rubric/feedback formatting */}
-            {assignment.description && !assignment.description.includes('<h1>') && assignment.description.length > 10 && (
+            {/* Assignment Description - Always show if there's meaningful content */}
+            {assignment.description && assignment.description.trim().length > 0 && (
               <div className="mb-6">
                 <h3 className="text-lg font-medium mb-2">Assignment Description</h3>
                 <QuillContent 
