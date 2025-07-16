@@ -394,8 +394,8 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
                     <FileUpload
                       onValueChange={(files: File[]) => setFile(files[0] || null)}
                       disabled={submitting}
-                      accept=".py,.java,.cpp,.ipynb,.zip,.js,.ts,.html,.css,.md,.txt"
-                      maxSize={10 * 1024 * 1024} // 10MB
+                      accept=".py,.java,.cpp,.ipynb,.zip,.js,.ts,.html,.css,.md,.txt,.pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.tiff,.mp3,.wav,.mp4,.mov,.avi,.json,.xml,.csv,.xlsx"
+                      maxSize={50 * 1024 * 1024} // 50MB for multimedia files
                     />
                   </TabsContent>
                 </Tabs>

@@ -52,13 +52,13 @@
     ARCHIVE: ['.zip', '.rar', '.tar', '.gz', '.7z'],
 
     // Images
-    IMAGE: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.tiff'],
+    IMAGE: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.tiff', '.tif', '.ico', '.psd', '.raw', '.heic', '.heif'],
 
     // Audio
-    AUDIO: ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a'],
+    AUDIO: ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.wma', '.opus'],
 
     // Video
-    VIDEO: ['.mp4', '.webm', '.avi', '.mov', '.wmv', '.mkv', '.flv'],
+    VIDEO: ['.mp4', '.webm', '.avi', '.mov', '.wmv', '.mkv', '.flv', '.m4v', '.3gp', '.mpg', '.mpeg'],
 
     // All allowed types combined
     ALLOWED: [
@@ -72,26 +72,45 @@
       '.csv', '.xls', '.xlsx', '.ods', '.json', '.xml', '.ipynb',
 
       // Archives
-      '.zip', '.rar', '.tar', '.gz', '.7z'
+      '.zip', '.rar', '.tar', '.gz', '.7z',
 
-      // Image, audio and video files can be enabled by uncommenting the following lines
-      // Uncomment as multimodal capabilities are enabled
-      // Images
-      // '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.tiff',
+      // Images - ALL MAJOR FORMATS
+      '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.tiff', '.tif', '.ico', '.psd', '.raw', '.heic', '.heif',
 
       // Audio
-      // '.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a',
+      '.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.wma', '.opus',
 
       // Video
-      // '.mp4', '.webm', '.avi', '.mov', '.wmv', '.mkv', '.flv',
+      '.mp4', '.webm', '.avi', '.mov', '.wmv', '.mkv', '.flv', '.m4v', '.3gp', '.mpg', '.mpeg',
+
+      // Additional document formats
+      '.pages', '.key', '.numbers', '.epub', '.mobi', '.azw3',
+
+      // Design files
+      '.ai', '.sketch', '.fig', '.xd', '.indd',
+
+      // 3D files
+      '.obj', '.fbx', '.dae', '.blend', '.max', '.ma', '.mb',
+
+      // Presentation files
+      '.ppt', '.pptx', '.odp',
+
+      // Database files
+      '.db', '.sqlite', '.sqlite3', '.mdb',
+
+      // Configuration files
+      '.yml', '.yaml', '.toml', '.ini', '.cfg', '.conf',
+
+      // Log files
+      '.log', '.out', '.err'
     ],
 
     // File size limits based on content type (in bytes)
-    MAX_SIZE: 10 * 1024 * 1024, // 10MB for general files
-    MAX_IMAGE_SIZE: 5 * 1024 * 1024, // 5MB for images
-    MAX_AUDIO_SIZE: 50 * 1024 * 1024, // 50MB for audio files
-    MAX_VIDEO_SIZE: 100 * 1024 * 1024, // 100MB for video files
-    MAX_DOCUMENT_SIZE: 20 * 1024 * 1024, // 20MB for documents
+    MAX_SIZE: 50 * 1024 * 1024, // 50MB for general files
+    MAX_IMAGE_SIZE: 50 * 1024 * 1024, // 50MB for images
+    MAX_AUDIO_SIZE: 100 * 1024 * 1024, // 100MB for audio files
+    MAX_VIDEO_SIZE: 500 * 1024 * 1024, // 500MB for video files
+    MAX_DOCUMENT_SIZE: 100 * 1024 * 1024, // 100MB for documents
   };
 
   export const SUBMISSION_STATUS = {
