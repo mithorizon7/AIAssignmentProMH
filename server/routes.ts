@@ -573,12 +573,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate a unique shareable code
       const shareableCode = generateShareableCode();
 
-      // Create assignment
-      const courseIdNum = courseId ? (typeof courseId === 'string' ? parseInt(courseId) : courseId) : undefined;
+      // Create assignment - if no courseId provided, use the default course
+      let finalCourseId = courseId ? (typeof courseId === 'string' ? parseInt(courseId) : courseId) : undefined;
+      
+      // If no course specified, create or use a default course
+      if (!finalCourseId) {
+        // Try to get or create a default course
+        const courses = await storage.listCourses();
+        if (courses.length === 0) {
+          // Create a default course
+          const defaultCourse = await storage.createCourse({
+            name: "General Assignments",
+            code: "GENERAL",
+            description: "Default course for standalone assignments"
+          });
+          finalCourseId = defaultCourse.id;
+        } else {
+          // Use the first available course
+          finalCourseId = courses[0].id;
+        }
+      }
+      
       const assignment = await storage.createAssignment({
         title,
         description,
-        courseId: courseIdNum,
+        courseId: finalCourseId,
         dueDate: new Date(dueDate),
         status: 'active',
         shareableCode,
