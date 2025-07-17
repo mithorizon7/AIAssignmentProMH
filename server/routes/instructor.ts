@@ -96,45 +96,32 @@ router.get('/assignments/:id/submissions', requireInstructor, asyncHandler(async
       return res.status(404).json({ message: 'Assignment not found' });
     }
     
-    // Get all submissions for the assignment with feedback
-    const submissionsData = await db
-      .select({
-        submission: submissions,
-        userName: users.name,
-        userEmail: users.email
-      })
+    console.log('[PERFORMANCE] Using optimized single-query submissions with feedback for assignment', assignmentId);
+    const startTime = performance.now();
+    
+    // Optimized single query: Get all submissions with feedback using LEFT JOIN (eliminates N+1 pattern)
+    const submissionsWithFeedback = await db
+      .select()
       .from(submissions)
       .innerJoin(users, eq(submissions.userId, users.id))
+      .leftJoin(feedback, eq(submissions.id, feedback.submissionId)) // LEFT JOIN to include submissions without feedback
       .where(eq(submissions.assignmentId, assignmentId))
       .orderBy(desc(submissions.createdAt));
     
-    // Get submission IDs for feedback lookup
-    const submissionIds = submissionsData.map((s: { submission: { id: number } }) => s.submission.id);
-    
-    // Get feedback for all submissions
-    const feedbackItems = submissionIds.length > 0 
-      ? await db
-          .select()
-          .from(feedback)
-          .where(inArray(feedback.submissionId, submissionIds))
-      : [];
-    
-    const feedbackMap = new Map();
-    for (const item of feedbackItems) {
-      feedbackMap.set(item.submissionId, item);
-    }
-    
-    // Get assignment metrics
+    // Get assignment metrics in parallel
     const metrics = await metricsService.getAssignmentMetrics(assignmentId);
     
-    // Combine the data
-    const result = submissionsData.map((item: { submission: Submission; userName: string; userEmail: string }) => ({
-      ...item.submission,
+    const endTime = performance.now();
+    console.log(`[PERFORMANCE] Submissions with feedback query completed in ${(endTime - startTime).toFixed(2)}ms`);
+    
+    // Structure the final response - single pass through data
+    const result = submissionsWithFeedback.map(row => ({
+      ...row.submissions, // Spread all properties from the submission
       student: {
-        name: item.userName,
-        email: item.userEmail
+        name: row.users.name,
+        email: row.users.email
       },
-      feedback: feedbackMap.get(item.submission.id) || null
+      feedback: row.feedback || null // The feedback object will be present or null
     }));
     
     res.json({
