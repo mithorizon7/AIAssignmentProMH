@@ -40,8 +40,8 @@ export function FeedbackCard({ feedback, expanded = true, onToggle }: FeedbackCa
   
   // Function to convert numeric criteriaId to a readable display name
   const getCriterionDisplayName = (criteriaId: string | number | undefined): string => {
-    // Handle undefined or null case
-    if (!criteriaId) return "Unknown Criterion";
+    // Handle undefined, null, or zero case properly
+    if (criteriaId === undefined || criteriaId === null) return "Unknown Criterion";
     
     // Convert to string to ensure we can use string methods
     const criteriaIdStr = String(criteriaId);

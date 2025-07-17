@@ -278,7 +278,7 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                           </div>
                           
                           {/* Feedback Section */}
-                          {submission.feedback && submission.feedback.summary ? (
+                          {submission.feedback && submission.feedback.summary && submission.feedback.summary.trim() ? (
                             <div className="mb-4">
                               <div className="flex items-center justify-between mb-3">
                                 <h4 className="font-medium text-neutral-800 flex items-center">
