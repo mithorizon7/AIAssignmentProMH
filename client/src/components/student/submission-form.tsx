@@ -264,7 +264,7 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
           <Tabs defaultValue="file" onValueChange={(value) => setSubmissionType(value as 'file' | 'text')}>
             <TabsList className="mb-6 border-b border-neutral-200">
               <TabsTrigger value="file">Upload File</TabsTrigger>
-              <TabsTrigger value="text">Enter Content</TabsTrigger>
+              <TabsTrigger value="text">Paste Content</TabsTrigger>
             </TabsList>
             
             <TabsContent value="file" className="file-upload-area">

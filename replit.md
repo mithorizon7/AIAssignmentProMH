@@ -534,6 +534,7 @@ AIGrader is an enterprise-grade AI-powered assignment feedback platform that enh
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+UI preferences: Use "Paste Content" instead of "Enter Content" for text submission tabs.
 
 ## System Architecture
 
