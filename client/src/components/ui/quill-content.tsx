@@ -12,7 +12,7 @@ export function QuillContent({ content, className = "" }: QuillContentProps) {
   
   return (
     <div 
-      className={`prose prose-sm max-w-none ${className}`}
+      className={`prose prose-sm max-w-none prose-gray dark:prose-invert prose-headings:font-semibold prose-headings:text-foreground prose-p:text-muted-foreground prose-p:leading-relaxed prose-strong:text-foreground prose-strong:font-medium prose-em:text-muted-foreground prose-em:italic prose-ul:text-muted-foreground prose-ol:text-muted-foreground prose-li:text-muted-foreground prose-li:leading-relaxed ${className}`}
       dangerouslySetInnerHTML={{ __html: sanitizedContent }}
     />
   );

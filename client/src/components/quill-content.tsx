@@ -19,8 +19,9 @@ const QuillContent: React.FC<QuillContentProps> = ({
   // Sanitize HTML content to prevent XSS attacks
   const sanitizedContent = DOMPurify.sanitize(content);
   
-  // Check if content contains HTML tags (is rich text)
-  const isHtmlContent = /<[a-z][\s\S]*>/i.test(content);
+  // Check if content contains meaningful HTML tags (not just wrapped paragraphs)
+  // Always treat content as HTML for consistent rendering
+  const isHtmlContent = true;
   
   return (
     <div 

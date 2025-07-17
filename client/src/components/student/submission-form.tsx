@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Calendar, Clock, RefreshCw, Loader2, Upload, AlertCircle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { QuillContent } from "@/components/quill-content";
 
 interface SubmissionFormProps {
   assignment: Assignment;
@@ -210,7 +211,9 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
     <Card className="overflow-hidden">
       <CardHeader className="border-b border-neutral-200">
         <CardTitle className="text-xl">{assignment.title}</CardTitle>
-        <CardDescription>{assignment.description}</CardDescription>
+        <div className="text-muted-foreground">
+          <QuillContent content={assignment.description} />
+        </div>
         
         <div className="flex flex-wrap gap-4 text-sm mt-4">
           <div className="flex items-center gap-1.5 px-2 py-1 bg-neutral-50 rounded-md">
