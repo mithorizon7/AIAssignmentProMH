@@ -400,42 +400,50 @@ export class BatchOperationsService {
     studentIds: number[],
     assignmentIds: number[]
   ): Promise<Map<string, number | null>> {
-    // ✅ LOGIC FIX: Use ROW_NUMBER() window function to get ONLY the latest submission per student-assignment pair
-    console.log(`[PERFORMANCE] Using ROW_NUMBER() window function to correctly isolate latest submissions for grade export`);
+    // ✅ LOGIC FIX: Get latest submission per student-assignment pair using optimized approach
+    console.log(`[PERFORMANCE] Using optimized query to correctly isolate latest submissions for grade export`);
     
-    const latestSubmissionsWithScores = await db.execute(sql`
-      WITH latest_submissions AS (
-        SELECT 
-          s.id as submission_id,
-          s.user_id,
-          s.assignment_id,
-          f.score,
-          ROW_NUMBER() OVER (
-            PARTITION BY s.user_id, s.assignment_id 
-            ORDER BY s.created_at DESC
-          ) as rn
-        FROM submissions s
-        LEFT JOIN feedback f ON s.id = f.submission_id
-        WHERE s.user_id = ANY(${studentIds})
-          AND s.assignment_id = ANY(${assignmentIds})
-          AND s.status = 'completed'
-      )
-      SELECT 
-        submission_id,
-        user_id,
-        assignment_id,
-        score
-      FROM latest_submissions
-      WHERE rn = 1
-    `);
+    // Get all completed submissions for the specified students and assignments
+    const allSubmissions = await db
+      .select({
+        id: submissions.id,
+        userId: submissions.userId,
+        assignmentId: submissions.assignmentId,
+        createdAt: submissions.createdAt,
+        score: feedback.score
+      })
+      .from(submissions)
+      .leftJoin(feedback, eq(submissions.id, feedback.submissionId))
+      .where(and(
+        inArray(submissions.userId, studentIds),
+        inArray(submissions.assignmentId, assignmentIds),
+        eq(submissions.status, 'completed')
+      ))
+      .orderBy(submissions.createdAt);
+    
+    // Group submissions by student-assignment pair and keep only the latest
+    const latestSubmissionsMap = new Map<string, { id: number; score: number | null; createdAt: Date }>();
+    
+    for (const submission of allSubmissions) {
+      const key = `${submission.userId}-${submission.assignmentId}`;
+      const existing = latestSubmissionsMap.get(key);
+      
+      // Keep the submission with the latest createdAt timestamp
+      if (!existing || submission.createdAt > existing.createdAt) {
+        latestSubmissionsMap.set(key, {
+          id: submission.id,
+          score: submission.score,
+          createdAt: submission.createdAt
+        });
+      }
+    }
     
     // Create a map of student-assignment to score
     const result = new Map<string, number | null>();
     
     // Process each latest submission
-    for (const row of latestSubmissionsWithScores.rows as any[]) {
-      const key = `${row.user_id}-${row.assignment_id}`;
-      const score = row.score === null ? null : Number(row.score);
+    for (const [key, submission] of latestSubmissionsMap.entries()) {
+      const score = submission.score === null ? null : Number(submission.score);
       result.set(key, score);
     }
     

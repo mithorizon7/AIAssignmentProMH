@@ -51,15 +51,13 @@ export class StorageService {
         console.log(`[StorageService] Uploading submission file to GCS`);
         const gcsPath = `submissions/${userId}/${assignmentId}/${timestamp}/${safeFileName}`;
         
-        // Handle both disk storage and memory storage for compatibility
-        if (file.buffer) {
-          // Memory storage (legacy)
-          return await uploadBuffer(file.buffer, gcsPath, file.mimetype);
-        } else if (file.path) {
-          // Disk storage (current implementation) 
+        // ✅ MEMORY OPTIMIZATION: Use disk-based processing only
+        if (file.path) {
+          // Disk storage (optimized implementation for memory efficiency)
+          console.log(`[STORAGE] Using disk-based file processing for memory optimization: ${file.path}`);
           return await uploadFile(file.path, gcsPath, file.mimetype);
         } else {
-          throw new Error('No file buffer or path available');
+          throw new Error('File path not available - disk storage required for memory optimization');
         }
       } else {
         console.warn('[StorageService] GCS not configured, storing file locally for development');
@@ -74,15 +72,13 @@ export class StorageService {
         // Create full path for the temporary file
         const tempFilePath = path.join(tempDir, `${Date.now()}-${safeFileName}`);
         
-        // Handle both disk and memory storage
-        if (file.buffer) {
-          // Memory storage (legacy)
-          fs.writeFileSync(tempFilePath, file.buffer);
-        } else if (file.path) {
-          // Disk storage - copy file to temp location
+        // ✅ MEMORY OPTIMIZATION: Use disk-based processing only
+        if (file.path) {
+          // Disk storage - copy file to temp location for memory efficiency
+          console.log(`[STORAGE] Using disk-based file copying for memory optimization: ${file.path} -> ${tempFilePath}`);
           fs.copyFileSync(file.path, tempFilePath);
         } else {
-          throw new Error('No file buffer or path available');
+          throw new Error('File path not available - disk storage required for memory optimization');
         }
         
         console.log(`[StorageService] File stored temporarily at: ${tempFilePath}`);
@@ -119,15 +115,13 @@ export class StorageService {
         const safeEmail = email.replace('@', '-at-').replace(/[^\w-]/g, '_');
         const gcsPath = `anonymous-submissions/${assignmentId}/${safeEmail}/${timestamp}/${safeFileName}`;
         
-        // Handle both disk storage and memory storage for compatibility
-        if (file.buffer) {
-          // Memory storage (legacy)
-          return await uploadBuffer(file.buffer, gcsPath, file.mimetype);
-        } else if (file.path) {
-          // Disk storage (current implementation)
+        // ✅ MEMORY OPTIMIZATION: Use disk-based processing only
+        if (file.path) {
+          // Disk storage (optimized implementation for memory efficiency)
+          console.log(`[STORAGE] Using disk-based file processing for anonymous submission: ${file.path}`);
           return await uploadFile(file.path, gcsPath, file.mimetype);
         } else {
-          throw new Error('No file buffer or path available');
+          throw new Error('File path not available - disk storage required for memory optimization');
         }
       } else {
         console.warn('[StorageService] GCS not configured, storing anonymous file locally for development');
@@ -142,15 +136,13 @@ export class StorageService {
         // Create full path for the temporary file
         const tempFilePath = path.join(tempDir, `${Date.now()}-${safeFileName}`);
         
-        // Handle both disk and memory storage for anonymous submissions
-        if (file.buffer) {
-          // Memory storage (legacy)
-          fs.writeFileSync(tempFilePath, file.buffer);
-        } else if (file.path) {
-          // Disk storage - copy file to temp location
+        // ✅ MEMORY OPTIMIZATION: Use disk-based processing only
+        if (file.path) {
+          // Disk storage - copy file to temp location for memory efficiency
+          console.log(`[STORAGE] Using disk-based file copying for anonymous submission: ${file.path} -> ${tempFilePath}`);
           fs.copyFileSync(file.path, tempFilePath);
         } else {
-          throw new Error('No file buffer or path available');
+          throw new Error('File path not available - disk storage required for memory optimization');
         }
         
         console.log(`[StorageService] Anonymous submission file stored temporarily at: ${tempFilePath}`);
