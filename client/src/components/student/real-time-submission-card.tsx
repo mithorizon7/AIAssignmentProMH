@@ -60,13 +60,11 @@ export function RealTimeSubmissionCard({
     }
   }, [isCompleted, hasFeedback, isLatest]);
 
-  // Handle feedback completion
+  // Handle feedback completion - only celebrate for most recent submission
   useEffect(() => {
-    if (isCompleted && hasFeedback && !justCompleted) {
+    if (isCompleted && hasFeedback && !justCompleted && isLatest) {
       setJustCompleted(true);
-      if (isLatest) {
-        setShowFeedback(true);
-      }
+      setShowFeedback(true);
       onFeedbackReady?.();
       
       // Reset the "just completed" state after animation
@@ -79,7 +77,7 @@ export function RealTimeSubmissionCard({
     <Card className={cn(
       "relative transition-all duration-300",
       isLatest && "ring-2 ring-primary/20 border-primary/30",
-      justCompleted && "ring-2 ring-green-400 shadow-lg scale-[1.02]"
+      justCompleted && isLatest && "ring-2 ring-green-400 shadow-lg scale-[1.02]"
     )}>
       {/* Latest submission indicator */}
       {isLatest && (
@@ -90,8 +88,8 @@ export function RealTimeSubmissionCard({
         </div>
       )}
 
-      {/* Just completed celebration */}
-      {justCompleted && (
+      {/* Just completed celebration - only for most recent submission */}
+      {justCompleted && isLatest && (
         <div className="absolute -top-2 -right-2 z-10 animate-bounce">
           <div className="bg-green-500 text-white rounded-full p-2 shadow-lg">
             <Sparkles className="h-4 w-4" />
