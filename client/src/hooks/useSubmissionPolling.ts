@@ -23,11 +23,11 @@ export function useSubmissionPolling(userId: number, options: UseSubmissionPolli
   }, [onFeedbackReady]);
 
   // Main submissions query with conditional polling
-  const { data: submissions = [], isLoading } = useQuery({
+  const { data: submissions = [], isLoading } = useQuery<SubmissionWithFeedback[]>({
     queryKey: ['/api/submissions'],
     enabled: enabled && !!userId,
     refetchInterval: (data) => {
-      if (!data) return false;
+      if (!data || !Array.isArray(data)) return false;
       
       // Check if any submissions are in processing status
       const hasProcessing = data.some((submission: SubmissionWithFeedback) => 
@@ -42,7 +42,7 @@ export function useSubmissionPolling(userId: number, options: UseSubmissionPolli
 
   // Track feedback completion and trigger callbacks
   useEffect(() => {
-    if (!submissions.length) return;
+    if (!Array.isArray(submissions) || !submissions.length) return;
 
     submissions.forEach((submission: SubmissionWithFeedback) => {
       const wasProcessing = processingSubmissionsRef.current.has(submission.id);
@@ -64,9 +64,11 @@ export function useSubmissionPolling(userId: number, options: UseSubmissionPolli
   }, [submissions]);
 
   // Get processing submissions for UI indicators
-  const processingSubmissions = submissions.filter((s: SubmissionWithFeedback) => 
-    s.status === 'processing' || s.status === 'pending'
-  );
+  const processingSubmissions = Array.isArray(submissions) 
+    ? submissions.filter((s: SubmissionWithFeedback) => 
+        s.status === 'processing' || s.status === 'pending'
+      )
+    : [];
 
   // Manual refresh function
   const refreshSubmissions = () => {

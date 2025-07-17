@@ -35,11 +35,11 @@ export function AssignmentTable({ assignments, loading = false, onExportCsv }: A
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'active':
-        return 'success';
+        return 'default';
       case 'completed':
         return 'secondary';
-      case 'reviewing':
-        return 'info';
+      case 'upcoming':
+        return 'outline';
       default:
         return 'outline';
     }

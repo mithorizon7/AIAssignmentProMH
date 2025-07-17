@@ -242,7 +242,7 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                           <div className="mb-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center">
-                                {submission.fileName && getSubmissionFileIcon(submission.mimeType || '', submission.fileName)}
+                                {submission.fileName && getSubmissionFileIcon(submission.fileType || '', submission.fileName)}
                                 <span className="text-sm font-medium text-neutral-700">
                                   {submission.fileName || 'Text Submission'}
                                 </span>
@@ -322,7 +322,6 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                                 {expandedFeedbacks[submission.id] && (
                                   <FeedbackCard 
                                     feedback={submission.feedback}
-                                    className="mt-3"
                                   />
                                 )}
                               </div>

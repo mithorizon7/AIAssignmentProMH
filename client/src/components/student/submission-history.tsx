@@ -78,29 +78,6 @@ export function SubmissionHistory({
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Use real-time polling if we have a user ID, otherwise use passed submissions
-  const shouldPoll = !!user?.id && !isAssignmentSpecific;
-  const { 
-    submissions: polledSubmissions, 
-    isLoading: pollingLoading,
-    hasProcessingSubmissions,
-    refreshSubmissions
-  } = useSubmissionPolling(user?.id || 0, {
-    enabled: shouldPoll,
-    onFeedbackReady: handleFeedbackReady
-  });
-  
-  // Use polled submissions if available, otherwise use passed submissions
-  const submissions = shouldPoll ? polledSubmissions : passedSubmissions;
-  const isLoading = shouldPoll ? pollingLoading : loading;
-  
-  const toggleFeedback = (submissionId: number) => {
-    setExpandedFeedbacks(prev => ({
-      ...prev,
-      [submissionId]: !prev[submissionId]
-    }));
-  };
-
   // Handle feedback ready notification
   const handleFeedbackReady = useCallback((submission: SubmissionWithFeedback) => {
     // Show toast notification
@@ -140,6 +117,29 @@ export function SubmissionHistory({
       });
     }
   }, [toast]);
+
+  // Use real-time polling if we have a user ID, otherwise use passed submissions
+  const shouldPoll = !!user?.id && !isAssignmentSpecific;
+  const { 
+    submissions: polledSubmissions, 
+    isLoading: pollingLoading,
+    hasProcessingSubmissions,
+    refreshSubmissions
+  } = useSubmissionPolling(user?.id || 0, {
+    enabled: shouldPoll,
+    onFeedbackReady: handleFeedbackReady
+  });
+  
+  // Use polled submissions if available, otherwise use passed submissions
+  const submissions = shouldPoll ? polledSubmissions : (passedSubmissions || []);
+  const isLoading = shouldPoll ? pollingLoading : loading;
+  
+  const toggleFeedback = (submissionId: number) => {
+    setExpandedFeedbacks(prev => ({
+      ...prev,
+      [submissionId]: !prev[submissionId]
+    }));
+  };
   
   if (isLoading) {
     return (
@@ -266,11 +266,11 @@ export function SubmissionHistory({
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {submissions.map((submission, index) => (
+        {Array.isArray(submissions) && submissions.map((submission: SubmissionWithFeedback, index: number) => (
           <div 
             key={submission.id}
             id={`submission-${submission.id}`}
-            className={`${index < submissions.length - 1 ? 'border-b border-neutral-200 pb-4' : ''}`}
+            className={`${index < (Array.isArray(submissions) ? submissions.length : 0) - 1 ? 'border-b border-neutral-200 pb-4' : ''}`}
           >
             <RealTimeSubmissionCard 
               submission={submission}

@@ -129,7 +129,7 @@ export default function DataProtection() {
       if (requestsFilter.type) params.append('type', requestsFilter.type);
       params.append('page', requestsFilter.page.toString());
       
-      return apiRequest(`/api/data-protection/requests?${params}`);
+      return apiRequest('GET', `/api/data-protection/requests?${params}`);
     },
   });
 
@@ -140,10 +140,7 @@ export default function DataProtection() {
       action: 'approve' | 'reject' | 'verify'; 
       notes: string; 
     }) => {
-      return apiRequest(`/api/data-protection/requests/${requestId}/process`, {
-        method: 'POST',
-        body: JSON.stringify({ action, adminNotes: notes }),
-      });
+      return apiRequest('POST', `/api/data-protection/requests/${requestId}/process`, { action, adminNotes: notes });
     },
     onSuccess: () => {
       toast({
@@ -168,7 +165,7 @@ export default function DataProtection() {
   // Export user data mutation
   const exportUserMutation = useMutation({
     mutationFn: async (userId: number) => {
-      return apiRequest(`/api/data-protection/users/${userId}/export`);
+      return apiRequest('GET', `/api/data-protection/users/${userId}/export`);
     },
     onSuccess: (data) => {
       // Create downloadable JSON file
@@ -176,7 +173,7 @@ export default function DataProtection() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `user-data-export-${data.user_info.id}-${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `user-data-export-${(data as any).user_info?.id || 'unknown'}-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -192,10 +189,7 @@ export default function DataProtection() {
   // Anonymize user mutation
   const anonymizeUserMutation = useMutation({
     mutationFn: async (userId: number) => {
-      return apiRequest(`/api/data-protection/users/${userId}/anonymize`, {
-        method: 'POST',
-        body: JSON.stringify({}),
-      });
+      return apiRequest('POST', `/api/data-protection/users/${userId}/anonymize`, {});
     },
     onSuccess: () => {
       toast({
@@ -209,8 +203,7 @@ export default function DataProtection() {
   // Delete user data mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: number) => {
-      return apiRequest(`/api/data-protection/users/${userId}/data`, {
-        method: 'DELETE',
+      return apiRequest('DELETE', `/api/data-protection/users/${userId}/data`, {
         body: JSON.stringify({ confirmDelete: true }),
       });
     },

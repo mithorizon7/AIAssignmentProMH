@@ -94,7 +94,7 @@ export function RealTimeSubmissionCard({
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3">
-            {getFileIcon(submission.fileName, submission.mimeType)}
+            {getFileIcon(submission.fileName, submission.fileType)}
             <div>
               <h3 className="font-medium text-neutral-900">
                 {submission.fileName || 'Code Submission'}
@@ -166,7 +166,7 @@ export function RealTimeSubmissionCard({
                 <span className="text-sm font-medium text-green-900">
                   Feedback Ready
                 </span>
-                {submission.feedback.score !== null && (
+                {submission.feedback?.score !== null && submission.feedback?.score !== undefined && (
                   <Badge variant="outline" className="bg-white">
                     {submission.feedback.score}%
                   </Badge>
@@ -188,7 +188,7 @@ export function RealTimeSubmissionCard({
             </div>
 
             {/* Detailed feedback */}
-            {showFeedback && (
+            {showFeedback && submission.feedback && (
               <div className="animate-in slide-in-from-top-2 duration-300">
                 <FeedbackCard feedback={submission.feedback} />
               </div>

@@ -4,7 +4,7 @@ import { APP_ROUTES, API_ROUTES } from './constants';
 import { User } from './types';
 import { apiRequest } from './queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { SafeStorage, STORAGE_KEYS } from './safe-storage';
+import { SafeStorage, EXTENDED_STORAGE_KEYS } from './safe-storage';
 
 // Simple logger for client-side logging
 const logger = {
@@ -44,16 +44,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleSSOLogoutRedirect = () => {
       try {
         // Check for Auth0 logout redirect
-        if (SafeStorage.getItem(STORAGE_KEYS.AUTH0_LOGOUT_REDIRECT) === 'true') {
+        if (SafeStorage.getItem(EXTENDED_STORAGE_KEYS.AUTH0_LOGOUT_REDIRECT) === 'true') {
           logger.info('Processing Auth0 logout redirect');
-          SafeStorage.removeItem(STORAGE_KEYS.AUTH0_LOGOUT_REDIRECT);
+          SafeStorage.removeItem(EXTENDED_STORAGE_KEYS.AUTH0_LOGOUT_REDIRECT);
           navigate(APP_ROUTES.LOGIN);
         }
         
         // Check for MIT Horizon OIDC logout redirect
-        if (SafeStorage.getItem(STORAGE_KEYS.HORIZON_LOGOUT_REDIRECT) === 'true') {
+        if (SafeStorage.getItem(EXTENDED_STORAGE_KEYS.HORIZON_LOGOUT_REDIRECT) === 'true') {
           logger.info('Processing MIT Horizon logout redirect');
-          SafeStorage.removeItem(STORAGE_KEYS.HORIZON_LOGOUT_REDIRECT);
+          SafeStorage.removeItem(EXTENDED_STORAGE_KEYS.HORIZON_LOGOUT_REDIRECT);
           navigate(APP_ROUTES.LOGIN);
         }
       } catch (error) {
@@ -158,13 +158,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (isMitHorizonRedirect) {
           logger.info('Setting MIT Horizon logout redirect flag');
-          safeStorage.setItem(STORAGE_KEYS.HORIZON_LOGOUT_REDIRECT, 'true');
+          SafeStorage.setItem(EXTENDED_STORAGE_KEYS.HORIZON_LOGOUT_REDIRECT, 'true');
         } else if (isAuth0Redirect) {
           logger.info('Setting Auth0 logout redirect flag');
-          safeStorage.setItem(STORAGE_KEYS.AUTH0_LOGOUT_REDIRECT, 'true');
+          SafeStorage.setItem(EXTENDED_STORAGE_KEYS.AUTH0_LOGOUT_REDIRECT, 'true');
         } else {
           logger.info('Setting generic SSO logout redirect flag');
-          safeStorage.setItem(STORAGE_KEYS.AUTH0_LOGOUT_REDIRECT, 'true');
+          SafeStorage.setItem(EXTENDED_STORAGE_KEYS.AUTH0_LOGOUT_REDIRECT, 'true');
         }
         
         // Use window.location for full page redirect to SSO provider

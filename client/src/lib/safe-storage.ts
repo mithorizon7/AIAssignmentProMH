@@ -13,7 +13,15 @@ export const STORAGE_KEYS = {
   FORM_DRAFT: 'formDraft'
 } as const;
 
+// Add the missing logout redirect storage keys
+export const EXTENDED_STORAGE_KEYS = {
+  ...STORAGE_KEYS,
+  AUTH0_LOGOUT_REDIRECT: 'auth0LogoutRedirect',
+  HORIZON_LOGOUT_REDIRECT: 'horizonLogoutRedirect'
+} as const;
+
 export type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];
+export type ExtendedStorageKey = typeof EXTENDED_STORAGE_KEYS[keyof typeof EXTENDED_STORAGE_KEYS];
 
 /**
  * Safe localStorage operations with error handling
@@ -42,7 +50,7 @@ export class SafeStorage {
   /**
    * Safely get item from storage
    */
-  static getItem(key: StorageKey, useSession = false): string | null {
+  static getItem(key: StorageKey | ExtendedStorageKey, useSession = false): string | null {
     try {
       const storage = this.getStorage(useSession);
       return storage?.getItem(key) ?? null;
@@ -55,7 +63,7 @@ export class SafeStorage {
   /**
    * Safely set item in storage
    */
-  static setItem(key: StorageKey, value: string, useSession = false): boolean {
+  static setItem(key: StorageKey | ExtendedStorageKey, value: string, useSession = false): boolean {
     try {
       const storage = this.getStorage(useSession);
       if (!storage) return false;
@@ -71,7 +79,7 @@ export class SafeStorage {
   /**
    * Safely remove item from storage
    */
-  static removeItem(key: StorageKey, useSession = false): boolean {
+  static removeItem(key: StorageKey | ExtendedStorageKey, useSession = false): boolean {
     try {
       const storage = this.getStorage(useSession);
       if (!storage) return false;
@@ -103,7 +111,7 @@ export class SafeStorage {
   /**
    * Safely get JSON object from storage
    */
-  static getJSON<T>(key: StorageKey, useSession = false): T | null {
+  static getJSON<T>(key: StorageKey | ExtendedStorageKey, useSession = false): T | null {
     try {
       const item = this.getItem(key, useSession);
       if (!item) return null;
@@ -120,7 +128,7 @@ export class SafeStorage {
   /**
    * Safely set JSON object in storage
    */
-  static setJSON<T>(key: StorageKey, value: T, useSession = false): boolean {
+  static setJSON<T>(key: StorageKey | ExtendedStorageKey, value: T, useSession = false): boolean {
     try {
       const serialized = JSON.stringify(value);
       return this.setItem(key, serialized, useSession);

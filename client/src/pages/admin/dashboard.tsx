@@ -142,7 +142,7 @@ export default function AdminDashboard() {
                   </Card>
                 ))
               ) : stats ? (
-                stats.map((stat, i) => (
+                stats.map((stat: any, i: number) => (
                 <Card key={i}>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">
@@ -266,7 +266,7 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {alerts.map((alert) => (
+                    {alerts.map((alert: any) => (
                       <div
                         key={alert.id}
                         className="flex items-start space-x-4 rounded-md border p-4"
