@@ -46,7 +46,7 @@ export function SubmissionForm({ assignment, onSubmissionComplete }: SubmissionF
       if (submissionType === 'file' && file) {
         formData.append('file', file);
       } else if (submissionType === 'text') {
-        formData.append('code', code);
+        formData.append('content', code);
       }
       
       if (notes) {

@@ -168,7 +168,9 @@ AIGrader is an enterprise-grade AI-powered assignment feedback platform that enh
 - ✅ **Error Response Bug**: Fixed allowedTypes display showing raw object instead of readable MIME types
 - ✅ **Function Call Bug**: Fixed isFileTypeAllowed parameter order (extension,contentType → mimeType,filename)
 - ✅ **Text Submission Bug**: Added "text" to submission type enum and implemented proper text handling logic
+- ✅ **Frontend-Backend Field Mismatch**: Fixed critical field name inconsistency where frontend sent 'code' but server expected 'content' for text submissions
 - ✅ **Validation Schema Enhancement**: Added content field validation for text submissions in both authenticated and anonymous endpoints
+- ✅ **Frontend Components Fixed**: Updated both submit.tsx and submission-form.tsx to send correct 'content' field
 - ✅ **Comprehensive Testing**: Validated all file types work correctly: images, documents, audio, video, text files
 - ✅ **All Endpoints Fixed**: Standard submissions, anonymous submissions, and test-rubric endpoints all use consistent validation
 - ✅ **Production Validation**: Server running optimally with all submission types fully functional

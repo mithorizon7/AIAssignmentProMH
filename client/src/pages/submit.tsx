@@ -185,6 +185,7 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
       
       if (notes) formData.append('notes', notes);
       if (submitType === 'code') formData.append('code', codeContent);
+      if (submitType === 'text') formData.append('content', codeContent);
       if (submitType === 'file' && file) formData.append('file', file);
       
       // Determine which endpoint to use based on authentication status
