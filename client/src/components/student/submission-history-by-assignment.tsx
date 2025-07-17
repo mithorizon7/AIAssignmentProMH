@@ -278,7 +278,7 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                           </div>
                           
                           {/* Feedback Section */}
-                          {submission.feedback ? (
+                          {submission.feedback && submission.feedback.summary ? (
                             <div className="mb-4">
                               <div className="flex items-center justify-between mb-3">
                                 <h4 className="font-medium text-neutral-800 flex items-center">
@@ -326,12 +326,30 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                                 )}
                               </div>
                             </div>
-                          ) : (
+                          ) : submission.status === 'completed' && submission.feedback ? (
+                            <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                              <div className="flex items-center">
+                                <CheckCircle className="h-4 w-4 mr-3 text-blue-600" />
+                                <p className="text-sm text-blue-700">
+                                  <strong>Feedback completed.</strong> View details below or click "View Full Details" for the complete analysis.
+                                </p>
+                              </div>
+                            </div>
+                          ) : submission.status === 'processing' || submission.status === 'pending' ? (
                             <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200">
                               <div className="flex items-center">
                                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-amber-600 border-t-transparent mr-3"></div>
                                 <p className="text-sm text-amber-700">
                                   <strong>Feedback is being generated.</strong> Please check back shortly.
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mb-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+                              <div className="flex items-center">
+                                <Clock className="h-4 w-4 mr-3 text-gray-600" />
+                                <p className="text-sm text-gray-700">
+                                  <strong>Feedback processing status unknown.</strong> Try refreshing the page.
                                 </p>
                               </div>
                             </div>
