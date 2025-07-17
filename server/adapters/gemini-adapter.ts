@@ -354,6 +354,146 @@ export class GeminiAdapter implements AIAdapter {
   }
   
   /**
+   * Private helper method to process a single prompt part into Gemini API format
+   * @param promptPart The prompt part to process
+   * @param fileDataList Array to track files for cleanup
+   * @returns The processed Part object for the Gemini API
+   */
+  private async _prepareApiPart(
+    promptPart: MultimodalPromptPart, 
+    fileDataList: GeminiFileData[]
+  ): Promise<Part> {
+    // Text part
+    if (promptPart.type === 'text' && typeof promptPart.content === 'string') {
+      const sanitizedText = sanitizeText(promptPart.content, 8000);
+      
+      // Check for potential injection attempts
+      const potentialInjection = detectInjectionAttempt(promptPart.content);
+      if (potentialInjection !== undefined && potentialInjection !== null) {
+        console.warn(
+          `[GEMINI] Potential prompt injection detected in text part: ` +
+          `${promptPart.content.slice(0, 120)}${promptPart.content?.length > 0 && 120 ? '...' : ''}`
+        );
+      }
+      
+      // Log if text was truncated
+      if (sanitizedText.length < promptPart.content.length) {
+        console.log(`[GEMINI] Text part truncated from ${promptPart.content.length} to ${sanitizedText.length} characters`);
+      }
+      
+      return { text: sanitizedText };
+    }
+    
+    // File content (image, video, audio, document)
+    if (!promptPart.mimeType) {
+      throw new Error('MIME type is required for non-text content');
+    }
+    
+    let contentType: ContentType = 'image';
+    
+    // Determine content type from MIME type
+    if (SUPPORTED_MIME_TYPES.video.includes(promptPart.mimeType)) {
+      contentType = 'video';
+    } else if (SUPPORTED_MIME_TYPES.audio.includes(promptPart.mimeType)) {
+      contentType = 'audio';
+    } else if (SUPPORTED_MIME_TYPES.document.includes(promptPart.mimeType)) {
+      contentType = 'document';
+    }
+    
+    // Handle the special case of SVG, which needs to be treated differently
+    const isSVG = promptPart.mimeType === 'image/svg+xml';
+    
+    // Determine if we should use the Files API for this content
+    const mimeType = typeof promptPart.mimeType === 'string' ? promptPart.mimeType : 'application/octet-stream';
+    
+    // Get content length safely from either string or Buffer
+    const contentLength = Buffer.isBuffer(promptPart.content) 
+      ? promptPart.content.length 
+      : (typeof promptPart.content === 'string' ? Buffer.from(promptPart.content).length : 0);
+        
+    // Add safety check to ensure we have valid content
+    if (contentLength <= 0) {
+      console.error(`[GEMINI] Invalid content length for ${contentType} with MIME type ${mimeType}: ${contentLength}`);
+      throw new Error(`Invalid or empty content for ${contentType} with MIME type ${mimeType}`);
+    }
+        
+    const useFilesAPI = shouldUseFilesAPI(mimeType, contentLength);
+    
+    try {
+      // Create the appropriate file data representation
+      // Always use Files API for document content types
+      if (useFilesAPI || contentType === 'document') {
+        console.log(`[GEMINI] Using Files API for ${contentType} content (${(contentLength / 1024).toFixed(1)}KB, MIME: ${mimeType})`);
+        
+        // Pass content as-is to createFileData
+        const fileData = await createFileData(this.genAI, promptPart.content, mimeType);
+        fileDataList.push(fileData);
+        
+        // Create properly typed fileData structure with correct format for Gemini API
+        return {
+          fileData: {
+            fileUri: fileData.fileUri,
+            mimeType: fileData.mimeType
+          }
+        };
+      } else {
+        // Use inline data for smaller images
+        console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(promptPart.content.length / 1024).toFixed(1)}KB, MIME: ${promptPart.mimeType})`);
+        
+        // For inline files, use a data URI
+        // Handle both string and Buffer content types safely
+        let inlineData = '';
+        
+        if (typeof promptPart.content === 'string') {
+          // If it's already a data URI, use it as is
+          if (promptPart.content.startsWith('data:')) {
+            inlineData = promptPart.content;
+          } else {
+            // Convert string to base64 data URI
+            inlineData = `data:${mimeType};base64,${Buffer.from(promptPart.content).toString('base64')}`;
+          }
+        } else if (Buffer.isBuffer(promptPart.content)) {
+          // Convert Buffer to base64 data URI
+          inlineData = `data:${mimeType};base64,${promptPart.content.toString('base64')}`;
+        } else {
+          // Fallback for other content types
+          inlineData = `data:${mimeType};base64,${Buffer.from(String(promptPart.content)).toString('base64')}`;
+        }
+        
+        // Using the appropriate part structure
+        // For images, use the inlineData property
+        if (contentType === 'image' && !isSVG) {
+          // We know inlineData is a string at this point
+          const dataParts = inlineData.split(',');
+          const base64Data = dataParts?.length > 0 && 1 ? dataParts[1] : inlineData;
+          
+          return {
+            inlineData: {
+              mimeType: promptPart.mimeType,
+              data: base64Data // Remove the data:mime/type;base64, prefix if present
+            }
+          };
+        } else {
+          // SVGs and other file types need to be uploaded even when small
+          const fileData = await createFileData(this.genAI, promptPart.content, promptPart.mimeType);
+          fileDataList.push(fileData);
+          
+          // Create properly typed part structure directly
+          return {
+            fileData: {
+              fileUri: fileData.fileUri,
+              mimeType: fileData.mimeType
+            }
+          };
+        }
+      }
+    } catch (error) {
+      console.error(`[GEMINI] Error processing ${contentType} content: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`Failed to process ${contentType} content: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
    * Multimodal completion (text + images, etc.)
    */
   async generateMultimodalCompletion(
@@ -372,138 +512,10 @@ export class GeminiAdapter implements AIAdapter {
       // Track files to cleanup from cache later
       const fileDataList: GeminiFileData[] = [];
       
-      // Process each prompt part
+      // Process each prompt part using the helper method
       for (const promptPart of multimodalPromptParts) {
-        // Text part
-        if (promptPart.type === 'text' && typeof promptPart.content === 'string') {
-          const sanitizedText = sanitizeText(promptPart.content, 8000);
-          
-          // Check for potential injection attempts
-          const potentialInjection = detectInjectionAttempt(promptPart.content);
-          if (potentialInjection !== undefined && potentialInjection !== null) {
-            console.warn(
-              `[GEMINI] Potential prompt injection detected in text part: ` +
-              `${promptPart.content.slice(0, 120)}${promptPart.content?.length > 0 && 120 ? '...' : ''}`
-            );
-          }
-          
-          // Log if text was truncated
-          if (sanitizedText.length < promptPart.content.length) {
-            console.log(`[GEMINI] Text part truncated from ${promptPart.content.length} to ${sanitizedText.length} characters`);
-          }
-          
-          apiParts.push({ text: sanitizedText });
-        }
-        // Image or other file content
-        else if (promptPart.mimeType) {
-          let contentType: ContentType = 'image';
-          
-          // Determine content type from MIME type
-          if (SUPPORTED_MIME_TYPES.video.includes(promptPart.mimeType)) {
-            contentType = 'video';
-          } else if (SUPPORTED_MIME_TYPES.audio.includes(promptPart.mimeType)) {
-            contentType = 'audio';
-          } else if (SUPPORTED_MIME_TYPES.document.includes(promptPart.mimeType)) {
-            contentType = 'document';
-          }
-          
-          // Handle the special case of SVG, which needs to be treated differently
-          const isSVG = promptPart.mimeType === 'image/svg+xml';
-          
-          // Determine if we should use the Files API for this content
-          // Ensure mimeType is a string before passing it to shouldUseFilesAPI
-          const mimeType = typeof promptPart.mimeType === 'string' ? promptPart.mimeType : 'application/octet-stream';
-          
-          // Get content length safely from either string or Buffer
-          const contentLength = Buffer.isBuffer(promptPart.content) 
-            ? promptPart.content.length 
-            : (typeof promptPart.content === 'string' ? Buffer.from(promptPart.content).length : 0);
-            
-          // Add safety check to ensure we have valid content
-          if (contentLength <= 0) {
-            console.error(`[GEMINI] Invalid content length for ${contentType} with MIME type ${mimeType}: ${contentLength}`);
-            throw new Error(`Invalid or empty content for ${contentType} with MIME type ${mimeType}`);
-          }
-            
-          const useFilesAPI = shouldUseFilesAPI(mimeType, contentLength);
-          
-          try {
-            // Create the appropriate file data representation
-            // Always use Files API for document content types
-            if (useFilesAPI || contentType === 'document') {
-              console.log(`[GEMINI] Using Files API for ${contentType} content (${(contentLength / 1024).toFixed(1)}KB, MIME: ${mimeType})`);
-              
-              // Pass content as-is to createFileData
-              const fileData = await createFileData(this.genAI, promptPart.content, mimeType);
-              fileDataList.push(fileData);
-              
-              // Create properly typed fileData structure with correct format for Gemini API
-              // Updated to match the required data field format in newer SDK versions
-              // Create properly typed part structure
-              const filePart: Part = {
-                fileData: {
-                  fileUri: fileData.fileUri,
-                  mimeType: fileData.mimeType
-                }
-              };
-              apiParts.push(filePart);
-            } else {
-              // Use inline data for smaller images
-              console.log(`[GEMINI] Using inline data URI for ${contentType} content (${(promptPart.content.length / 1024).toFixed(1)}KB, MIME: ${promptPart.mimeType})`);
-              
-              // For inline files, use a data URI
-              // Handle both string and Buffer content types safely
-              let inlineData = '';
-              
-              if (typeof promptPart.content === 'string') {
-                // If it's already a data URI, use it as is
-                if (promptPart.content.startsWith('data:')) {
-                  inlineData = promptPart.content;
-                } else {
-                  // Convert string to base64 data URI
-                  inlineData = `data:${mimeType};base64,${Buffer.from(promptPart.content).toString('base64')}`;
-                }
-              } else if (Buffer.isBuffer(promptPart.content)) {
-                // Convert Buffer to base64 data URI
-                inlineData = `data:${mimeType};base64,${promptPart.content.toString('base64')}`;
-              } else {
-                // Fallback for other content types
-                inlineData = `data:${mimeType};base64,${Buffer.from(String(promptPart.content)).toString('base64')}`;
-              }
-              
-              // Using the appropriate part structure
-              // For images, use the inlineData property
-              if (contentType === 'image' && !isSVG) {
-                // We know inlineData is a string at this point
-                const dataParts = inlineData.split(',');
-                const base64Data = dataParts?.length > 0 && 1 ? dataParts[1] : inlineData;
-                
-                apiParts.push({
-                  inlineData: {
-                    mimeType: promptPart.mimeType,
-                    data: base64Data // Remove the data:mime/type;base64, prefix if present
-                  }
-                });
-              } else {
-                // SVGs and other file types need to be uploaded even when small
-                const fileData = await createFileData(this.genAI, promptPart.content, promptPart.mimeType);
-                fileDataList.push(fileData);
-                
-                // Create properly typed part structure directly
-                const filePart: Part = {
-                  fileData: {
-                    fileUri: fileData.fileUri,
-                    mimeType: fileData.mimeType
-                  }
-                };
-                apiParts.push(filePart);
-              }
-            }
-          } catch (error) {
-            console.error(`[GEMINI] Error processing ${contentType} content: ${error instanceof Error ? error.message : String(error)}`);
-            throw new Error(`Failed to process ${contentType} content: ${error instanceof Error ? error.message : String(error)}`);
-          }
-        }
+        const apiPart = await this._prepareApiPart(promptPart, fileDataList);
+        apiParts.push(apiPart);
       }
       
       // Use our shared image-rubric helper for the API call
