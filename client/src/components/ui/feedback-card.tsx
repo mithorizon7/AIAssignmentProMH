@@ -39,22 +39,28 @@ export function FeedbackCard({ feedback, expanded = true, onToggle }: FeedbackCa
   };
   
   // Function to convert numeric criteriaId to a readable display name
-  const getCriterionDisplayName = (criteriaId: string): string => {
+  const getCriterionDisplayName = (criteriaId: string | number | undefined): string => {
+    // Handle undefined or null case
+    if (!criteriaId) return "Unknown Criterion";
+    
+    // Convert to string to ensure we can use string methods
+    const criteriaIdStr = String(criteriaId);
+    
     // If it's a long numeric ID (like timestamp-based IDs)
-    if (/^\d{10,}$/.test(criteriaId)) {
+    if (/^\d{10,}$/.test(criteriaIdStr)) {
       // For this specific assignment about tall men graphics
-      if (criteriaId === "1747323694467") {
+      if (criteriaIdStr === "1747323694467") {
         return "Subject Matter";
-      } else if (criteriaId === "1747323714703") {
+      } else if (criteriaIdStr === "1747323714703") {
         return "Visual Quality";
       } else {
         // Convert timestamp-like IDs to simplified names
-        return "Criterion " + (criteriaId.substring(0, 2));
+        return "Criterion " + (criteriaIdStr.substring(0, 2));
       }
     }
     
     // Format other IDs to be more readable
-    return criteriaId
+    return criteriaIdStr
       .replace(/_/g, ' ')
       .replace(/([A-Z])/g, ' $1')
       .replace(/^./, str => str.toUpperCase());
