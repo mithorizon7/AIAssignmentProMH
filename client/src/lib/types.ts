@@ -29,6 +29,7 @@ export interface Assignment {
   courseId: number;
   course: Course;
   dueDate: string;
+  availableAt?: string;
   status: 'active' | 'completed' | 'upcoming';
   shareableCode?: string;
   rubric?: Rubric;

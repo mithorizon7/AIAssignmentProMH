@@ -30,6 +30,7 @@ const assignmentSchema = z.object({
     .regex(/.*[.!?](\s|$)/, { message: "Description should have at least one complete sentence" }),
   dueDate: z.date()
     .refine((date) => date > new Date(), { message: "Due date must be in the future" }),
+  availableAt: z.date().optional(),
   courseId: z.number().optional(),
   instructorContext: z.string().optional(),
 });
@@ -55,6 +56,7 @@ export default function EnhancedCreateAssignment() {
       title: "",
       description: "",
       dueDate: new Date(new Date().setDate(new Date().getDate() + 14)), // Default to 2 weeks from now
+      availableAt: new Date(), // Default to now (open instantly)
       instructorContext: "",
     },
     mode: "onChange", // Enables real-time validation as the user types
@@ -225,6 +227,19 @@ export default function EnhancedCreateAssignment() {
                 </div>
                 <div className="flex flex-wrap gap-4">
                   <div>
+                    <h3 className="font-medium">Available From</h3>
+                    <p className="text-sm">
+                      {createdAssignment.availableAt && new Date(createdAssignment.availableAt) > new Date() ? (
+                        <>
+                          {new Date(createdAssignment.availableAt).toLocaleDateString()} at {new Date(createdAssignment.availableAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          <span className="ml-1 text-xs text-muted-foreground">({Intl.DateTimeFormat().resolvedOptions().timeZone})</span>
+                        </>
+                      ) : (
+                        <span className="text-green-600">Available immediately</span>
+                      )}
+                    </p>
+                  </div>
+                  <div>
                     <h3 className="font-medium">Due Date</h3>
                     <p className="text-sm">
                       {new Date(createdAssignment.dueDate).toLocaleDateString()} at {new Date(createdAssignment.dueDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -339,6 +354,17 @@ export default function EnhancedCreateAssignment() {
                       showSuccessState
                     />
                   </div>
+                  
+                  <EnhancedFormField
+                    control={form.control}
+                    name="availableAt"
+                    label="Available From"
+                    type="date"
+                    placeholder="Select when students can submit"
+                    description="When students can start submitting (default: now)"
+                    validateOnChange
+                    showSuccessState
+                  />
                   
                   <div>
                     <EnhancedFormField

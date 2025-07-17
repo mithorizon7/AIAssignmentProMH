@@ -142,7 +142,7 @@ export class AssignmentStatusService {
         throw new Error(`Assignment ${assignmentId} not found`);
       }
       
-      const calculatedStatus = this.calculateStatusByDate(assignment.dueDate);
+      const calculatedStatus = this.calculateStatusByDate(assignment.availableAt, assignment.dueDate);
       
       if (assignment.status === calculatedStatus && !force) {
         return { updated: false };
@@ -190,7 +190,7 @@ export class AssignmentStatusService {
         grouped[effectiveStatus].push({
           ...assignment,
           effectiveStatus,
-          calculatedStatus: this.calculateStatusByDate(assignment.dueDate),
+          calculatedStatus: this.calculateStatusByDate(assignment.availableAt, assignment.dueDate),
           manualStatus: assignment.status
         });
       }

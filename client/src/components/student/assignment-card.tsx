@@ -22,6 +22,7 @@ export function AssignmentCard({ assignment, latestSubmission }: AssignmentCardP
   const effectiveStatus = assignment.effectiveStatus || assignment.status;
   const isActive = effectiveStatus === 'active';
   const isSubmitted = !!latestSubmission;
+  const isUpcoming = assignment.availableAt && new Date(assignment.availableAt) > new Date();
   
   return (
     <Card className="overflow-hidden card-hover scale-in transition-all duration-300 hover:shadow-md">
@@ -40,7 +41,11 @@ export function AssignmentCard({ assignment, latestSubmission }: AssignmentCardP
         <p className="text-neutral-600 text-sm mb-3 fade-in" style={{animationDelay: "100ms"}}>{assignment.course.name}</p>
         <div className="flex items-center text-sm text-neutral-600 fade-in" style={{animationDelay: "150ms"}}>
           <Calendar className="h-4 w-4 mr-1.5" />
-          <span>Due: {formatDate(assignment.dueDate)}</span>
+          {assignment.availableAt && new Date(assignment.availableAt) > new Date() ? (
+            <span className="text-blue-600">Available: {formatDate(assignment.availableAt)}</span>
+          ) : (
+            <span>Due: {formatDate(assignment.dueDate)}</span>
+          )}
         </div>
       </CardContent>
       
@@ -53,13 +58,19 @@ export function AssignmentCard({ assignment, latestSubmission }: AssignmentCardP
             </span>
           </div>
           
-          {isActive && !isSubmitted && (
+          {isActive && !isSubmitted && !isUpcoming && (
             <Link href={`/submission/${assignment.id}`} className="slide-in-right" style={{animationDelay: "250ms"}}>
               <Button size="sm" className="h-10 px-4 btn-hover-effect group relative overflow-hidden whitespace-nowrap bg-gradient-to-r from-primary to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all duration-300">
                 <span className="relative z-10">Submit Assignment</span>
                 <ArrowRightCircle className="ml-2 h-4 w-4 relative z-10 group-hover:translate-x-0.5 transition-transform" />
               </Button>
             </Link>
+          )}
+          
+          {isUpcoming && (
+            <Button size="sm" disabled className="h-10 px-4 bg-gray-100 text-gray-500 cursor-not-allowed">
+              Not Yet Available
+            </Button>
           )}
           
           {isSubmitted && (
@@ -88,11 +99,13 @@ export function AssignmentCard({ assignment, latestSubmission }: AssignmentCardP
           </div>
         ) : (
           <div className="text-xs text-neutral-600 fade-in">
-            {isActive 
-              ? 'Submit before the deadline to receive AI feedback and improve your work.'
-              : assignment.status === 'completed' 
-                ? 'Submission deadline has passed.'
-                : 'This assignment will be available soon.'}
+            {isUpcoming
+              ? `Assignment opens on ${formatDate(assignment.availableAt!)}`
+              : isActive 
+                ? 'Submit before the deadline to receive AI feedback and improve your work.'
+                : assignment.status === 'completed' 
+                  ? 'Submission deadline has passed.'
+                  : 'Assignment is not currently accepting submissions.'}
           </div>
         )}
       </div>

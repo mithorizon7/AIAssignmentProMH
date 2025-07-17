@@ -308,6 +308,39 @@ export default function SubmitAssignment({ code: propCode }: SubmitAssignmentPro
   if (!assignment) {
     return null;
   }
+
+  // Check if assignment is available for submission
+  const isAvailable = !assignment.availableAt || new Date(assignment.availableAt) <= new Date();
+  const isPastDue = new Date(assignment.dueDate) < new Date();
+  
+  if (!isAvailable) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-background">
+        <Card className="w-full max-w-lg shadow-lg">
+          <CardHeader className="bg-blue-50 dark:bg-blue-950">
+            <CardTitle className="text-blue-600 dark:text-blue-400">Assignment Not Yet Available</CardTitle>
+            <CardDescription>
+              This assignment is not yet open for submissions
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="text-center mb-4">
+              <p className="mb-2">
+                <strong>{assignment.title}</strong> will be available on:
+              </p>
+              <p className="text-lg font-medium mb-4">
+                {new Date(assignment.availableAt!).toLocaleDateString()} at {new Date(assignment.availableAt!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+              </p>
+              <p className="text-sm text-muted-foreground mb-6">
+                Please check back later or contact your instructor if you have questions.
+              </p>
+              <Button onClick={() => navigate('/')}>Return to Dashboard</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen bg-background py-12">

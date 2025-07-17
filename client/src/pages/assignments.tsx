@@ -16,13 +16,13 @@ export default function Assignments() {
   });
   
   // Enhanced filtering with automated status calculation
-  const calculateStatusByDate = (availableAt: string, dueDate: string): 'upcoming' | 'active' | 'completed' => {
+  const calculateStatusByDate = (availableAt: string | null, dueDate: string): 'upcoming' | 'active' | 'completed' => {
     const now = new Date();
-    const availableAtObj = new Date(availableAt);
+    const availableAtObj = availableAt ? new Date(availableAt) : new Date(0); // Default to epoch if null (immediately available)
     const dueDateObj = new Date(dueDate);
     
     // upcoming: Assignment has not yet opened for submissions
-    if (now < availableAtObj) {
+    if (availableAt && now < availableAtObj) {
       return 'upcoming';
     }
     

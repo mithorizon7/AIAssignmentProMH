@@ -40,6 +40,7 @@ const assignmentSchema = z.object({
     z.number()
   ]).optional(),
   dueDate: z.date({ required_error: "Please select a due date" }),
+  availableAt: z.date().optional(),
   instructorContext: z.string().optional(),
 });
 
@@ -64,6 +65,7 @@ export default function CreateAssignment() {
       title: "",
       description: "",
       dueDate: new Date(new Date().setDate(new Date().getDate() + 14)), // Default to 2 weeks from now
+      availableAt: new Date(), // Default to now (open instantly)
       instructorContext: "",
     },
   });
@@ -216,6 +218,19 @@ export default function CreateAssignment() {
                   />
                 </div>
                 <div className="flex flex-wrap gap-4">
+                  <div>
+                    <h3 className="font-medium">Available From</h3>
+                    <p className="text-sm">
+                      {createdAssignment.availableAt && new Date(createdAssignment.availableAt) > new Date() ? (
+                        <>
+                          {new Date(createdAssignment.availableAt).toLocaleDateString()} at {new Date(createdAssignment.availableAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          <span className="ml-1 text-xs text-muted-foreground">({Intl.DateTimeFormat().resolvedOptions().timeZone})</span>
+                        </>
+                      ) : (
+                        <span className="text-green-600">Available immediately</span>
+                      )}
+                    </p>
+                  </div>
                   <div>
                     <h3 className="font-medium">Due Date</h3>
                     <p className="text-sm">
@@ -583,6 +598,108 @@ export default function CreateAssignment() {
                       )}
                     />
                   </div>
+                  
+                  {/* Available At Field */}
+                  <FormField
+                    control={form.control}
+                    name="availableAt"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <div className="flex items-center space-x-2">
+                          <FormLabel>Available From</FormLabel>
+                          <TooltipInfo content={
+                            <>
+                              <p className="font-medium">How this is used:</p>
+                              <p>Controls when students can start submitting to this assignment. The assignment will show as "upcoming" until this date/time.</p>
+                              <p className="mt-1 font-medium">Tips:</p>
+                              <ul className="list-disc pl-4 space-y-1">
+                                <li>Default is "now" (students can submit immediately)</li>
+                                <li>Use this to schedule assignments for future release</li>
+                                <li>Students can see upcoming assignments but cannot submit</li>
+                                <li>Useful for coordinating with class schedules</li>
+                              </ul>
+                            </>
+                          } />
+                        </div>
+                        <div className="space-y-2">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant={"outline"}
+                                  className={cn(
+                                    "pl-3 text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  {field.value ? (
+                                    format(field.value, "PPP")
+                                  ) : (
+                                    <span>Pick a date</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          
+                          <div className="flex items-center gap-2">
+                            <div className="grid grid-cols-2 gap-2 flex-1">
+                              <div className="flex items-center gap-1 border rounded-md px-3 py-1">
+                                <span className="text-muted-foreground text-sm">Time:</span>
+                                <select
+                                  className="flex-1 bg-transparent focus:outline-none"
+                                  value={field.value?.getHours() || 0}
+                                  onChange={(e) => {
+                                    const newDate = new Date(field.value || new Date());
+                                    newDate.setHours(parseInt(e.target.value));
+                                    field.onChange(newDate);
+                                  }}
+                                >
+                                  {Array.from({ length: 24 }, (_, i) => (
+                                    <option key={i} value={i}>
+                                      {i.toString().padStart(2, '0')}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="flex items-center gap-1 border rounded-md px-3 py-1">
+                                <span className="text-muted-foreground text-sm">Min:</span>
+                                <select
+                                  className="flex-1 bg-transparent focus:outline-none"
+                                  value={field.value?.getMinutes() || 0}
+                                  onChange={(e) => {
+                                    const newDate = new Date(field.value || new Date());
+                                    newDate.setMinutes(parseInt(e.target.value));
+                                    field.onChange(newDate);
+                                  }}
+                                >
+                                  {Array.from({ length: 4 }, (_, i) => (
+                                    <option key={i} value={i * 15}>
+                                      {(i * 15).toString().padStart(2, '0')}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <FormDescription>
+                          When students can start submitting (default: now)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </CardContent>
               </Card>
               
