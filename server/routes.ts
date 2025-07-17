@@ -78,7 +78,12 @@ const upload = multer({
   },
   fileFilter: function (req, file, cb) {
     // Additional security: validate file types
-    const allowedTypes = Array.from(SUPPORTED_MIME_TYPES);
+    const allowedTypes = [
+      ...SUPPORTED_MIME_TYPES.image,
+      ...SUPPORTED_MIME_TYPES.video,
+      ...SUPPORTED_MIME_TYPES.audio,
+      ...SUPPORTED_MIME_TYPES.document
+    ];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -812,7 +817,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!contentType || !isFileTypeAllowed(extension, contentType)) {
         return res.status(400).json({
           message: `File type .${extension} is not allowed`,
-          allowedTypes: SUPPORTED_MIME_TYPES
+          allowedTypes: [
+            ...SUPPORTED_MIME_TYPES.image,
+            ...SUPPORTED_MIME_TYPES.video,
+            ...SUPPORTED_MIME_TYPES.audio,
+            ...SUPPORTED_MIME_TYPES.document
+          ]
         });
       }
 
