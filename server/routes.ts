@@ -745,11 +745,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/anonymous-submissions', submissionRateLimiter, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
     const submissionSchema = z.object({
       assignmentId: z.string().transform(val => parseInt(val)),
-      submissionType: z.enum(['file', 'code']),
+      submissionType: z.enum(['file', 'code', 'text']),
       name: z.string().min(1),
       email: z.string().email(),
       notes: z.string().optional(),
       code: z.string().optional(),
+      content: z.string().optional(),
       shareableCode: z.string().min(1, "Shareable code is required for anonymous submissions"),
     });
 
@@ -845,6 +846,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       submission.contentType = 'text';
       submission.content = code;
       submission.fileExtension = 'txt';
+    } else if (submissionType === 'text') {
+      const textContent = req.body.content;
+      if (!textContent || !textContent.trim()) {
+        return res.status(400).json({ message: 'Text content is required for text submissions' });
+      }
+
+      submission.contentType = 'text';
+      submission.content = textContent;
+      submission.fileExtension = 'txt';
     } else {
       return res.status(400).json({ message: 'Invalid submission type' });
     }
@@ -876,8 +886,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const submissionSchema = z.object({
         assignmentId: z.string().transform(val => parseInt(val)),
-        submissionType: z.enum(['file', 'code']),
-        notes: z.string().optional()
+        submissionType: z.enum(['file', 'code', 'text']),
+        notes: z.string().optional(),
+        content: z.string().optional()
       });
 
       const result = submissionSchema.safeParse(req.body);
@@ -885,7 +896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid submission data', errors: result.error });
       }
 
-      const { assignmentId, submissionType, notes } = result.data;
+      const { assignmentId, submissionType, notes, content: textContent } = result.data;
 
       const isActive = await storageService.isAssignmentActive(assignmentId);
       if (!isActive) {
@@ -975,8 +986,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mimeType = 'text/plain';
         contentType = 'text' as ContentType;
         fileSize = Buffer.from(content).length;
+      } else if (submissionType === 'text') {
+        content = textContent || '';
+
+        if (!content.trim()) {
+          return res.status(400).json({ message: 'Text content is required for text submissions' });
+        }
+
+        mimeType = 'text/plain';
+        contentType = 'text' as ContentType;
+        fileSize = Buffer.from(content).length;
       } else {
-        return res.status(400).json({ message: 'Invalid submission type or missing file' });
+        return res.status(400).json({ message: 'Invalid submission type or missing content' });
       }
 
       const submission = await storage.createSubmission({
