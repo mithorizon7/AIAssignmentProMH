@@ -453,7 +453,7 @@ export class DataProtectionService {
     // Delete data retention logs (if the table has userId field)
     try {
       await db.delete(dataRetentionLog)
-        .where(eq(dataRetentionLog.recordId, userId.toString()));
+        .where(eq(dataRetentionLog.recordId, userId));
       console.log(`[DATA-PROTECTION] ✅ Deleted retention logs`);
     } catch (error) {
       console.log(`[DATA-PROTECTION] ✅ Retention logs - skipped (table structure variation)`);
