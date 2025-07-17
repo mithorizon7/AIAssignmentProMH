@@ -112,6 +112,12 @@ export interface IStorage {
   // Optimized data operations
   getStudentProgress(assignmentId?: number): Promise<any[]>;
   listCoursesWithStats(): Promise<any[]>;
+  
+  // OPTIMIZED: Get submissions with feedback in single query (with optional assignment filter)
+  listSubmissionsWithFeedbackForUser(userId: number, assignmentId?: number): Promise<(Submission & { feedback: Feedback | null })[]>;
+  
+  // OPTIMIZED: Get submissions with feedback for specific assignment (supports both student and instructor views)
+  listSubmissionsWithFeedbackForAssignment(assignmentId: number, userId?: number): Promise<(Submission & { feedback: Feedback | null })[]>;
 }
 
 export class DatabaseStorage implements IStorage {

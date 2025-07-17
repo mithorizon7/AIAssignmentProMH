@@ -33,7 +33,7 @@ export default function SubmissionDetail({ id }: SubmissionDetailProps) {
     // Poll for feedback status updates if any submission is in "processing" state
     if (submissions?.some(s => s.status === 'processing')) {
       const intervalId = setInterval(() => {
-        queryClient.invalidateQueries({ queryKey: [`${API_ROUTES.SUBMISSIONS}`, assignmentId] });
+        queryClient.invalidateQueries({ queryKey: [`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/submissions`] });
       }, 5000); // Poll every 5 seconds
       
       return () => clearInterval(intervalId);
@@ -42,7 +42,8 @@ export default function SubmissionDetail({ id }: SubmissionDetailProps) {
   
   const handleSubmissionComplete = (submission: SubmissionWithFeedback) => {
     // Update queries to reflect the new submission
-    queryClient.invalidateQueries({ queryKey: [`${API_ROUTES.SUBMISSIONS}`, assignmentId] });
+    queryClient.invalidateQueries({ queryKey: [`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/submissions`] });
+    queryClient.invalidateQueries({ queryKey: [`${API_ROUTES.SUBMISSIONS}`] });
     
     // Show a toast notification
     toast({

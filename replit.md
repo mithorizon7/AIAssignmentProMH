@@ -4,7 +4,20 @@
 
 AIGrader is an enterprise-grade AI-powered assignment feedback platform that enhances educational workflows through intelligent error handling and robust parsing mechanisms. The system is designed to scale for large classes and provides AI-driven feedback through Google's Gemini model, with comprehensive production monitoring, security enhancement, and automated recovery systems.
 
-## Recent Changes (2025-07-16)
+## Recent Changes (2025-07-17)
+
+### ✅ ASSIGNMENT-SPECIFIC SUBMISSION HISTORY FEATURE COMPLETED (2025-07-17)
+**Status**: Enterprise-grade assignment-specific submission history fully implemented with optimized performance
+**Key Achievements**:
+- ✅ **Database Storage Enhancement**: Added `listSubmissionsWithFeedbackForAssignment` method with conditional filtering for student/instructor views
+- ✅ **Role-Based API Endpoint**: Created `/api/assignments/:id/submissions` with proper access control (students see own submissions, instructors see all)
+- ✅ **Optimized Database Queries**: Single LEFT JOIN query eliminates N+1 patterns, supports both filtered and unfiltered views
+- ✅ **Frontend Integration**: Enhanced submission history component with assignment-specific context and messaging
+- ✅ **Cache Management**: Proper query key patterns and cache invalidation for real-time updates
+- ✅ **TypeScript Interface**: Added new method to IStorage interface ensuring type safety
+- ✅ **UI/UX Context**: Conditional titles, descriptions, and empty states for assignment-specific views
+- ✅ **Performance Logging**: Comprehensive performance monitoring with specific query identification
+- ✅ **Error Handling**: Input validation, assignment existence checks, and proper HTTP status codes
 
 ### ✅ CRITICAL DATABASE FIXES & ELEGANT UI/UX IMPROVEMENTS COMPLETED (2025-07-16)
 **Status**: All database query errors resolved, UI/UX enhanced with best practices
