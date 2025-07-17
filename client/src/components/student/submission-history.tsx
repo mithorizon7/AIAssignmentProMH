@@ -74,7 +74,7 @@ export function SubmissionHistory({
   assignmentTitle, 
   isAssignmentSpecific = false 
 }: SubmissionHistoryProps) {
-  const [expandedFeedbacks, setExpandedFeedbacks] = useState<Record<number, boolean>>({});
+  // Note: expandedFeedbacks state removed - now handled by RealTimeSubmissionCard internally
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -135,31 +135,8 @@ export function SubmissionHistory({
   const submissions = shouldPoll ? polledSubmissions : (passedSubmissions || []);
   const isLoading = shouldPoll ? pollingLoading : loading;
   
-  // Initialize expanded state to only show the most recent submission expanded
-  const initializeExpandedState = useCallback(() => {
-    if (submissions.length > 0) {
-      const mostRecentSubmissionId = submissions[0].id;
-      setExpandedFeedbacks(prev => {
-        // Only expand if not already set
-        if (Object.keys(prev).length === 0) {
-          return { [mostRecentSubmissionId]: true };
-        }
-        return prev;
-      });
-    }
-  }, [submissions]);
-  
-  // Initialize expanded state when submissions change
-  React.useEffect(() => {
-    initializeExpandedState();
-  }, [initializeExpandedState]);
-  
-  const toggleFeedback = (submissionId: number) => {
-    setExpandedFeedbacks(prev => ({
-      ...prev,
-      [submissionId]: !prev[submissionId]
-    }));
-  };
+  // Note: Feedback expansion logic moved to RealTimeSubmissionCard component
+  // Each card manages its own showFeedback state based on isLatest prop
   
   if (isLoading) {
     return (

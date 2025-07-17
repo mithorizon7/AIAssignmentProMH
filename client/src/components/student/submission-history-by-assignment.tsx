@@ -6,6 +6,7 @@ import { FeedbackCard } from "@/components/ui/feedback-card";
 import { formatDate } from "@/lib/utils/format";
 import { SubmissionWithFeedback } from "@/lib/types";
 import { useState } from "react";
+import * as React from "react";
 import { 
   History, Loader2, ArrowUpCircle, FileText, File, 
   Image, FileCode, Video, Music, PieChart, FileJson, 
@@ -99,6 +100,19 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
   const assignmentsWithSubmissions = assignments.filter(assignment => 
     assignment.submissions && assignment.submissions.length > 0
   );
+  
+  // Initialize expanded state to only show the most recent submission for each assignment
+  React.useEffect(() => {
+    const newExpandedState: Record<number, boolean> = {};
+    assignmentsWithSubmissions.forEach(assignment => {
+      if (assignment.submissions && assignment.submissions.length > 0) {
+        // Only expand the first (most recent) submission for each assignment
+        const mostRecentSubmissionId = assignment.submissions[0].id;
+        newExpandedState[mostRecentSubmissionId] = true;
+      }
+    });
+    setExpandedFeedbacks(newExpandedState);
+  }, [assignmentsWithSubmissions]);
   
   if (assignmentsWithSubmissions.length === 0) {
     return (
@@ -291,7 +305,7 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                                   onClick={() => toggleFeedback(submission.id)}
                                   className="text-primary hover:text-primary-dark hover:bg-primary/10 transition-colors"
                                 >
-                                  {expandedFeedbacks[submission.id] ? 'Hide' : 'Show'} Details
+                                  {(expandedFeedbacks[submission.id] || (index === 0)) ? 'Hide' : 'Show'} Details
                                 </Button>
                               </div>
                               
@@ -319,7 +333,7 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                                   </div>
                                 )}
                                 
-                                {expandedFeedbacks[submission.id] && (
+                                {(expandedFeedbacks[submission.id] || (index === 0)) && (
                                   <FeedbackCard 
                                     feedback={submission.feedback}
                                   />
