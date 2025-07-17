@@ -113,100 +113,111 @@ export class BatchOperationsService {
       .where(eq(enrollments.courseId, courseId))
       .orderBy(users.name);
     
-    // Get all submissions for this course (across all assignments and students)
-    // Using batching to handle large datasets efficiently
-    const studentBatches = this.chunkArray(enrolledStudents.map((s: { userId: number }) => s.userId), this.batchSize);
+    // ✅ PERFORMANCE FIX: Single optimized query eliminates N+1 batch pattern
+    console.log(`[PERFORMANCE] Using optimized single-query approach for course ${courseId} progress (eliminating N+1 batch queries)`);
     
-    // Process each batch of students
-    const studentsWithProgress = [];
+    // Get ALL submissions and feedback for this course in a single LEFT JOIN query
+    const allSubmissionsWithFeedback = await db
+      .select({
+        // Submission fields
+        submissionId: submissions.id,
+        userId: submissions.userId,
+        assignmentId: submissions.assignmentId,
+        status: submissions.status,
+        submissionCreatedAt: submissions.createdAt,
+        // Feedback fields (LEFT JOIN allows null feedback)
+        feedbackId: feedback.id,
+        score: feedback.score,
+        strengths: feedback.strengths,
+        improvements: feedback.improvements,
+        suggestions: feedback.suggestions,
+        summary: feedback.summary,
+        criteriaScores: feedback.criteriaScores,
+        processingTime: feedback.processingTime,
+        modelName: feedback.modelName,
+        tokenCount: feedback.tokenCount,
+        feedbackCreatedAt: feedback.createdAt
+      })
+      .from(submissions)
+      .leftJoin(feedback, eq(submissions.id, feedback.submissionId))
+      .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
+      .where(and(
+        eq(assignments.courseId, courseId),
+        inArray(submissions.userId, enrolledStudents.map((s: { userId: number }) => s.userId))
+      ))
+      .orderBy(submissions.createdAt);
     
-    for (const batchUserIds of studentBatches) {
-      // Get all submissions from students in this batch
-      const studentSubmissions = await db
-        .select({
-          id: submissions.id,
-          userId: submissions.userId,
-          assignmentId: submissions.assignmentId,
-          status: submissions.status,
-          createdAt: submissions.createdAt
-        })
-        .from(submissions)
-        .where(and(
-          inArray(submissions.userId, batchUserIds as number[]),
-          inArray(submissions.assignmentId, courseAssignments.map((a: { id: number }) => a.id))
-        ))
-        .orderBy(submissions.createdAt);
-      
-      // Get feedback for all submissions
-      const submissionIds = studentSubmissions.map((s: { id: number }) => s.id);
-      const feedbackItems = submissionIds.length > 0
-        ? await db
-            .select()
-            .from(feedback)
-            .where(inArray(feedback.submissionId, submissionIds))
-        : [];
-      
-      // Create a map for easy lookup of feedback
-      const feedbackMap = new Map();
-      for (const item of feedbackItems) {
-        feedbackMap.set(item.submissionId, item);
+    // Group submissions by student using Map for O(1) lookup
+    const submissionsByStudent = new Map<number, any[]>();
+    
+    for (const row of allSubmissionsWithFeedback) {
+      if (!submissionsByStudent.has(row.userId)) {
+        submissionsByStudent.set(row.userId, []);
       }
       
-      // Group submissions by student
-      const submissionsByStudent = new Map();
-      for (const submission of studentSubmissions) {
-        if (!submissionsByStudent.has(submission.userId)) {
-          submissionsByStudent.set(submission.userId, []);
-        }
-        
-        // Add feedback to submission if available
-        const submissionWithFeedback = {
-          ...submission,
-          feedback: feedbackMap.get(submission.id) || null
-        };
-        
-        submissionsByStudent.get(submission.userId).push(submissionWithFeedback);
-      }
+      // Build submission object with feedback
+      const submissionWithFeedback = {
+        id: row.submissionId,
+        userId: row.userId,
+        assignmentId: row.assignmentId,
+        status: row.status,
+        createdAt: row.submissionCreatedAt,
+        feedback: row.feedbackId ? {
+          id: row.feedbackId,
+          submissionId: row.submissionId,
+          score: row.score,
+          strengths: row.strengths,
+          improvements: row.improvements,
+          suggestions: row.suggestions,
+          summary: row.summary,
+          criteriaScores: row.criteriaScores,
+          processingTime: row.processingTime,
+          modelName: row.modelName,
+          tokenCount: row.tokenCount,
+          createdAt: row.feedbackCreatedAt
+        } : null
+      };
       
-      // Calculate progress for each student in the batch
-      for (const student of enrolledStudents.filter((s: { userId: number }) => batchUserIds.includes(s.userId))) {
-        const studentSubmissions = submissionsByStudent.get(student.userId) || [];
-        
-        // Calculate completion rate (completed submissions / total assignments)
-        const completedCount = studentSubmissions.filter((s: { status: string }) => s.status === 'completed').length;
-        const completionRate = courseAssignments.length > 0
-          ? completedCount / courseAssignments.length
-          : 0;
-        
-        // Calculate average score across all submissions with feedback
-        const submissionsWithScores = studentSubmissions.filter((s: { 
-          feedback?: { score?: number } 
-        }) => s.feedback && typeof s.feedback.score === 'number');
-        
-        const totalScore = submissionsWithScores.reduce(
-          (sum: number, s: { feedback: { score?: number } }) => sum + (s.feedback.score || 0), 
-          0
-        );
-        
-        const averageScore = submissionsWithScores.length > 0
-          ? totalScore / submissionsWithScores.length
-          : 0;
-        
-        // Add to result
-        studentsWithProgress.push({
-          userId: student.userId,
-          name: student.name,
-          email: student.email,
-          completionRate,
-          averageScore,
-          completedAssignments: completedCount,
-          totalAssignments: courseAssignments.length,
-          submissions: studentSubmissions
-        });
-      }
+      submissionsByStudent.get(row.userId)!.push(submissionWithFeedback);
     }
     
-    // Calculate course-level statistics
+    // Calculate progress for all students in memory (no additional database queries)
+    const studentsWithProgress = enrolledStudents.map(student => {
+      const studentSubmissions = submissionsByStudent.get(student.userId) || [];
+      
+      // Calculate completion rate (completed submissions / total assignments)
+      const completedCount = studentSubmissions.filter((s: { status: string }) => s.status === 'completed').length;
+      const completionRate = courseAssignments.length > 0
+        ? completedCount / courseAssignments.length
+        : 0;
+      
+      // Calculate average score across all submissions with feedback
+      const submissionsWithScores = studentSubmissions.filter((s: { 
+        feedback?: { score?: number } 
+      }) => s.feedback && typeof s.feedback.score === 'number');
+      
+      const totalScore = submissionsWithScores.reduce(
+        (sum: number, s: { feedback: { score?: number } }) => sum + (s.feedback.score || 0), 
+        0
+      );
+      
+      const averageScore = submissionsWithScores.length > 0
+        ? totalScore / submissionsWithScores.length
+        : 0;
+      
+      return {
+        userId: student.userId,
+        name: student.name,
+        email: student.email,
+        completionRate,
+        averageScore,
+        completedAssignments: completedCount,
+        totalAssignments: courseAssignments.length,
+        submissions: studentSubmissions
+      };
+    });
+    
+    // Calculate course-level statistics from processed data
     const avgCompletionRate = studentsWithProgress.length > 0
       ? studentsWithProgress.reduce((sum, s) => sum + s.completionRate, 0) / studentsWithProgress.length
       : 0;
@@ -389,53 +400,43 @@ export class BatchOperationsService {
     studentIds: number[],
     assignmentIds: number[]
   ): Promise<Map<string, number | null>> {
-    // Use a subquery to find the latest submission for each student/assignment
-    const latestSubmissions = await db
-      .select({
-        submissionId: submissions.id,
-        userId: submissions.userId,
-        assignmentId: submissions.assignmentId
-      })
-      .from(submissions)
-      .where(and(
-        inArray(submissions.userId, studentIds),
-        inArray(submissions.assignmentId, assignmentIds),
-        eq(submissions.status, 'completed')
-      ))
-      .orderBy(submissions.createdAt);
-      
-    // If no submissions, return empty map
-    if (latestSubmissions.length === 0) {
-      return new Map();
-    }
+    // ✅ LOGIC FIX: Use ROW_NUMBER() window function to get ONLY the latest submission per student-assignment pair
+    console.log(`[PERFORMANCE] Using ROW_NUMBER() window function to correctly isolate latest submissions for grade export`);
     
-    // Get submission IDs
-    const submissionIds = latestSubmissions.map((s: { submissionId: number }) => s.submissionId);
-    
-    // Get feedback scores for these submissions
-    const feedbackScores = await db
-      .select({
-        submissionId: feedback.submissionId,
-        score: feedback.score
-      })
-      .from(feedback)
-      .where(inArray(feedback.submissionId, submissionIds));
-    
-    // Create a map of submission ID to score with proper typing
-    const scoreMap = new Map<number, number | null>();
-    for (const fs of feedbackScores) {
-      scoreMap.set(fs.submissionId, fs.score === null ? null : Number(fs.score));
-    }
+    const latestSubmissionsWithScores = await db.execute(sql`
+      WITH latest_submissions AS (
+        SELECT 
+          s.id as submission_id,
+          s.user_id,
+          s.assignment_id,
+          f.score,
+          ROW_NUMBER() OVER (
+            PARTITION BY s.user_id, s.assignment_id 
+            ORDER BY s.created_at DESC
+          ) as rn
+        FROM submissions s
+        LEFT JOIN feedback f ON s.id = f.submission_id
+        WHERE s.user_id = ANY(${studentIds})
+          AND s.assignment_id = ANY(${assignmentIds})
+          AND s.status = 'completed'
+      )
+      SELECT 
+        submission_id,
+        user_id,
+        assignment_id,
+        score
+      FROM latest_submissions
+      WHERE rn = 1
+    `);
     
     // Create a map of student-assignment to score
     const result = new Map<string, number | null>();
     
-    // Map each student-assignment pair to its score
-    for (const submission of latestSubmissions as SubmissionRecord[]) {
-      const key = `${submission.userId}-${submission.assignmentId}`;
-      const score = scoreMap.get(submission.submissionId);
-      // Ensure we only set numeric values or null
-      result.set(key, score ?? null);
+    // Process each latest submission
+    for (const row of latestSubmissionsWithScores.rows as any[]) {
+      const key = `${row.user_id}-${row.assignment_id}`;
+      const score = row.score === null ? null : Number(row.score);
+      result.set(key, score);
     }
     
     return result;
