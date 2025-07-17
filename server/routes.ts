@@ -827,7 +827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
 
-  app.post('/api/submissions', requireAuth, csrfProtection, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/submissions', requireAuth, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
       const user = req.user as any;
 
       if (user.role !== 'student') {
