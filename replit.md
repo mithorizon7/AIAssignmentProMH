@@ -6,6 +6,19 @@ AIGrader is an enterprise-grade AI-powered assignment feedback platform that enh
 
 ## Recent Changes (2025-07-17)
 
+### ✅ CRITICAL AI SERVICE BUG FIXED - RUBRIC EVALUATION RESTORED (2025-07-17)
+**Status**: Critical rubric evaluation feature restored to full functionality
+**Root Cause**: Disabled evaluation logic with `&& 0` condition in all three AI analysis functions
+**Resolution**: Fixed critical bug that completely disabled rubric-based grading
+- ✅ **analyzeSubmission()**: Removed `&& 0` condition, restored rubric processing for text submissions
+- ✅ **analyzeMultimodalSubmission()**: Removed `&& 0` condition, restored rubric processing for file/image submissions  
+- ✅ **analyzeProgrammingAssignment()**: Removed `&& 0` condition, restored rubric processing for code submissions
+- ✅ **Impact**: All rubric criteria now properly sent to AI for detailed evaluation and scoring
+- ✅ **Validation**: Rubric evaluation logic fully operational, criteriaScores generation restored
+- ✅ **Production Ready**: Core AI grading functionality now working as designed
+
+## Recent Changes (2025-07-17)
+
 ### ✅ STRUCTURED JSON LOGGING ENHANCEMENT COMPLETED (2025-07-17)
 **Status**: Production-grade structured logging implemented to replace truncated string logs
 **Key Achievements**:
