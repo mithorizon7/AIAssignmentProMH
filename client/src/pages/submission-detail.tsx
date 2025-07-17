@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { API_ROUTES } from "@/lib/constants";
@@ -9,6 +9,7 @@ import { SubmissionHistory } from "@/components/student/submission-history";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useSubmissionPolling } from "@/hooks/useSubmissionPolling";
 
 interface SubmissionDetailProps {
   id: string;
@@ -28,17 +29,23 @@ export default function SubmissionDetail({ id }: SubmissionDetailProps) {
     queryKey: [`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/submissions`],
     enabled: !!assignmentId && !isNaN(assignmentId),
   });
-  
-  useEffect(() => {
-    // Poll for feedback status updates if any submission is in "processing" state
-    if (submissions?.some(s => s.status === 'processing')) {
-      const intervalId = setInterval(() => {
-        queryClient.invalidateQueries({ queryKey: [`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/submissions`] });
-      }, 5000); // Poll every 5 seconds
+
+  // Use real-time polling for global submissions to get live updates
+  const { hasProcessingSubmissions } = useSubmissionPolling(user?.id || 0, {
+    enabled: !!user?.id,
+    onFeedbackReady: (submission) => {
+      // Invalidate assignment-specific submissions when feedback is ready
+      queryClient.invalidateQueries({ 
+        queryKey: [`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/submissions`] 
+      });
       
-      return () => clearInterval(intervalId);
+      toast({
+        title: "Feedback Ready!",
+        description: `Your assignment feedback is now available with a score of ${submission.feedback?.score}%.`,
+        duration: 5000,
+      });
     }
-  }, [submissions, assignmentId, queryClient]);
+  });
   
   const handleSubmissionComplete = (submission: SubmissionWithFeedback) => {
     // Update queries to reflect the new submission
