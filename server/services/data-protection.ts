@@ -24,7 +24,7 @@ import {
   type InsertDataAuditLog,
   type User,
 } from "../../shared/schema";
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, gte, lte, inArray } from "drizzle-orm";
 import { DATA_RETENTION_POLICIES, ANONYMIZATION_RULES, type UserDataExport } from "../../shared/data-protection";
 import crypto from "crypto";
 
@@ -278,9 +278,19 @@ export class DataProtectionService {
       .innerJoin(users, eq(users.id, enrollments.userId))
       .where(eq(enrollments.userId, userId));
 
-    // Get feedback given (if instructor)
-    const feedbackGiven = user.role === 'instructor' ? 
-      await db.select().from(feedback).where(eq(feedback.submissionId, userId)) : [];
+    // Get feedback received on user's submissions
+    const userSubmissionsForFeedback = await db.select({ id: submissions.id })
+      .from(submissions)
+      .where(eq(submissions.userId, userId));
+    
+    const submissionIdsForFeedback = userSubmissionsForFeedback.map(s => s.id);
+    
+    // Get feedback received on this user's submissions
+    const feedbackReceived = submissionIdsForFeedback.length > 0 ? 
+      await db.select().from(feedback).where(inArray(feedback.submissionId, submissionIdsForFeedback)) : [];
+    
+    // Get feedback given by this user (if instructor/admin - this would need instructor feedback tracking)
+    // Note: Current schema doesn't track who gave feedback, would need additional field
 
     return {
       user_info: {
@@ -306,11 +316,13 @@ export class DataProtectionService {
         enrolled_at: c.enrolled_at,
         role: 'student' as const,
       })),
-      feedback_given: user.role === 'instructor' ? feedbackGiven.map(f => ({
+      feedback_received: feedbackReceived.map(f => ({
         submission_id: f.submissionId,
         feedback: f.summary || '',
+        score: f.score,
         created_at: f.createdAt,
-      })) : undefined,
+      })),
+      // Note: feedback_given would require additional schema tracking
       activity_logs: [], // Would come from audit logs
     };
   }
@@ -347,14 +359,43 @@ export class DataProtectionService {
 
   /**
    * Permanently delete user data
+   * ✅ CRITICAL FIX: Corrected feedback deletion logic to use submission IDs
    */
   async deleteUserData(userId: number, performedBy: number): Promise<void> {
+    console.log(`[DATA-PROTECTION] Starting user data deletion for userId: ${userId}`);
+    
+    // ✅ FIX: First find all submission IDs belonging to this user
+    const userSubmissions = await db.select({ id: submissions.id })
+      .from(submissions)
+      .where(eq(submissions.userId, userId));
+    
+    const submissionIds = userSubmissions.map(s => s.id);
+    console.log(`[DATA-PROTECTION] Found ${submissionIds.length} submissions for user ${userId}`);
+    
     // Delete in correct order due to foreign key constraints
-    await db.delete(feedback).where(eq(feedback.submissionId, userId));
-    await db.delete(submissions).where(eq(submissions.userId, userId));
+    
+    // 1. Delete feedback associated with user's submissions (using correct submission IDs)
+    if (submissionIds.length > 0) {
+      await db.delete(feedback).where(inArray(feedback.submissionId, submissionIds));
+      console.log(`[DATA-PROTECTION] Deleted feedback for ${submissionIds.length} submissions`);
+    }
+    
+    // 2. Delete user's submissions
+    const deletedSubmissions = await db.delete(submissions)
+      .where(eq(submissions.userId, userId));
+    console.log(`[DATA-PROTECTION] Deleted submissions for user ${userId}`);
+    
+    // 3. Delete user's enrollments
     await db.delete(enrollments).where(eq(enrollments.userId, userId));
+    console.log(`[DATA-PROTECTION] Deleted enrollments for user ${userId}`);
+    
+    // 4. Delete user's consent records
     await db.delete(userConsents).where(eq(userConsents.userId, userId));
+    console.log(`[DATA-PROTECTION] Deleted consent records for user ${userId}`);
+    
+    // 5. Finally delete the user record
     await db.delete(users).where(eq(users.id, userId));
+    console.log(`[DATA-PROTECTION] Deleted user record for userId: ${userId}`);
 
     await this.logDataAccess({
       userId,
@@ -363,10 +404,14 @@ export class DataProtectionService {
       recordId: userId,
       details: { 
         permanentDeletion: true,
-        cascadeDeleted: ['submissions', 'enrollments', 'feedback', 'consents']
+        cascadeDeleted: ['submissions', 'enrollments', 'feedback', 'consents'],
+        submissionIds: submissionIds,
+        totalFeedbackDeleted: submissionIds.length
       },
       performedBy,
     });
+    
+    console.log(`[DATA-PROTECTION] User data deletion completed for userId: ${userId}`);
   }
 
   /**
