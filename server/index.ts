@@ -92,7 +92,7 @@ app.use(securityMonitoringMiddleware);
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
+  const startMemory = process.memoryUsage().heapUsed;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
@@ -103,17 +103,41 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
+    const endMemory = process.memoryUsage().heapUsed;
+    
+    if (req.path.startsWith("/api")) {
+      // Create structured log data object
+      const logData = {
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        durationMs: duration,
+        memoryDelta: endMemory - startMemory,
+        timestamp: new Date().toISOString(),
+        userAgent: req.headers['user-agent'],
+        ip: req.ip || req.connection.remoteAddress,
+        contentLength: res.get('content-length'),
+        response: capturedJsonResponse ? {
+          type: typeof capturedJsonResponse,
+          isArray: Array.isArray(capturedJsonResponse),
+          hasData: capturedJsonResponse && Object.keys(capturedJsonResponse).length > 0,
+          preview: JSON.stringify(capturedJsonResponse).substring(0, 200) + (JSON.stringify(capturedJsonResponse).length > 200 ? '...' : '')
+        } : undefined
+      };
 
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
+      // Log performance warnings for slow requests
+      if (duration > 1000) {
+        logger.warn('Slow request detected', logData);
+      } else if (duration > 500) {
+        logger.info('Request completed', logData);
+      } else {
+        // For fast requests, log more concisely in development
+        if (process.env.NODE_ENV === 'development') {
+          log(`${req.method} ${req.path} ${res.statusCode} in ${duration}ms${capturedJsonResponse ? ` :: ${JSON.stringify(capturedJsonResponse).substring(0, 100)}${JSON.stringify(capturedJsonResponse).length > 100 ? '...' : ''}` : ''}`);
+        } else {
+          logger.debug('Request completed', logData);
+        }
       }
-
-      log(logLine);
     }
   });
 
