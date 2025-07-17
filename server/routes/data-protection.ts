@@ -10,7 +10,7 @@ import { csrfProtection } from "../middleware/csrf-protection";
 import { dataProtectionService } from "../services/data-protection";
 import { db } from "../db";
 import { dataSubjectRequests, userConsents, dataAuditLog } from "../../shared/schema";
-import { eq, desc, and, gte, lte, count } from "drizzle-orm";
+import { eq, desc, and, gte, lte, count, sql } from "drizzle-orm";
 import { z } from "zod";
 
 const router = Router();
@@ -19,7 +19,8 @@ const router = Router();
 // The configureAuth is called in the main routes.ts
 
 /**
- * Get data subject requests dashboard
+ * Get data subject requests with optimized pagination and stats
+ * ✅ PERFORMANCE OPTIMIZED: Single query with window functions
  */
 router.get('/requests', async (req, res) => {
   try {
@@ -28,7 +29,14 @@ router.get('/requests', async (req, res) => {
     const status = req.query.status as string;
     const type = req.query.type as string;
 
-    let query = db.select({
+    // Build WHERE conditions
+    const conditions = [];
+    if (status) conditions.push(eq(dataSubjectRequests.status, status as any));
+    if (type) conditions.push(eq(dataSubjectRequests.type, type as any));
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // ✅ OPTIMIZATION: Single query with window function for pagination + total count
+    const requestsWithTotal = await db.select({
       id: dataSubjectRequests.id,
       type: dataSubjectRequests.type,
       userId: dataSubjectRequests.userId,
@@ -37,39 +45,30 @@ router.get('/requests', async (req, res) => {
       requestedAt: dataSubjectRequests.requestedAt,
       completedAt: dataSubjectRequests.completedAt,
       details: dataSubjectRequests.details,
-    }).from(dataSubjectRequests);
-
-    if (status) {
-      query = query.where(eq(dataSubjectRequests.status, status as any));
-    }
-
-    if (type) {
-      query = query.where(eq(dataSubjectRequests.type, type as any));
-    }
-
-    const requests = await query
+      totalCount: sql<number>`count(*) over()`.as('total_count'),
+    }).from(dataSubjectRequests)
+      .where(whereClause)
       .orderBy(desc(dataSubjectRequests.requestedAt))
       .limit(limit)
       .offset((page - 1) * limit);
 
-    // Get total count for pagination
-    const [totalResult] = await db.select({ count: count() })
-      .from(dataSubjectRequests);
+    const total = requestsWithTotal.length > 0 ? requestsWithTotal[0].totalCount : 0;
+    const requests = requestsWithTotal.map(({ totalCount, ...request }) => request);
 
-    const stats = {
-      total: totalResult.count,
-      pending: 0,
-      processing: 0,
-      completed: 0,
-      rejected: 0,
-    };
-
-    // Get status counts
+    // ✅ OPTIMIZATION: Single query for all status statistics
     const statusCounts = await db.select({
       status: dataSubjectRequests.status,
       count: count(),
     }).from(dataSubjectRequests)
       .groupBy(dataSubjectRequests.status);
+
+    const stats = {
+      total,
+      pending: 0,
+      verified: 0,
+      completed: 0,
+      rejected: 0,
+    };
 
     statusCounts.forEach(({ status, count }) => {
       stats[status] = count;
@@ -80,8 +79,8 @@ router.get('/requests', async (req, res) => {
       pagination: {
         page,
         limit,
-        total: totalResult.count,
-        totalPages: Math.ceil(totalResult.count / limit),
+        total,
+        totalPages: Math.ceil(total / limit),
       },
       stats,
     });
@@ -231,7 +230,8 @@ router.delete('/users/:userId/data', csrfProtection, async (req, res) => {
 });
 
 /**
- * Get consent management dashboard
+ * Get consent management dashboard with optimized pagination
+ * ✅ PERFORMANCE OPTIMIZED: Single query with window functions + fixed pagination bug
  */
 router.get('/consent', async (req, res) => {
   try {
@@ -239,7 +239,11 @@ router.get('/consent', async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 20;
     const purpose = req.query.purpose as string;
 
-    let query = db.select({
+    // Build WHERE condition
+    const whereClause = purpose ? eq(userConsents.purpose, purpose as any) : undefined;
+
+    // ✅ BUG FIX + OPTIMIZATION: Single query with window function for pagination + total count
+    const consentsWithTotal = await db.select({
       id: userConsents.id,
       userId: userConsents.userId,
       purpose: userConsents.purpose,
@@ -247,18 +251,17 @@ router.get('/consent', async (req, res) => {
       grantedAt: userConsents.grantedAt,
       withdrawnAt: userConsents.withdrawnAt,
       version: userConsents.version,
-    }).from(userConsents);
-
-    if (purpose) {
-      query = query.where(eq(userConsents.purpose, purpose as any));
-    }
-
-    const consents = await query
+      totalCount: sql<number>`count(*) over()`.as('total_count'),
+    }).from(userConsents)
+      .where(whereClause)
       .orderBy(desc(userConsents.grantedAt))
       .limit(limit)
       .offset((page - 1) * limit);
 
-    // Get consent statistics
+    const total = consentsWithTotal.length > 0 ? consentsWithTotal[0].totalCount : 0;
+    const consents = consentsWithTotal.map(({ totalCount, ...consent }) => consent);
+
+    // ✅ OPTIMIZATION: Single query for consent statistics
     const purposeStats = await db.select({
       purpose: userConsents.purpose,
       granted: userConsents.granted,
@@ -284,7 +287,8 @@ router.get('/consent', async (req, res) => {
       pagination: {
         page,
         limit,
-        total: consents.length,
+        total, // ✅ BUG FIX: Now shows correct total, not consents.length
+        totalPages: Math.ceil(total / limit),
       },
       stats,
     });
@@ -295,7 +299,8 @@ router.get('/consent', async (req, res) => {
 });
 
 /**
- * Get audit log
+ * Get audit log with optimized pagination
+ * ✅ PERFORMANCE OPTIMIZED: Single query with window functions + fixed pagination bug
  */
 router.get('/audit', async (req, res) => {
   try {
@@ -306,29 +311,42 @@ router.get('/audit', async (req, res) => {
     const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
     const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
 
-    let query = db.select().from(dataAuditLog);
-
+    // Build WHERE conditions
     const conditions = [];
     if (action) conditions.push(eq(dataAuditLog.action, action as any));
     if (userId) conditions.push(eq(dataAuditLog.userId, userId));
     if (startDate) conditions.push(gte(dataAuditLog.timestamp, startDate));
     if (endDate) conditions.push(lte(dataAuditLog.timestamp, endDate));
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-
-    const auditLogs = await query
+    // ✅ BUG FIX + OPTIMIZATION: Single query with window function for pagination + total count
+    const auditLogsWithTotal = await db.select({
+      id: dataAuditLog.id,
+      userId: dataAuditLog.userId,
+      action: dataAuditLog.action,
+      tableName: dataAuditLog.tableName,
+      recordId: dataAuditLog.recordId,
+      details: dataAuditLog.details,
+      ipAddress: dataAuditLog.ipAddress,
+      performedBy: dataAuditLog.performedBy,
+      timestamp: dataAuditLog.timestamp,
+      totalCount: sql<number>`count(*) over()`.as('total_count'),
+    }).from(dataAuditLog)
+      .where(whereClause)
       .orderBy(desc(dataAuditLog.timestamp))
       .limit(limit)
       .offset((page - 1) * limit);
 
+    const total = auditLogsWithTotal.length > 0 ? auditLogsWithTotal[0].totalCount : 0;
+    const logs = auditLogsWithTotal.map(({ totalCount, ...log }) => log);
+
     res.json({
-      logs: auditLogs,
+      logs,
       pagination: {
         page,
         limit,
-        total: auditLogs.length,
+        total, // ✅ BUG FIX: Now shows correct total, not auditLogs.length
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
