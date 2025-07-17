@@ -159,6 +159,7 @@
     description: text("description"),
     courseId: integer("course_id").references(() => courses.id, { onDelete: 'cascade' }).notNull(),
     dueDate: timestamp("due_date").notNull(),
+    availableAt: timestamp("available_at").defaultNow().notNull(), // When assignments opens for submissions
     status: assignmentStatusEnum("status").notNull().default('upcoming'),
     shareableCode: text("shareable_code"),
     rubric: json("rubric").$type<Rubric>(),
@@ -170,7 +171,8 @@
       courseIdIdx: index("idx_assignments_course_id").on(table.courseId),
       statusIdx: index("idx_assignments_status").on(table.status),
       shareableCodeIdx: index("idx_assignments_shareable_code").on(table.shareableCode),
-      dueDateIdx: index("idx_assignments_due_date").on(table.dueDate)
+      dueDateIdx: index("idx_assignments_due_date").on(table.dueDate),
+      availableAtIdx: index("idx_assignments_available_at").on(table.availableAt)
     };
   });
 

@@ -4,29 +4,32 @@ import { eq, and, or, lte, gte } from "drizzle-orm";
 
 export class AssignmentStatusService {
   /**
-   * Calculate what the status should be based on current date and due date
+   * Calculate what the status should be based on current date, available date, and due date
    */
-  static calculateStatusByDate(dueDate: Date): 'upcoming' | 'active' | 'completed' {
+  static calculateStatusByDate(availableAt: Date, dueDate: Date): 'upcoming' | 'active' | 'completed' {
     const now = new Date();
+    const availableAtObj = new Date(availableAt);
     const dueDateObj = new Date(dueDate);
     
-    // Assignment is active from 1 week before due date until due date
-    const activeStartDate = new Date(dueDateObj.getTime() - (7 * 24 * 60 * 60 * 1000)); // 1 week before
-    
-    if (now < activeStartDate) {
+    // upcoming: Assignment has not yet opened for submissions
+    if (now < availableAtObj) {
       return 'upcoming';
-    } else if (now >= activeStartDate && now <= dueDateObj) {
-      return 'active';
-    } else {
-      return 'completed';
     }
+    
+    // active: Assignment is open for submissions and before due date
+    if (now >= availableAtObj && now <= dueDateObj) {
+      return 'active';
+    }
+    
+    // completed: Assignment is past due date
+    return 'completed';
   }
 
   /**
    * Get the effective status for an assignment (checks both manual status and calculated status)
    */
-  static getEffectiveStatus(assignment: { status: string; dueDate: Date }, preferAutomated: boolean = true): 'upcoming' | 'active' | 'completed' {
-    const calculatedStatus = this.calculateStatusByDate(assignment.dueDate);
+  static getEffectiveStatus(assignment: { status: string; availableAt: Date; dueDate: Date }, preferAutomated: boolean = true): 'upcoming' | 'active' | 'completed' {
+    const calculatedStatus = this.calculateStatusByDate(assignment.availableAt, assignment.dueDate);
     
     if (preferAutomated) {
       return calculatedStatus;
@@ -35,21 +38,22 @@ export class AssignmentStatusService {
     // Use manual status if it makes sense, otherwise fall back to calculated
     const manualStatus = assignment.status as 'upcoming' | 'active' | 'completed';
     
-    // If manual status is reasonable given the date, use it
+    // If manual status is reasonable given the dates, use it
     // Otherwise use calculated status
     const now = new Date();
+    const availableAt = new Date(assignment.availableAt);
     const dueDate = new Date(assignment.dueDate);
     
     if (manualStatus === 'completed' && now > dueDate) {
       return 'completed'; // Manual completed status after due date is reasonable
     }
     
-    if (manualStatus === 'active' && now <= dueDate) {
-      return 'active'; // Manual active status before due date is reasonable
+    if (manualStatus === 'active' && now >= availableAt && now <= dueDate) {
+      return 'active'; // Manual active status when submissions are open is reasonable
     }
     
-    if (manualStatus === 'upcoming' && now < dueDate) {
-      return 'upcoming'; // Manual upcoming status before due date is reasonable
+    if (manualStatus === 'upcoming' && now < availableAt) {
+      return 'upcoming'; // Manual upcoming status before available date is reasonable
     }
     
     // Fall back to calculated status if manual doesn't make sense
@@ -85,7 +89,9 @@ export class AssignmentStatusService {
       
       for (const assignment of allAssignments) {
         const currentStatus = assignment.status;
-        const calculatedStatus = this.calculateStatusByDate(assignment.dueDate);
+        // Use availableAt (which now exists in the database)
+        const availableAt = assignment.availableAt;
+        const calculatedStatus = this.calculateStatusByDate(availableAt, assignment.dueDate);
         
         if (currentStatus !== calculatedStatus) {
           changes.push({
