@@ -7,6 +7,7 @@ import { logger } from './logger';
 import { db } from '../db';
 import redisClient from '../queue/redis';
 import { Server } from 'http';
+import { assignmentScheduler } from '../services/assignment-scheduler';
 
 interface ShutdownHandler {
   name: string;
@@ -101,6 +102,16 @@ class GracefulShutdown {
         logger.info('Queue workers closed');
       } catch (error) {
         logger.error('Error closing queue workers', { error });
+      }
+    });
+
+    // Stop assignment scheduler
+    this.registerHandler('assignment-scheduler', async () => {
+      try {
+        assignmentScheduler.stop();
+        logger.info('Assignment scheduler stopped');
+      } catch (error) {
+        logger.error('Error stopping assignment scheduler', { error });
       }
     });
   }

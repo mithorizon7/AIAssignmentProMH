@@ -670,24 +670,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     const statusSchema = z.object({
-      status: z.enum(['active', 'upcoming', 'completed'])
+      status: z.enum(['active', 'upcoming', 'completed']).optional(),
+      useAutomated: z.boolean().optional().default(false)
     });
 
     const result = statusSchema.safeParse(req.body);
     if (!result.success) {
-      return res.status(400).json({ message: 'Invalid status value', errors: result.error });
+      return res.status(400).json({ message: 'Invalid request body', errors: result.error });
     }
 
-    const { status } = result.data;
+    const { status, useAutomated } = result.data;
 
     const assignment = await storage.getAssignment(assignmentId);
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment not found' });
     }
 
-    const updatedAssignment = await storage.updateAssignmentStatus(assignmentId, status);
+    if (useAutomated) {
+      // Use automated status calculation based on due date
+      const { AssignmentStatusService } = await import('./services/assignment-status-service');
+      const updateResult = await AssignmentStatusService.updateAssignmentStatus(assignmentId, true);
+      
+      if (updateResult.updated) {
+        const updatedAssignment = await storage.getAssignment(assignmentId);
+        res.json({ 
+          ...updatedAssignment, 
+          statusUpdate: {
+            ...updateResult,
+            message: `Status automatically updated from ${updateResult.oldStatus} to ${updateResult.newStatus} based on due date`
+          }
+        });
+      } else {
+        res.json({ 
+          ...assignment, 
+          statusUpdate: {
+            ...updateResult,
+            message: 'Status already matches calculated status based on due date'
+          }
+        });
+      }
+    } else if (status) {
+      // Manual status update
+      const updatedAssignment = await storage.updateAssignmentStatus(assignmentId, status);
+      res.json({ 
+        ...updatedAssignment, 
+        statusUpdate: {
+          updated: true,
+          oldStatus: assignment.status,
+          newStatus: status,
+          message: `Status manually set to ${status}`
+        }
+      });
+    } else {
+      return res.status(400).json({ message: 'Either status or useAutomated must be provided' });
+    }
+  }));
 
-    res.json(updatedAssignment);
+  // Bulk update all assignment statuses based on due dates (admin only)
+  app.post('/api/assignments/update-statuses', requireAuth, flexibleRequireRole(['admin']), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
+    const { dryRun = false } = req.body;
+    
+    try {
+      const { AssignmentStatusService } = await import('./services/assignment-status-service');
+      const result = await AssignmentStatusService.updateAllAssignmentStatuses(dryRun);
+      
+      res.json({
+        success: true,
+        dryRun,
+        ...result,
+        message: dryRun ? 
+          `Would update ${result.updated} assignments` : 
+          `Successfully updated ${result.updated} assignments`
+      });
+    } catch (error) {
+      console.error('Error in bulk status update:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to update assignment statuses',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }));
+
+  // Get assignment status analysis (instructor/admin)
+  app.get('/api/assignments/status-analysis', requireAuth, flexibleRequireRole(['instructor']), asyncHandler(async (req: Request, res: Response) => {
+    const { preferAutomated = "true" } = req.query;
+    
+    try {
+      const { AssignmentStatusService } = await import('./services/assignment-status-service');
+      const grouped = await AssignmentStatusService.getAssignmentsByEffectiveStatus(
+        preferAutomated === "true"
+      );
+      
+      // Calculate statistics
+      const total = grouped.upcoming.length + grouped.active.length + grouped.completed.length;
+      const stats = {
+        total,
+        upcoming: grouped.upcoming.length,
+        active: grouped.active.length,
+        completed: grouped.completed.length,
+        percentages: {
+          upcoming: total > 0 ? Math.round((grouped.upcoming.length / total) * 100) : 0,
+          active: total > 0 ? Math.round((grouped.active.length / total) * 100) : 0,
+          completed: total > 0 ? Math.round((grouped.completed.length / total) * 100) : 0
+        }
+      };
+      
+      // Find assignments where manual status differs from calculated status
+      const allAssignments = [...grouped.upcoming, ...grouped.active, ...grouped.completed];
+      const statusMismatches = allAssignments.filter(a => 
+        a.manualStatus !== a.calculatedStatus
+      );
+      
+      res.json({
+        stats,
+        assignments: grouped,
+        statusMismatches,
+        analysis: {
+          automatedStatusPreferred: preferAutomated === "true",
+          mismatches: statusMismatches.length,
+          message: statusMismatches.length > 0 ? 
+            `${statusMismatches.length} assignments have manual status different from calculated status` :
+            'All assignment statuses match their calculated status'
+        }
+      });
+    } catch (error) {
+      console.error('Error in status analysis:', error);
+      res.status(500).json({ 
+        message: 'Failed to analyze assignment statuses',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }));
 
   app.get('/api/assignments/code/:code', defaultRateLimiter, asyncHandler(async (req: Request, res: Response) => {

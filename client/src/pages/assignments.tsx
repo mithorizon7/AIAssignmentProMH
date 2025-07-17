@@ -15,9 +15,32 @@ export default function Assignments() {
     queryKey: [API_ROUTES.ASSIGNMENTS],
   });
   
-  const activeAssignments = assignments?.filter(a => a.status === 'active') || [];
-  const pastAssignments = assignments?.filter(a => a.status === 'completed') || [];
-  const upcomingAssignments = assignments?.filter(a => a.status === 'upcoming') || [];
+  // Enhanced filtering with automated status calculation
+  const calculateStatusByDate = (dueDate: string): 'upcoming' | 'active' | 'completed' => {
+    const now = new Date();
+    const dueDateObj = new Date(dueDate);
+    const activeStartDate = new Date(dueDateObj.getTime() - (7 * 24 * 60 * 60 * 1000)); // 1 week before
+    
+    if (now < activeStartDate) {
+      return 'upcoming';
+    } else if (now >= activeStartDate && now <= dueDateObj) {
+      return 'active';
+    } else {
+      return 'completed';
+    }
+  };
+
+  // Use automated status calculation for better user experience
+  const enhancedAssignments = assignments?.map(assignment => ({
+    ...assignment,
+    calculatedStatus: calculateStatusByDate(assignment.dueDate),
+    manualStatus: assignment.status,
+    effectiveStatus: calculateStatusByDate(assignment.dueDate) // Prefer automated status
+  })) || [];
+
+  const activeAssignments = enhancedAssignments.filter(a => a.effectiveStatus === 'active');
+  const pastAssignments = enhancedAssignments.filter(a => a.effectiveStatus === 'completed');
+  const upcomingAssignments = enhancedAssignments.filter(a => a.effectiveStatus === 'upcoming');
   
   const renderAssignmentGrid = (items: AssignmentWithSubmissions[]) => {
     if (items.length === 0) {

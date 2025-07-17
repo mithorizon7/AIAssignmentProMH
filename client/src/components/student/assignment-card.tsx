@@ -7,14 +7,20 @@ import { Link } from "wouter";
 import { APP_ROUTES } from "@/lib/constants";
 import { Calendar, CheckCircle, ArrowRightCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AssignmentStatusIndicator } from "./assignment-status-indicator";
 
 interface AssignmentCardProps {
-  assignment: Assignment;
+  assignment: Assignment & {
+    effectiveStatus?: 'upcoming' | 'active' | 'completed';
+    calculatedStatus?: 'upcoming' | 'active' | 'completed';
+    manualStatus?: string;
+  };
   latestSubmission?: Submission;
 }
 
 export function AssignmentCard({ assignment, latestSubmission }: AssignmentCardProps) {
-  const isActive = assignment.status === 'active';
+  const effectiveStatus = assignment.effectiveStatus || assignment.status;
+  const isActive = effectiveStatus === 'active';
   const isSubmitted = !!latestSubmission;
   
   return (
@@ -22,19 +28,14 @@ export function AssignmentCard({ assignment, latestSubmission }: AssignmentCardP
       <CardContent className="p-5 border-b border-neutral-200">
         <div className="flex justify-between items-start mb-2">
           <h2 className="text-lg font-medium text-neutral-800 fade-in" style={{animationDelay: "50ms"}}>{assignment.title}</h2>
-          <Badge 
-            variant={isActive ? "default" : "secondary"}
-            className={cn(
-              "transition-all duration-300 slide-in-right",
-              isActive && "bg-green-100 text-green-800 hover:bg-green-200",
-              assignment.status === 'completed' && "bg-gray-100 text-gray-800 hover:bg-gray-200",
-              assignment.status === 'upcoming' && "bg-blue-100 text-blue-800 hover:bg-blue-200"
-            )}
-            style={{animationDelay: "150ms"}}
-          >
-            {assignment.status === 'active' ? 'Active' : 
-             assignment.status === 'completed' ? 'Completed' : 'Upcoming'}
-          </Badge>
+          <div className="slide-in-right" style={{animationDelay: "150ms"}}>
+            <AssignmentStatusIndicator
+              effectiveStatus={effectiveStatus as 'upcoming' | 'active' | 'completed'}
+              manualStatus={assignment.manualStatus || assignment.status}
+              calculatedStatus={assignment.calculatedStatus || assignment.status as 'upcoming' | 'active' | 'completed'}
+              dueDate={assignment.dueDate}
+            />
+          </div>
         </div>
         <p className="text-neutral-600 text-sm mb-3 fade-in" style={{animationDelay: "100ms"}}>{assignment.course.name}</p>
         <div className="flex items-center text-sm text-neutral-600 fade-in" style={{animationDelay: "150ms"}}>

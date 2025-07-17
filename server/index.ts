@@ -16,6 +16,7 @@ import { securityMonitoringMiddleware, initializeSecurityMonitoring } from "./li
 import { errorRecoveryMiddleware, initializeErrorRecovery } from "./lib/error-recovery";
 import { initializeCacheManager } from "./lib/cache-manager";
 import { initializeMemoryMonitor } from "./lib/memory-monitor";
+import { assignmentScheduler } from "./services/assignment-scheduler";
 
 // Load and validate configuration
 const config = loadConfig();
@@ -242,6 +243,11 @@ app.use((req, res, next) => {
 
   // Setup graceful shutdown handling
   initGracefulShutdown(server);
+
+  // Initialize assignment status scheduler for automatic updates
+  console.log('[Startup] Initializing assignment status scheduler...');
+  assignmentScheduler.start(60); // Update every 60 minutes
+  console.log('[Startup] Assignment status scheduler initialized');
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
