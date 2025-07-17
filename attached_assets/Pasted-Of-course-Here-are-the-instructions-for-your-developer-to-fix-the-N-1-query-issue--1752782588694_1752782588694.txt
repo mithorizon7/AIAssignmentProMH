@@ -1,0 +1,100 @@
+Of course. Here are the instructions for your developer to fix the N+1 query issue.
+
+-----
+
+### \#\# The Change: Combine Two Database Queries into One
+
+The goal is to refactor the `GET /assignments/:id/submissions` endpoint in the `instructor-2.ts` file.
+
+Currently, this endpoint makes two separate queries to the database:
+
+1.  First, it fetches all submissions for an assignment.
+2.  Then, it collects the IDs from those submissions and makes a second query to fetch the feedback.
+
+The change is to combine these into a **single, more efficient database query** that retrieves both the submissions and their associated feedback at the same time.
+
+### \#\# The Reason: Performance at Scale
+
+This change is critical for ensuring the application can handle the load from millions of students.
+
+  * **Network Latency**: The current two-query approach creates unnecessary back-and-forth communication between your application server and the database. While this delay might be small with a few records, it becomes a major performance bottleneck under heavy load, leading to slow API responses.
+  * **Database Efficiency**: Relational databases are highly optimized to perform `JOIN` operations. A single query with a `JOIN` allows the database's query planner to create the most efficient plan for retrieving the combined data, which is always faster than two separate, uncoordinated queries.
+  * **Application Simplicity**: A single query simplifies the application code. It removes the need to manually build a list of IDs in memory and then map the results of the second query back to the first.
+
+### \#\# How to Implement the Fix
+
+In the `server/routes/instructor-2.ts` file, you will replace the existing database query logic inside the `GET /assignments/:id/submissions` route handler.
+
+#### **Current Inefficient Code**
+
+```typescript
+// instructor-2.ts
+
+// ...
+// Get all submissions for the assignment with feedback
+const submissionsData = await db
+  .select({
+    submission: submissions,
+    userName: users.name,
+    userEmail: users.email
+  })
+  .from(submissions)
+  .innerJoin(users, eq(submissions.userId, users.id))
+  .where(eq(submissions.assignmentId, assignmentId))
+  .orderBy(desc(submissions.createdAt));
+
+// Get submission IDs for feedback lookup
+const submissionIds = submissionsData.map((s) => s.submission.id);
+
+// Get feedback for all submissions
+const feedbackItems = submissionIds.length > 0 
+  ? await db
+      .select()
+      .from(feedback)
+      .where(inArray(feedback.submissionId, submissionIds))
+  : [];
+
+const feedbackMap = new Map();
+for (const item of feedbackItems) {
+  feedbackMap.set(item.submissionId, item);
+}
+// ... manual mapping logic continues
+```
+
+#### **Recommended Fix**
+
+Replace the block above with the following code. This version uses a single query with a `LEFT JOIN` to fetch all the data at once.
+
+```typescript
+// instructor-2.ts
+
+// ...
+// Get all submissions for the assignment with feedback using a single query
+const submissionsWithFeedback = await db
+  .select()
+  .from(submissions)
+  .innerJoin(users, eq(submissions.userId, users.id))
+  .leftJoin(feedback, eq(submissions.id, feedback.submissionId)) // Use a LEFT JOIN here
+  .where(eq(submissions.assignmentId, assignmentId))
+  .orderBy(desc(submissions.createdAt));
+
+// Get assignment metrics
+const metrics = await metricsService.getAssignmentMetrics(assignmentId);
+
+// Structure the final response
+const result = submissionsWithFeedback.map(row => ({
+  ...row.submissions, // Spread all properties from the submission
+  student: {
+    name: row.users.name,
+    email: row.users.email
+  },
+  feedback: row.feedback || null // The feedback object will be present or null
+}));
+
+res.json({
+  assignment,
+  submissions: result,
+  metrics: metrics[0] || null
+});
+// ...
+```
