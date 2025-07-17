@@ -53,18 +53,27 @@ export function RealTimeSubmissionCard({
     }
   }, [isProcessing]);
 
+  // Initialize feedback visibility based on whether it's the latest submission
+  useEffect(() => {
+    if (isCompleted && hasFeedback && isLatest) {
+      setShowFeedback(true);
+    }
+  }, [isCompleted, hasFeedback, isLatest]);
+
   // Handle feedback completion
   useEffect(() => {
     if (isCompleted && hasFeedback && !justCompleted) {
       setJustCompleted(true);
-      setShowFeedback(true);
+      if (isLatest) {
+        setShowFeedback(true);
+      }
       onFeedbackReady?.();
       
       // Reset the "just completed" state after animation
       const timer = setTimeout(() => setJustCompleted(false), 2000);
       return () => clearTimeout(timer);
     }
-  }, [isCompleted, hasFeedback, justCompleted, onFeedbackReady]);
+  }, [isCompleted, hasFeedback, justCompleted, onFeedbackReady, isLatest]);
 
   return (
     <Card className={cn(

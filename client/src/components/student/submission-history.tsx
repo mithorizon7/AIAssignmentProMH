@@ -5,6 +5,7 @@ import { RealTimeSubmissionCard } from "./real-time-submission-card";
 import { formatDate } from "@/lib/utils/format";
 import { SubmissionWithFeedback } from "@/lib/types";
 import { useState, useCallback } from "react";
+import * as React from "react";
 import { 
   History, Loader2, ArrowUpCircle, FileText, File, 
   Image, FileCode, Video, Music, PieChart, FileJson, 
@@ -133,6 +134,25 @@ export function SubmissionHistory({
   // Use polled submissions if available, otherwise use passed submissions
   const submissions = shouldPoll ? polledSubmissions : (passedSubmissions || []);
   const isLoading = shouldPoll ? pollingLoading : loading;
+  
+  // Initialize expanded state to only show the most recent submission expanded
+  const initializeExpandedState = useCallback(() => {
+    if (submissions.length > 0) {
+      const mostRecentSubmissionId = submissions[0].id;
+      setExpandedFeedbacks(prev => {
+        // Only expand if not already set
+        if (Object.keys(prev).length === 0) {
+          return { [mostRecentSubmissionId]: true };
+        }
+        return prev;
+      });
+    }
+  }, [submissions]);
+  
+  // Initialize expanded state when submissions change
+  React.useEffect(() => {
+    initializeExpandedState();
+  }, [initializeExpandedState]);
   
   const toggleFeedback = (submissionId: number) => {
     setExpandedFeedbacks(prev => ({

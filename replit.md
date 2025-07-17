@@ -6,6 +6,15 @@ AIGrader is an enterprise-grade AI-powered assignment feedback platform that enh
 
 ## Recent Changes (2025-07-17)
 
+### ✅ SUBMISSION HISTORY UX IMPROVEMENT COMPLETED (2025-07-17)
+**Status**: Enhanced submission history display to show only most recent submission expanded by default
+**User Request**: "Only the most recent should be expanded. The rest should be able to be expanded, but not initially expanded by default."
+**Resolution**: Modified RealTimeSubmissionCard component to initialize feedback visibility based on isLatest flag
+- ✅ **Smart Expansion Logic**: Only the most recent submission shows feedback expanded initially
+- ✅ **User Control**: All other submissions remain collapsible but start collapsed
+- ✅ **Clean UI**: Improved visual hierarchy in submission history pages
+- ✅ **Production Ready**: Zero impact on existing functionality, pure UX enhancement
+
 ### ✅ COMPREHENSIVE AUTOMATED ASSIGNMENT STATUS SYSTEM COMPLETED (2025-07-17)
 **Status**: 🏆 **ENTERPRISE-GRADE AUTOMATED STATUS MANAGEMENT** - Complete intelligent date-based assignment lifecycle management
 **Achievement**: Sophisticated automated status transitions with 1-week activation period and intelligent manual override logic
