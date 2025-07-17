@@ -24,8 +24,8 @@ interface GeminiFilePart {
 }
 
 // Token budget constants for two-step approach
-const BASE_MAX_TOKENS = 2000;   // first attempt - increased for better document handling
-const RETRY_MAX_TOKENS = 3000;  // if finishReason !== "STOP" - increased for complex documents
+const BASE_MAX_TOKENS = 4000;   // first attempt - optimized for comprehensive feedback
+const RETRY_MAX_TOKENS = 8000;  // if finishReason !== "STOP" - for complex documents requiring detailed analysis
 
 // The newest Gemini model is "gemini-2.5-flash-preview-05-20" which was released May 20, 2025
 import { ContentType } from '../utils/file-type-settings';
@@ -127,7 +127,7 @@ export class GeminiAdapter implements AIAdapter {
       systemInstruction: systemPrompt,
       config: {
         ...this.defaultConfig,
-        maxOutputTokens: 4000, // Increased from 2000 to prevent JSON truncation
+        maxOutputTokens: BASE_MAX_TOKENS, // Using constant for consistency
         responseMimeType: "application/json",
         responseSchema: this.responseSchema
       }
@@ -191,12 +191,12 @@ export class GeminiAdapter implements AIAdapter {
     const runOnce = async (cap: number) => collectStream(buildRequest(cap));
     
     // First try with base token limit
-    let { raw, finishReason, usageMetadata } = await runOnce(4000);
+    let { raw, finishReason, usageMetadata } = await runOnce(BASE_MAX_TOKENS);
     
     // If the model stopped early, retry with a higher token limit
     if (finishReason !== 'STOP') {
       console.warn(`[GEMINI] early stop ${finishReason} – retry ↑ tokens`);
-      ({ raw, finishReason, usageMetadata } = await runOnce(8000));
+      ({ raw, finishReason, usageMetadata } = await runOnce(RETRY_MAX_TOKENS));
     }
     
     // If still having issues, throw an error
@@ -298,7 +298,7 @@ export class GeminiAdapter implements AIAdapter {
       console.log(`[GEMINI] Prompt preview: ${prompt.slice(0, 250)}${prompt?.length > 0 && 250 ? '...' : ''}`);
       
       // Sanitize input text to prevent prompt injection and other issues
-      const sanitizedPrompt = sanitizeText(prompt, 8000);
+      const sanitizedPrompt = sanitizeText(prompt, RETRY_MAX_TOKENS);
       
       // Check for potential injection attempts
       const potentialInjection = detectInjectionAttempt(prompt);
@@ -365,7 +365,7 @@ export class GeminiAdapter implements AIAdapter {
   ): Promise<Part> {
     // Text part
     if (promptPart.type === 'text' && typeof promptPart.content === 'string') {
-      const sanitizedText = sanitizeText(promptPart.content, 8000);
+      const sanitizedText = sanitizeText(promptPart.content, RETRY_MAX_TOKENS);
       
       // Check for potential injection attempts
       const potentialInjection = detectInjectionAttempt(promptPart.content);
