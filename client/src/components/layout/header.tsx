@@ -37,7 +37,7 @@ export function Header() {
         </Sheet>
         
         <Link href={getRootPath()} className="flex items-center">
-          <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-8 mr-2" />
+          <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-12 mr-2" />
           <span className="text-lg font-medium text-primary hidden sm:block">Academus</span>
         </Link>
       </div>

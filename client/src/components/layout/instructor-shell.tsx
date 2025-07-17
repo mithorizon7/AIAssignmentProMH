@@ -203,7 +203,7 @@ export function InstructorShell({ children }: { children: ReactNode }) {
         <div className="flex flex-1">
           <aside className="fixed inset-y-0 left-0 z-20 hidden w-80 flex-col border-r bg-background md:flex">
             <div className="p-5 flex items-center">
-              <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-10 mr-3" />
+              <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-12 mr-3" />
               <div className="flex flex-col">
                 <span className="text-xl font-semibold">Instructor Portal</span>
                 <span className="text-sm text-muted-foreground">AI Grader</span>

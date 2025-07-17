@@ -50,7 +50,7 @@ export function Sidebar() {
     <aside className="hidden md:flex flex-col w-80 bg-white border-r border-neutral-200 dark:bg-sidebar dark:border-sidebar-border overflow-y-auto">
       <div className="p-5 border-b border-neutral-200 dark:border-sidebar-border">
         <div className="flex items-center">
-          <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-10 mr-3" />
+          <img src="/AcademusLogo.webp" alt="Academus Logo" className="h-12 mr-3" />
           <div>
             <h1 className="text-xl font-medium text-primary">
               {user.role === 'admin' ? 'Admin Portal' : 
