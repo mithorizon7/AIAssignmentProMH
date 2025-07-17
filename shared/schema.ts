@@ -141,8 +141,8 @@
   // Enrollments
   export const enrollments = pgTable("enrollments", {
     id: serial("id").primaryKey(),
-    userId: integer("user_id").references(() => users.id).notNull(),
-    courseId: integer("course_id").references(() => courses.id).notNull(),
+    userId: integer("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    courseId: integer("course_id").references(() => courses.id, { onDelete: 'cascade' }).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   }, (table) => {
     return {
@@ -177,8 +177,8 @@
   // Submissions
   export const submissions = pgTable("submissions", {
     id: serial("id").primaryKey(),
-    assignmentId: integer("assignment_id").references(() => assignments.id).notNull(),
-    userId: integer("user_id").references(() => users.id).notNull(),
+    assignmentId: integer("assignment_id").references(() => assignments.id, { onDelete: 'cascade' }).notNull(),
+    userId: integer("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
     fileUrl: text("file_url"),
     fileName: text("file_name"),
     mimeType: text("mime_type"), 
@@ -236,7 +236,7 @@
     security: json("security").$type<Record<string, unknown> | null>().default(null),// New in HEAD
     description: text("description"),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    updatedBy: integer("updated_by").references(() => users.id),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
   }, (table) => {
     return {
       keyIdx: index("idx_system_settings_key").on(table.key)
@@ -254,7 +254,7 @@
     mimeTypes: json("mime_types").$type<string[]>().notNull(),
     maxSize: integer("max_size").notNull(), 
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    updatedBy: integer("updated_by").references(() => users.id),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
   }, (table) => {
     return {
       contextTypeIdx: index("idx_file_type_settings_context_type").on(table.context, table.contentType),
@@ -265,7 +265,7 @@
   // User Notification Settings (from HEAD branch)
   export const userNotificationSettings = pgTable("user_notification_settings", {
     id: serial("id").primaryKey(),
-    userId: integer("user_id").references(() => users.id).notNull().unique(),
+    userId: integer("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull().unique(),
     emailNotifications: boolean("email_notifications").notNull().default(true),
     assignmentNotifications: boolean("assignment_notifications").notNull().default(true),
     feedbackNotifications: boolean("feedback_notifications").notNull().default(true),
@@ -300,7 +300,7 @@
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    createdBy: integer("created_by").references(() => users.id),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   }, (table) => {
     return {
       providerIdx: index("idx_lms_credentials_provider").on(table.provider),
@@ -311,7 +311,7 @@
   // LMS Sync Jobs (from main branch)
   export const lmsSyncJobs = pgTable("lms_sync_jobs", {
     id: serial("id").primaryKey(),
-    credentialId: integer("credential_id").references(() => lmsCredentials.id).notNull(),
+    credentialId: integer("credential_id").references(() => lmsCredentials.id, { onDelete: 'cascade' }).notNull(),
     syncType: text("sync_type").notNull(), 
     status: syncStatusEnum("status").notNull().default('pending'),
     startedAt: timestamp("started_at"),
@@ -319,7 +319,7 @@
     errorMessage: text("error_message"),
     syncData: json("sync_data").$type<Record<string, unknown>>(), 
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    createdBy: integer("created_by").references(() => users.id),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   }, (table) => {
     return {
       credentialIdIdx: index("idx_lms_sync_jobs_credential_id").on(table.credentialId),
@@ -563,7 +563,7 @@
   export const dataSubjectRequests = pgTable("data_subject_requests", {
     id: serial("id").primaryKey(),
     type: dataSubjectRequestTypeEnum("type").notNull(),
-    userId: integer("user_id").references(() => users.id).notNull(),
+    userId: integer("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
     requesterEmail: text("requester_email").notNull(),
     verificationToken: text("verification_token").notNull(),
     details: text("details"),
@@ -584,7 +584,7 @@
   // User consent management
   export const userConsents = pgTable("user_consents", {
     id: serial("id").primaryKey(),
-    userId: integer("user_id").references(() => users.id).notNull(),
+    userId: integer("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
     purpose: consentPurposeEnum("purpose").notNull(),
     granted: boolean("granted").notNull(),
     grantedAt: timestamp("granted_at").defaultNow().notNull(),
@@ -604,14 +604,14 @@
   // Data processing audit trail
   export const dataAuditLog = pgTable("data_audit_log", {
     id: serial("id").primaryKey(),
-    userId: integer("user_id").references(() => users.id),
+    userId: integer("user_id").references(() => users.id, { onDelete: 'set null' }),
     action: auditActionEnum("action").notNull(),
     tableName: text("table_name").notNull(),
     recordId: integer("record_id"),
     details: json("details").$type<Record<string, unknown>>(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
-    performedBy: integer("performed_by").references(() => users.id),
+    performedBy: integer("performed_by").references(() => users.id, { onDelete: 'set null' }),
     timestamp: timestamp("timestamp").defaultNow().notNull(),
   }, (table) => {
     return {
@@ -645,7 +645,7 @@
   // Privacy policy acceptance tracking
   export const privacyPolicyAcceptances = pgTable("privacy_policy_acceptances", {
     id: serial("id").primaryKey(),
-    userId: integer("user_id").references(() => users.id).notNull(),
+    userId: integer("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
     policyVersion: text("policy_version").notNull(),
     acceptedAt: timestamp("accepted_at").defaultNow().notNull(),
     ipAddress: text("ip_address"),
