@@ -25,7 +25,8 @@ export default function SubmissionDetail({ id }: SubmissionDetailProps) {
   });
   
   const { data: submissions, isLoading: submissionsLoading } = useQuery<SubmissionWithFeedback[]>({
-    queryKey: [`${API_ROUTES.SUBMISSIONS}`, assignmentId],
+    queryKey: [`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/submissions`],
+    enabled: !!assignmentId && !isNaN(assignmentId),
   });
   
   useEffect(() => {
@@ -80,7 +81,9 @@ export default function SubmissionDetail({ id }: SubmissionDetailProps) {
         <div className="mb-8">
           <SubmissionHistory 
             submissions={submissions || []} 
-            loading={submissionsLoading} 
+            loading={submissionsLoading}
+            assignmentTitle={assignment?.title}
+            isAssignmentSpecific={true}
           />
         </div>
       </div>

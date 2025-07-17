@@ -582,6 +582,81 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // OPTIMIZED: Get all submissions with feedback for specific assignment (instructor view)
+  async listSubmissionsWithFeedbackForAssignment(assignmentId: number, userId?: number): Promise<(Submission & { feedback: Feedback | null })[]> {
+    console.log(`[PERFORMANCE] Using optimized assignment-specific submissions query for assignment ${assignmentId}, user ${userId}`);
+    
+    const result = await db.select({
+      // Submission fields (matching actual schema)
+      id: submissions.id,
+      assignmentId: submissions.assignmentId,
+      userId: submissions.userId,
+      fileUrl: submissions.fileUrl,
+      fileName: submissions.fileName,
+      content: submissions.content,
+      notes: submissions.notes,
+      status: submissions.status,
+      mimeType: submissions.mimeType,
+      fileSize: submissions.fileSize,
+      contentType: submissions.contentType,
+      createdAt: submissions.createdAt,
+      updatedAt: submissions.updatedAt,
+      // Feedback fields
+      feedbackId: feedback.id,
+      feedbackSubmissionId: feedback.submissionId,
+      feedbackStrengths: feedback.strengths,
+      feedbackImprovements: feedback.improvements,
+      feedbackSuggestions: feedback.suggestions,
+      feedbackSummary: feedback.summary,
+      feedbackScore: feedback.score,
+      feedbackCriteriaScores: feedback.criteriaScores,
+      feedbackProcessingTime: feedback.processingTime,
+      feedbackRawResponse: feedback.rawResponse,
+      feedbackModelName: feedback.modelName,
+      feedbackTokenCount: feedback.tokenCount,
+      feedbackCreatedAt: feedback.createdAt
+    })
+    .from(submissions)
+    .leftJoin(feedback, eq(submissions.id, feedback.submissionId))
+    .where(
+      userId 
+        ? and(eq(submissions.assignmentId, assignmentId), eq(submissions.userId, userId))
+        : eq(submissions.assignmentId, assignmentId)
+    )
+    .orderBy(desc(submissions.createdAt));
+
+    return result.map(row => ({
+      id: row.id,
+      assignmentId: row.assignmentId,
+      userId: row.userId,
+      fileUrl: row.fileUrl,
+      fileName: row.fileName,
+      content: row.content,
+      notes: row.notes,
+      status: row.status,
+      mimeType: row.mimeType,
+      fileSize: row.fileSize,
+      contentType: row.contentType,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      feedback: row.feedbackId ? {
+        id: row.feedbackId,
+        submissionId: row.feedbackSubmissionId!,
+        strengths: row.feedbackStrengths!,
+        improvements: row.feedbackImprovements!,
+        suggestions: row.feedbackSuggestions!,
+        summary: row.feedbackSummary,
+        score: row.feedbackScore,
+        criteriaScores: row.feedbackCriteriaScores,
+        processingTime: row.feedbackProcessingTime!,
+        rawResponse: row.feedbackRawResponse,
+        modelName: row.feedbackModelName,
+        tokenCount: row.feedbackTokenCount,
+        createdAt: row.feedbackCreatedAt!
+      } : null
+    }));
+  }
+
   // OPTIMIZED: Get submissions with feedback in single query
   async listSubmissionsWithFeedbackForUser(userId: number, assignmentId?: number): Promise<(Submission & { feedback: Feedback | null })[]> {
     console.log(`[PERFORMANCE] Using optimized submissions with feedback query for user ${userId}`);

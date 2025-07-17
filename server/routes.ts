@@ -485,6 +485,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
 
+
+
   // Create assignment (instructor only)
   app.post('/api/assignments', requireAuth, requireRole('instructor'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     try {
@@ -977,19 +979,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(recentSubmissions);
   }));
 
-  app.get('/api/assignments/:id/submissions', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/assignments/:id/submissions', requireAuth, asyncHandler(async (req: Request, res: Response) => {
       const assignmentId = parseInt(req.params.id);
+      const user = req.user as any;
+      
+      // Validate assignmentId
+      if (isNaN(assignmentId) || assignmentId <= 0) {
+        return res.status(400).json({ message: 'Invalid assignment ID' });
+      }
 
       const assignment = await storage.getAssignment(assignmentId);
       if (!assignment) {
         return res.status(404).json({ message: 'Assignment not found' });
       }
 
-      // Use optimized single query to get submissions with feedback
-      console.log(`[PERFORMANCE] Using optimized submissions with feedback query for assignment ${assignmentId}`);
-      const submissionsWithFeedback = await storage.listSubmissionsWithFeedbackForAssignment(assignmentId);
-
-      res.json(submissionsWithFeedback);
+      // Role-based access control
+      if (user.role === 'student') {
+        // Students can only see their own submissions for this assignment
+        console.log(`[PERFORMANCE] Using optimized assignment-specific submissions query for assignment ${assignmentId}, user ${user.id}`);
+        const submissions = await storage.listSubmissionsWithFeedbackForAssignment(assignmentId, user.id);
+        res.json(submissions);
+      } else if (user.role === 'instructor') {
+        // Instructors can see all submissions for the assignment
+        console.log(`[PERFORMANCE] Using optimized submissions with feedback query for assignment ${assignmentId} (instructor view)`);
+        const submissionsWithFeedback = await storage.listSubmissionsWithFeedbackForAssignment(assignmentId);
+        res.json(submissionsWithFeedback);
+      } else {
+        return res.status(403).json({ message: 'Access denied' });
+      }
   }));
 
   app.get('/api/courses', requireAuth, createCacheMiddleware({ 

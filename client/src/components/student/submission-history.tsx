@@ -58,9 +58,17 @@ interface SubmissionHistoryProps {
   submissions: SubmissionWithFeedback[];
   loading?: boolean;
   showAssignmentTitle?: boolean;
+  assignmentTitle?: string;
+  isAssignmentSpecific?: boolean;
 }
 
-export function SubmissionHistory({ submissions, loading = false, showAssignmentTitle = false }: SubmissionHistoryProps) {
+export function SubmissionHistory({ 
+  submissions, 
+  loading = false, 
+  showAssignmentTitle = false, 
+  assignmentTitle, 
+  isAssignmentSpecific = false 
+}: SubmissionHistoryProps) {
   const [expandedFeedbacks, setExpandedFeedbacks] = useState<Record<number, boolean>>({});
   const [, navigate] = useLocation();
   
@@ -75,8 +83,12 @@ export function SubmissionHistory({ submissions, loading = false, showAssignment
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Submission History</CardTitle>
-          <CardDescription>Loading your previous submissions...</CardDescription>
+          <CardTitle>
+            {isAssignmentSpecific ? `Submission History - ${assignmentTitle}` : 'Submission History'}
+          </CardTitle>
+          <CardDescription>
+            Loading your {isAssignmentSpecific ? 'submissions for this assignment' : 'previous submissions'}...
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center p-10">
           <Loader2 className="h-10 w-10 text-primary animate-spin" />
@@ -89,8 +101,15 @@ export function SubmissionHistory({ submissions, loading = false, showAssignment
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Submission History</CardTitle>
-          <CardDescription>View your previous submissions and AI feedback</CardDescription>
+          <CardTitle>
+            {isAssignmentSpecific ? `Submission History - ${assignmentTitle}` : 'Submission History'}
+          </CardTitle>
+          <CardDescription>
+            {isAssignmentSpecific 
+              ? 'View your submissions and AI feedback for this assignment' 
+              : 'View your previous submissions and AI feedback'
+            }
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-8 text-center">
           <div className="flex flex-col items-center">
@@ -103,10 +122,14 @@ export function SubmissionHistory({ submissions, loading = false, showAssignment
               </div>
             </div>
             
-            <h3 className="text-xl font-semibold text-neutral-800 mb-3">Your AI feedback journey starts here</h3>
+            <h3 className="text-xl font-semibold text-neutral-800 mb-3">
+              {isAssignmentSpecific ? 'No submissions for this assignment' : 'Your AI feedback journey starts here'}
+            </h3>
             <p className="text-neutral-600 mb-6 max-w-md">
-              Submit your first assignment to receive detailed AI feedback. All your submissions
-              will be tracked here so you can see your progress over time.
+              {isAssignmentSpecific 
+                ? 'You haven\'t submitted any work for this assignment yet. Submit your work above to receive detailed AI feedback and track your progress.'
+                : 'Submit your first assignment to receive detailed AI feedback. All your submissions will be tracked here so you can see your progress over time.'
+              }
             </p>
             
             <div className="w-full max-w-md bg-blue-50 rounded-md p-4 mb-5 text-left border border-blue-100">
@@ -139,8 +162,15 @@ export function SubmissionHistory({ submissions, loading = false, showAssignment
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Submission History</CardTitle>
-        <CardDescription>View your previous submissions and AI feedback</CardDescription>
+        <CardTitle>
+          {isAssignmentSpecific ? `Submission History - ${assignmentTitle}` : 'Submission History'}
+        </CardTitle>
+        <CardDescription>
+          {isAssignmentSpecific 
+            ? 'View your submissions and AI feedback for this assignment' 
+            : 'View your previous submissions and AI feedback'
+          }
+        </CardDescription>
       </CardHeader>
       
       <CardContent className="p-6">
