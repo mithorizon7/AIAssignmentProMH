@@ -14,6 +14,7 @@ AIGrader is an enterprise-grade AI-powered assignment feedback platform that enh
 - ✅ **Database Query Optimization**: Replaced 8 separate sequential queries with 4 optimized parallel queries using conditional aggregation
 - ✅ **Performance Improvement**: 8x faster admin statistics endpoint with proper query batching and performance logging
 - ✅ **N+1 Query Pattern Eliminated**: Fixed instructor submissions endpoint by replacing 2-query pattern with single LEFT JOIN query
+- ✅ **Critical Duplicate Method Bug Fixed**: Removed duplicate `listSubmissionsWithFeedbackForAssignment` method that was overwriting the more capable version
 - ✅ **Remaining Auth Migration**: Completed conversion of final 3 routes from old `requireRole('instructor')` to new `flexibleRequireRole(['instructor'])` pattern
 - ✅ **Code Quality**: Eliminated all inconsistent authentication patterns across the entire codebase
 - ✅ **Production Ready**: All routes now use scalable middleware with comprehensive error handling and performance monitoring
