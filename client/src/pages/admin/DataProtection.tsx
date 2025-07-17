@@ -402,7 +402,7 @@ export default function DataProtection() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {requestsData?.requests?.map((request: DataSubjectRequest) => (
+                  {(requestsData as any)?.requests?.map((request: DataSubjectRequest) => (
                     <TableRow key={request.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">

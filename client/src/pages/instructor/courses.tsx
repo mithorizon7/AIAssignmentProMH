@@ -191,7 +191,7 @@ export default function CoursesPage() {
               <Skeleton key={i} className="h-64 rounded-lg" />
             ))}
           </div>
-        ) : courses.length === 0 ? (
+        ) : (courses as any[])?.length === 0 ? (
           <div className="flex h-[450px] shrink-0 items-center justify-center rounded-lg border border-dashed">
             <div className="mx-auto flex max-w-[450px] flex-col items-center justify-center text-center">
               <BookOpen className="h-8 w-8 text-muted-foreground" />

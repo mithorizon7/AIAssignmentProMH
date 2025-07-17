@@ -16,7 +16,7 @@ declare global {
     interface User {
       id: number;
       username: string;
-      email?: string;
+      email: string;
       role: string;
       name?: string;
       // Add other commonly used User properties here
