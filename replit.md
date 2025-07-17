@@ -6,6 +6,12 @@ AIGrader is an enterprise-grade AI-powered assignment feedback platform that enh
 
 ## Recent Changes (2025-07-17)
 
+### ✅ CRITICAL SUBMISSION HISTORY BUG FIXED - HIDE FUNCTIONALITY RESTORED (2025-07-17)
+**Status**: 🏆 **CRITICAL BUG RESOLUTION** - Fixed "Hide Details" button functionality that was broken by smart default logic
+**Critical Issue**: expandedFeedbacks[submission.id] || (index === 0) condition prevented users from hiding feedback on latest submissions
+**Root Cause**: The || (index === 0) check overrode user's hide action, making latest submission feedback permanently visible
+**Resolution**: Made expandedFeedbacks state the single source of truth by removing || (index === 0) from both button text and visibility logic
+
 ### ✅ COMPREHENSIVE SUBMISSION HISTORY UX REFINEMENT COMPLETED (2025-07-17)
 **Status**: 🏆 **COMPLETE UX ENHANCEMENT** - Submission history system completely refined with elegant expansion logic and celebration animations
 **User Request**: "Only the most recent should be expanded. The rest should be able to be expanded, but not initially expanded by default."

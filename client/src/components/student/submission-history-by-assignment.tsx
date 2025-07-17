@@ -314,7 +314,7 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                                   onClick={() => toggleFeedback(submission.id)}
                                   className="text-primary hover:text-primary-dark hover:bg-primary/10 transition-colors"
                                 >
-                                  {(expandedFeedbacks[submission.id] || (index === 0)) ? 'Hide' : 'Show'} Details
+                                  {expandedFeedbacks[submission.id] ? 'Hide' : 'Show'} Details
                                 </Button>
                               </div>
                               
@@ -342,7 +342,7 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                                   </div>
                                 )}
                                 
-                                {(expandedFeedbacks[submission.id] || (index === 0)) && (
+                                {expandedFeedbacks[submission.id] && (
                                   <FeedbackCard 
                                     feedback={submission.feedback}
                                   />
