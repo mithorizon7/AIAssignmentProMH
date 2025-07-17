@@ -343,6 +343,8 @@ export function configureAuth(app: any) {
     // Combined list of routes to skip CSRF for
     const skipCsrfForRoutes = [...baseSkipList, ...devSkipList, ...alwaysSkipList];
     
+
+    
     if (skipCsrfForRoutes.includes(req.path)) {
       return next();
     }

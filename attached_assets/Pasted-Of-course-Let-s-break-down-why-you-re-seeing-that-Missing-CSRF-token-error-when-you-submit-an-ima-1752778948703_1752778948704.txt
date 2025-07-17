@@ -1,0 +1,48 @@
+Of course. Let's break down why you're seeing that "Missing CSRF token" error when you submit an image.
+
+You're running into this error because of a misconfiguration in the application's security settings for handling anonymous submissions. The endpoint for anonymous uploads is incorrectly demanding a security token (a CSRF token) that isn't being provided by the browser during this specific type of submission.
+
+-----
+
+## The Problem
+
+The core issue lies in a contradiction between two files that handle security and API routes.
+
+1.  **The Intention (`auth-2.ts`):** The main authentication file, `auth-2.ts`, is set up to *skip* the CSRF security check for the anonymous submission endpoint (`/api/anonymous-submissions`). The developers correctly identified that this specific route should not require the token.
+
+2.  **The Bug (`routes-4.ts`):** However, the file that defines the API endpoint, `routes-4.ts`, mistakenly re-applies the CSRF security check directly to the anonymous submission route.
+
+This means that even though the global configuration says to skip the check, the specific route handler enforces it anyway, causing the "Missing CSRF token" error you're experiencing. Authenticated submissions to `/api/submissions` work correctly because they don't have this redundant check.
+
+### Code evidence
+
+Here is the incorrect code from the `routes-4.ts` file:
+
+```typescript
+// From: routes-4.ts
+
+app.post('/api/anonymous-submissions', submissionRateLimiter, csrfProtection, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
+  // ... route logic
+}));
+```
+
+The `csrfProtection` middleware in that line is what's causing the error.
+
+-----
+
+## The Fix
+
+To resolve this, the redundant `csrfProtection` middleware must be removed from the `/api/anonymous-submissions` route definition in `routes-4.ts`. The route is still protected by other mechanisms, like a rate limiter, so this change is safe.
+
+Here is the corrected code:
+
+```typescript
+// From: routes-4.ts
+
+// CORRECTED: The csrfProtection middleware is removed
+app.post('/api/anonymous-submissions', submissionRateLimiter, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
+  // ... route logic
+}));
+```
+
+By making this change, the anonymous submission endpoint will behave as intended, and you will no longer receive the CSRF token error when uploading an image.

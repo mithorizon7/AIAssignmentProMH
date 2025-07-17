@@ -15,7 +15,9 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     '/api/auth/logout',
     '/api/auth/register',
     '/api/auth-sso/callback',
-    '/api/newsletter/subscribe' // Public endpoint
+    '/api/newsletter/subscribe', // Public endpoint
+    '/api/submissions', // Skip for student submissions - handled by global middleware
+    '/api/anonymous-submissions' // Skip for anonymous submissions - handled by global middleware
   ];
 
   if (skipPaths.some(path => req.path.startsWith(path))) {
