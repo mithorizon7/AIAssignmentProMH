@@ -31,7 +31,7 @@ import { verifyTotp } from './utils/totp';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import connectPgSimple from 'connect-pg-simple';
-import { User } from '@shared/schema';
+import { User } from '../shared/schema';
 import { doubleCsrf } from 'csrf-csrf';
 import { pool } from './db';
 import { authRateLimiter, csrfRateLimiter } from './middleware/rate-limiter';

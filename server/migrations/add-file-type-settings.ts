@@ -2,7 +2,7 @@
  * Migration to create the file_type_settings table and add default settings
  */
 import { pool, db } from '../db';
-import { fileTypeSettings, contentTypeEnum } from '@shared/schema';
+import { fileTypeSettings, contentTypeEnum } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 
 export async function createFileTypeSettingsTable() {

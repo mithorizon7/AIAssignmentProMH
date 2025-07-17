@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { submissionQueue } from '../queue/worker';
 import { db } from '../db';
 import { storage } from '../storage';
-import { submissions, users, courses, assignments, feedback } from '@shared/schema';
+import { submissions, users, courses, assignments, feedback } from '../../shared/schema';
 import { eq, count, avg, gt, lt, between, and, desc } from 'drizzle-orm';
 import { metricsService } from '../services/metrics-service';
 import { asyncHandler } from '../lib/error-handler';

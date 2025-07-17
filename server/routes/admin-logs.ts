@@ -1,6 +1,6 @@
 import express from 'express';
 import { db } from '../db';
-import { submissions, feedback, users } from '@shared/schema';
+import { submissions, feedback, users } from '../../shared/schema';
 import { sql, desc, eq, and, gte, like, or } from 'drizzle-orm';
 import { asyncHandler } from '../lib/error-handler';
 import { requireAuth } from '../auth';

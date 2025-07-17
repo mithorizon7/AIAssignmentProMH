@@ -1,7 +1,7 @@
 /**
  * Shared interfaces for AI adapters
  */
-import { CriteriaScore } from '@shared/schema';
+import { CriteriaScore } from '../../shared/schema';
 import { GradingFeedback } from '../schemas/gradingSchema';
 
 // Define a structure for multimodal prompts

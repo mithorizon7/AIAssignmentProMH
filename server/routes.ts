@@ -14,7 +14,7 @@ import { OpenAIAdapter } from "./adapters/openai-adapter";
 import { z } from "zod";
 import { eq, count } from "drizzle-orm";
 import { db } from "./db";
-import { submissions, feedback, users, userNotificationSettings, newsletterSubscribers, type User } from "@shared/schema";
+import { submissions, feedback, users, userNotificationSettings, newsletterSubscribers, type User } from "../shared/schema";
 import { v4 as uuidv4 } from "uuid";
 import { defaultRateLimiter, submissionRateLimiter } from "./middleware/rate-limiter";
 import adminRoutes from "./routes/admin";

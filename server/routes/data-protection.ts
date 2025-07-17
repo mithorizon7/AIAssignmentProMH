@@ -9,7 +9,7 @@ import { configureAuth } from "../auth";
 import { csrfProtection } from "../middleware/csrf-protection";
 import { dataProtectionService } from "../services/data-protection";
 import { db } from "../db";
-import { dataSubjectRequests, userConsents, dataAuditLog } from "@shared/schema";
+import { dataSubjectRequests, userConsents, dataAuditLog } from "../../shared/schema";
 import { eq, desc, and, gte, lte, count } from "drizzle-orm";
 import { z } from "zod";
 

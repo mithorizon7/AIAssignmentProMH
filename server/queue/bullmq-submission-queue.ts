@@ -1,5 +1,5 @@
 import { Queue, Worker, QueueEvents, Job, ConnectionOptions } from 'bullmq';
-import { submissions } from '@shared/schema';
+import { submissions } from '../../shared/schema';
 import { db } from '../db';
 import { eq } from 'drizzle-orm';
 import { GeminiAdapter } from '../adapters/gemini-adapter';
