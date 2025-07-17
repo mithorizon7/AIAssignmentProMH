@@ -6,17 +6,12 @@ import { submissions, users, courses, assignments, feedback } from '@shared/sche
 import { eq, count, avg, gt, lt, between, and, desc } from 'drizzle-orm';
 import { metricsService } from '../services/metrics-service';
 import { asyncHandler } from '../lib/error-handler';
+import { requireRole } from '../middleware/auth';
 
 const router = Router();
 
-// Middleware to ensure user is an admin
-const requireAdmin = (req: Request, res: Response, next: any) => {
-  const user = (req as any).user;
-  if (user?.role !== 'admin') {
-    return res.status(403).json({ message: 'Admin access required' });
-  }
-  next();
-};
+// Use the flexible role middleware for admin access
+const requireAdmin = requireRole(['admin']);
 
 // Get overall system statistics
 router.get('/stats', requireAdmin, asyncHandler(async (req: Request, res: Response) => {

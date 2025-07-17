@@ -7,17 +7,12 @@ import { batchOperations } from '../services/batch-operations';
 import { metricsService } from '../services/metrics-service';
 import { stringify } from 'csv-stringify';
 import { asyncHandler } from '../lib/error-handler';
+import { requireRole } from '../middleware/auth';
 
 const router = Router();
 
-// Middleware to ensure user is an instructor
-const requireInstructor = (req: Request, res: Response, next: any) => {
-  const user = (req as any).user;
-  if (user?.role !== 'instructor' && user?.role !== 'admin') {
-    return res.status(403).json({ message: 'Instructor access required' });
-  }
-  next();
-};
+// Use the flexible role middleware for instructor access (includes admins)
+const requireInstructor = requireRole(['instructor']);
 
 // Get student progress for an entire course (optimized for large classes)
 router.get('/students/progress/:courseId', requireInstructor, asyncHandler(async (req: Request, res: Response) => {

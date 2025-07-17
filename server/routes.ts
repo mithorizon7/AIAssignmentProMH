@@ -62,19 +62,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
   const { requireAuth, requireRole } = configureAuth(app);
   
+  // Import the new flexible middleware from auth middleware
+  const { requireRole: flexibleRequireRole, requireInstructor, requireAdmin } = await import('./middleware/auth.js');
+  
   // Add CSRF protection middleware
   app.use(addCSRFToken);
   
   // CSRF token endpoint
   app.get('/api/csrf-token', getCSRFToken);
-
-  const requireInstructor = (req: Request, res: Response, next: NextFunction) => {
-    const role = (req.user as any)?.role;
-    if (role !== 'instructor' && role !== 'admin') {
-      return res.status(403).json({ message: 'Instructor access required' });
-    }
-    next();
-  };
 
   // Initialize services
   const storageService = new StorageService();
@@ -86,7 +81,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/instructor', instructorRoutes);
 
   // Data protection routes (GDPR/FERPA compliance) - require admin role
-  app.use('/api/data-protection', requireAuth, requireRole('admin'), dataProtectionRouter);
+  app.use('/api/data-protection', requireAuth, flexibleRequireRole(['admin']), dataProtectionRouter);
   
   // Mount error reporting routes
   app.use('/api', errorReportingRoutes);
@@ -133,38 +128,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
   
   // Production readiness check (admin only)
-  app.get('/api/admin/production-readiness', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  app.get('/api/admin/production-readiness', requireAuth, flexibleRequireRole(['admin']), asyncHandler(async (req, res) => {
     const result = await validateProductionReadiness();
     res.status(result.isValid ? 200 : 400).json(result);
   }));
 
   // Database health check (admin only)
-  app.get('/api/admin/database-health', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  app.get('/api/admin/database-health', requireAuth, flexibleRequireRole(['admin']), asyncHandler(async (req, res) => {
     const result = await getDatabaseHealth();
     res.json(result);
   }));
 
   // Queue health check (admin only)
-  app.get('/api/admin/queue-health', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  app.get('/api/admin/queue-health', requireAuth, flexibleRequireRole(['admin']), asyncHandler(async (req, res) => {
     const result = await getQueueHealthStatus();
     res.json(result);
   }));
 
   // Security health check (admin only)
-  app.get('/api/admin/security-health', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  app.get('/api/admin/security-health', requireAuth, flexibleRequireRole(['admin']), asyncHandler(async (req, res) => {
     const result = getSecurityHealth();
     res.json(result);
   }));
 
   // Recovery system status (admin only)
-  app.get('/api/admin/recovery-status', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  app.get('/api/admin/recovery-status', requireAuth, flexibleRequireRole(['admin']), asyncHandler(async (req, res) => {
     const status = errorRecoverySystem.getRecoveryStatus();
     const metrics = getRecoveryMetrics();
     res.json({ status, metrics });
   }));
 
   // Manual recovery trigger (admin only)
-  app.post('/api/admin/trigger-recovery', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req, res) => {
+  app.post('/api/admin/trigger-recovery', requireAuth, flexibleRequireRole(['admin']), csrfProtection, asyncHandler(async (req, res) => {
     const { actionId } = req.body;
     if (!actionId) {
       return res.status(400).json({ error: 'actionId is required' });
@@ -182,12 +177,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Cache management endpoints (admin only)
-  app.get('/api/admin/cache-health', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  app.get('/api/admin/cache-health', requireAuth, flexibleRequireRole(['admin']), asyncHandler(async (req, res) => {
     const health = await cacheManager.getHealth();
     res.json(health);
   }));
 
-  app.post('/api/admin/cache-clear', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req, res) => {
+  app.post('/api/admin/cache-clear', requireAuth, flexibleRequireRole(['admin']), csrfProtection, asyncHandler(async (req, res) => {
     const { pattern, tags } = req.body;
     
     let deletedCount = 0;
@@ -203,23 +198,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Queue management and monitoring endpoints (admin only)
-  app.get('/api/admin/queue/stats', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/admin/queue/stats', requireAuth, flexibleRequireRole(['admin']), asyncHandler(async (req: Request, res: Response) => {
     const stats = await queueApi.getStats();
     res.json(stats);
   }));
 
-  app.get('/api/admin/queue/performance', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/admin/queue/performance', requireAuth, flexibleRequireRole(['admin']), asyncHandler(async (req: Request, res: Response) => {
     const report = await queueApi.getPerformanceReport();
     res.json(report);
   }));
 
-  app.get('/api/admin/queue/timings', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/admin/queue/timings', requireAuth, flexibleRequireRole(['admin']), asyncHandler(async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 20;
     const timings = await queueApi.getRecentJobTimings(limit);
     res.json(timings);
   }));
 
-  app.post('/api/admin/queue/retry-failed', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/admin/queue/retry-failed', requireAuth, flexibleRequireRole(['admin']), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const retried = await queueApi.retryFailedSubmissions();
     res.json({ 
       message: `Retried ${retried} failed submissions`,
@@ -228,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Memory monitoring endpoints (admin only)
-  app.get('/api/admin/memory-status', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  app.get('/api/admin/memory-status', requireAuth, flexibleRequireRole(['admin']), asyncHandler(async (req, res) => {
     const memoryTrend = memoryMonitor.getMemoryTrend();
     const memoryHistory = memoryMonitor.getMemoryHistory();
     
@@ -242,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
 
-  app.post('/api/admin/memory-gc', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req, res) => {
+  app.post('/api/admin/memory-gc', requireAuth, flexibleRequireRole(['admin']), csrfProtection, asyncHandler(async (req, res) => {
     const forced = memoryMonitor.forceGarbageCollection();
     const statsAfter = memoryMonitor.getMemoryStats();
     
@@ -254,14 +249,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // System settings endpoints
-  app.get('/api/admin/system-settings', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/admin/system-settings', requireAuth, flexibleRequireRole(['admin']), asyncHandler(async (req: Request, res: Response) => {
     const settings = await storage.listSystemSettings();
     const result: Record<string, any> = {};
     settings.forEach(s => { result[s.key] = { value: s.value, lms: s.lms, storage: s.storage, security: s.security }; });
     res.json(result);
   }));
 
-  app.put('/api/admin/system-settings', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
+  app.put('/api/admin/system-settings', requireAuth, flexibleRequireRole(['admin']), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const updates = req.body as Record<string, any>;
     if (!updates || typeof updates !== 'object') {
       return res.status(400).json({ message: 'Invalid request body' });
@@ -281,7 +276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(result);
   }));
 
-  app.post('/api/admin/security-audit', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/admin/security-audit', requireAuth, flexibleRequireRole(['admin']), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as User;
     await queueSecurityAudit(user.id);
     res.json({ message: 'Security audit queued' });
@@ -313,12 +308,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication endpoints handled in auth.ts
 
   // Admin user management (from codex/add-admin-user-routes-and-connect-to-storage branch)
-  app.get('/api/admin/users', requireAuth, requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/admin/users', requireAuth, flexibleRequireRole(['admin']), asyncHandler(async (req: Request, res: Response) => {
     const usersList = await storage.listUsers();
     res.json(usersList);
   }));
 
-  app.post('/api/admin/users', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/admin/users', requireAuth, flexibleRequireRole(['admin']), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const userSchema = z.object({
       name: z.string().min(1),
       username: z.string().min(3),
@@ -337,7 +332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(201).json(newUser);
   }));
 
-  app.put('/api/admin/users/:id', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
+  app.put('/api/admin/users/:id', requireAuth, flexibleRequireRole(['admin']), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
@@ -364,7 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(updated);
   }));
 
-  app.delete('/api/admin/users/:id', requireAuth, requireRole('admin'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
+  app.delete('/api/admin/users/:id', requireAuth, flexibleRequireRole(['admin']), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
@@ -1092,7 +1087,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(course);
   }));
 
-  app.get('/api/courses/:courseId/students', requireAuth, requireInstructor, asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/courses/:courseId/students', requireAuth, flexibleRequireRole(['instructor']), asyncHandler(async (req: Request, res: Response) => {
       const courseId = parseInt(req.params.courseId);
       if (isNaN(courseId)) {
         return res.status(400).json({ message: 'Invalid course ID' });
@@ -1102,7 +1097,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(students);
   }));
 
-  app.get('/api/students', requireAuth, requireInstructor, asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/students', requireAuth, flexibleRequireRole(['instructor']), asyncHandler(async (req: Request, res: Response) => {
       const students = await storage.listStudents();
       res.json(students);
   }));
