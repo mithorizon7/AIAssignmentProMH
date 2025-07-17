@@ -682,12 +682,14 @@
   export const insertDataAuditLogSchema = z.object({
     userId: z.number().nullable(),
     action: z.enum(["create", "read", "update", "delete", "export", "anonymize"]),
-    tableName: z.string(),
-    recordId: z.string(),
+    tableName: z.string().optional(),
+    recordId: z.string().optional(),
+    details: z.any().nullable(),
     oldValues: z.any().nullable(),
     newValues: z.any().nullable(),
     ipAddress: z.string().nullable(),
-    userAgent: z.string().nullable()
+    userAgent: z.string().nullable(),
+    performedBy: z.number().optional()
   });
   
   export const insertDataRetentionLogSchema = z.object({

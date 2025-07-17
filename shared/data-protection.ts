@@ -117,6 +117,12 @@ export interface UserDataExport {
     enrolled_at: Date | null;
     role: 'student' | 'instructor' | 'admin';
   }>;
+  feedback_received: Array<{
+    submission_id: number;
+    feedback: string;
+    score: number | null;
+    created_at: Date | null;
+  }>;
   feedback_given?: Array<{
     submission_id: number;
     feedback: string;

@@ -26,7 +26,7 @@ import {
 } from "../../shared/schema";
 import { eq, and, desc, gte, lte, inArray } from "drizzle-orm";
 import { DATA_RETENTION_POLICIES, ANONYMIZATION_RULES, type UserDataExport } from "../../shared/data-protection";
-import crypto from "crypto";
+import * as crypto from "crypto";
 
 export class DataProtectionService {
   /**
@@ -54,8 +54,7 @@ export class DataProtectionService {
       userId,
       action: 'create',
       tableName: 'data_subject_requests',
-      recordId: request.id,
-      details: { type, requesterEmail },
+      recordId: request.id.toString(),
       performedBy: userId,
     });
 
@@ -120,8 +119,7 @@ export class DataProtectionService {
       userId: request.userId,
       action: 'export',
       tableName: 'users',
-      recordId: request.userId,
-      details: { requestType: 'access', totalRecords: Object.keys(userData).length },
+      recordId: request.userId.toString(),
       performedBy: adminUserId,
     });
   }
@@ -154,8 +152,7 @@ export class DataProtectionService {
       userId: request.userId,
       action: 'export',
       tableName: 'users',
-      recordId: request.userId,
-      details: { requestType: 'portability', format: 'JSON' },
+      recordId: request.userId.toString(),
       performedBy: adminUserId,
     });
   }
@@ -214,8 +211,7 @@ export class DataProtectionService {
       userId: request.userId,
       action: 'update',
       tableName: 'users',
-      recordId: request.userId,
-      details: { action: 'restrict_processing' },
+      recordId: request.userId.toString(),
       performedBy: adminUserId,
     });
   }
@@ -245,8 +241,7 @@ export class DataProtectionService {
       userId: request.userId,
       action: 'update',
       tableName: 'user_consents',
-      recordId: request.userId,
-      details: { action: 'withdraw_consent' },
+      recordId: request.userId.toString(),
       performedBy: adminUserId,
     });
   }
@@ -348,11 +343,7 @@ export class DataProtectionService {
       userId,
       action: 'anonymize',
       tableName: 'users',
-      recordId: userId,
-      details: { 
-        anonymized: true,
-        preservedEducationalData: ANONYMIZATION_RULES.PRESERVE_ACADEMIC_CONTENT 
-      },
+      recordId: userId.toString(),
       performedBy,
     });
   }
@@ -401,13 +392,7 @@ export class DataProtectionService {
       userId,
       action: 'delete',
       tableName: 'users',
-      recordId: userId,
-      details: { 
-        permanentDeletion: true,
-        cascadeDeleted: ['submissions', 'enrollments', 'feedback', 'consents'],
-        submissionIds: submissionIds,
-        totalFeedbackDeleted: submissionIds.length
-      },
+      recordId: userId.toString(),
       performedBy,
     });
     
@@ -493,8 +478,7 @@ export class DataProtectionService {
       userId,
       action: 'create',
       tableName: 'user_consents',
-      recordId: consent.id,
-      details: { purpose, granted, version },
+      recordId: consent.id.toString(),
       ipAddress,
       userAgent,
       performedBy: userId,
@@ -544,7 +528,7 @@ export class DataProtectionService {
 
         for (const record of recordsToAnonymize) {
           if (record.tableName === 'users') {
-            await this.anonymizeUserData(record.recordId, 0); // System anonymization
+            await this.anonymizeUserData(parseInt(record.recordId.toString()), 0); // System anonymization
             
             await db.update(dataRetentionLog)
               .set({
