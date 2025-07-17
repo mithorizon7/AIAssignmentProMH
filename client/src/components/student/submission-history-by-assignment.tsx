@@ -341,7 +341,7 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => navigate(`/submission/${assignment.id}`)}
+                              onClick={() => navigate(`/submission/${submission.id}`)}
                               className="text-primary border-primary hover:bg-primary/5 hover:border-primary/70 transition-all duration-200"
                             >
                               <FileText className="h-4 w-4 mr-2" />

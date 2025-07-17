@@ -123,11 +123,21 @@ export function AssignmentTable({ assignments, loading = false, onExportCsv }: A
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Link href={APP_ROUTES.INSTRUCTOR_ASSIGNMENT(assignment.id)}>
-                        <Button variant="link" className="text-primary hover:text-primary-dark h-auto p-0">
-                          View Details
+                      <div className="flex gap-2 justify-end">
+                        <Link href={APP_ROUTES.INSTRUCTOR_ASSIGNMENT(assignment.id)}>
+                          <Button variant="link" className="text-primary hover:text-primary-dark h-auto p-0">
+                            View Details
+                          </Button>
+                        </Link>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => onExportCsv && onExportCsv(assignment.id)}
+                          className="text-primary border-primary"
+                        >
+                          Export CSV
                         </Button>
-                      </Link>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -138,16 +148,9 @@ export function AssignmentTable({ assignments, loading = false, onExportCsv }: A
       </CardContent>
       
       <CardFooter className="p-4 border-t border-neutral-200 flex justify-end">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => onExportCsv && onExportCsv(filteredAssignments[0]?.id)}
-          disabled={filteredAssignments.length === 0}
-          className="text-primary border-primary"
-        >
-          <span className="material-icons text-sm mr-2">file_download</span>
-          Export Grades (CSV)
-        </Button>
+        <div className="text-sm text-neutral-600">
+          Use "Export CSV" next to each assignment for individual grade exports
+        </div>
       </CardFooter>
     </Card>
   );
