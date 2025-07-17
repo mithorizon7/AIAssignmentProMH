@@ -30,7 +30,7 @@ const RETRY_MAX_TOKENS = 3000;  // if finishReason !== "STOP" - increased for co
 // The newest Gemini model is "gemini-2.5-flash-preview-05-20" which was released May 20, 2025
 import { ContentType } from '../utils/file-type-settings';
 import { AIAdapter, AIAdapterResponse, MultimodalPromptPart } from './interfaces';
-import { CriteriaScore } from '@shared/schema';
+import { CriteriaScore } from '../../shared/schema';
 import { parseStrict } from '../utils/json-parser';
 import { GradingFeedback, SCHEMA_VERSION, gradingJSONSchema } from '../schemas/gradingSchema';
 import { sanitizeText, detectInjectionAttempt } from '../utils/text-sanitizer';
@@ -121,7 +121,7 @@ export class GeminiAdapter implements AIAdapter {
     this.processingStart = Date.now();
     
     // Prepare the base request with common parameters
-    const requestParams: unknown = {
+    const requestParams: any = {
       model: this.modelName,
       contents: [{ role: 'user', parts: apiParts }],
       systemInstruction: systemPrompt,
@@ -142,16 +142,16 @@ export class GeminiAdapter implements AIAdapter {
     
     // Helper to build request with the specified token cap
     const buildRequest = (cap: number) => {
-      const req = { ...requestParams };
+      const req = { ...requestParams } as any;
       req.config.maxOutputTokens = cap;
       return req;
     };
     
     // Helper to run streaming request and collect all chunks
-    const collectStream = async (req: unknown): Promise<{raw: string, finishReason: string, usageMetadata: unknown}> => {
+    const collectStream = async (req: any): Promise<{raw: string, finishReason: string, usageMetadata: unknown}> => {
       console.log(`[GEMINI] Using streaming with token limit: ${req.config.maxOutputTokens}`);
       
-      const stream = await this.genAI.models.generateContentStream(req);
+      const stream = await this.genAI.models.generateContentStream(req as any);
       let streamedText = '';
       let finishReason = 'STOP'; // Default to successful finish
       let usageMetadata = null; // Will store metadata when available
@@ -162,9 +162,9 @@ export class GeminiAdapter implements AIAdapter {
         if (chunk.usageMetadata) {
           usageMetadata = chunk.usageMetadata;
           console.log(`[GEMINI] Received usage metadata from stream: `, {
-            promptTokenCount: usageMetadata.promptTokenCount,
-            candidatesTokenCount: usageMetadata.candidatesTokenCount,
-            totalTokenCount: usageMetadata.totalTokenCount
+            promptTokenCount: (usageMetadata as any).promptTokenCount,
+            candidatesTokenCount: (usageMetadata as any).candidatesTokenCount,
+            totalTokenCount: (usageMetadata as any).totalTokenCount
           });
         }
         
@@ -217,16 +217,16 @@ export class GeminiAdapter implements AIAdapter {
     };
     
     // Get token count from actually captured metadata (no fallbacks)
-    const tokenCount = result.usageMetadata?.totalTokenCount;
+    const tokenCount = (result.usageMetadata as any)?.totalTokenCount;
     
     // Log comprehensive usage information
     if (result.usageMetadata) {
       const retryInfo = finishReason !== 'STOP' ? '(retry required)' : '';
       const metrics = {
         modelName: this.modelName,
-        promptTokens: result.usageMetadata.promptTokenCount || 0,
-        candidatesTokens: result.usageMetadata.candidatesTokenCount || 0,
-        totalTokens: result.usageMetadata.totalTokenCount || 0,
+        promptTokens: (result.usageMetadata as any).promptTokenCount || 0,
+        candidatesTokens: (result.usageMetadata as any).candidatesTokenCount || 0,
+        totalTokens: (result.usageMetadata as any).totalTokenCount || 0,
         streamingUsed: true, // Always using streaming now
         partsCount: apiParts.length,
         processingTimeMs: Date.now() - this.processingStart

@@ -1,4 +1,4 @@
-import { CriteriaScore } from '@shared/schema';
+import { CriteriaScore } from '../../shared/schema';
 
 import { ContentType } from '../utils/file-type-settings';
 

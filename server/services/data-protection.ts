@@ -23,9 +23,9 @@ import {
   type DataAuditLog,
   type InsertDataAuditLog,
   type User,
-} from "@shared/schema";
+} from "../../shared/schema";
 import { eq, and, desc, gte, lte } from "drizzle-orm";
-import { DATA_RETENTION_POLICIES, ANONYMIZATION_RULES, type UserDataExport } from "@shared/data-protection";
+import { DATA_RETENTION_POLICIES, ANONYMIZATION_RULES, type UserDataExport } from "../../shared/data-protection";
 import crypto from "crypto";
 
 export class DataProtectionService {

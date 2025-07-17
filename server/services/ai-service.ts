@@ -1,4 +1,4 @@
-import { InsertFeedback, Rubric, CriteriaScore, InstructorContext } from '@shared/schema';
+import { InsertFeedback, Rubric, CriteriaScore, InstructorContext } from '../../shared/schema';
 import { logger } from '../lib/error-handler';
 import { AIAdapter, MultimodalPromptPart } from '../adapters/ai-adapter';
 import { processFileForMultimodal } from '../utils/multimodal-processor';

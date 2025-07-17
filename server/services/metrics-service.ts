@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { submissions, feedback } from '@shared/schema';
+import { submissions, feedback } from '../../shared/schema';
 import { eq, count, avg, max, min, gt, lt, between, and, desc, sql } from 'drizzle-orm';
 
 /**

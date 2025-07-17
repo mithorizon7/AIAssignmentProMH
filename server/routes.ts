@@ -1263,7 +1263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use optimized single-query method for assignment statistics
       if (assignmentId) {
         console.log(`[PERFORMANCE] Using optimized assignment stats for assignment ${assignmentId}`);
-        const stats = await storage.getAssignmentStats(assignmentId, courseId);
+        const stats = await storage.getAssignmentStatsWithDetails(assignmentId, courseId);
         return res.json(stats);
       }
 

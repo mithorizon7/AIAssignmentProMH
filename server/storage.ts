@@ -27,7 +27,7 @@ import {
   type InsertFileTypeSetting,
   type UserNotificationSetting,
   type InsertUserNotificationSetting,
-} from "@shared/schema";
+} from "../shared/schema";
 
 // Define type for the content type enum values
 type ContentType = "text" | "image" | "audio" | "video" | "document";
@@ -78,6 +78,7 @@ export interface IStorage {
   // Optimized assignment operations with JOINs
   getAssignmentWithDetails(id: number): Promise<any>;
   listAssignmentsWithStats(courseId?: number): Promise<any[]>;
+  getAssignmentStatsWithDetails(assignmentId: number, courseId?: number): Promise<any>;
   getAssignmentStats(): Promise<any[]>;
 
   // Submission operations
@@ -403,8 +404,8 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // OPTIMIZED: Get comprehensive assignment statistics with single query
-  async getAssignmentStats(assignmentId: number, courseId?: number): Promise<{
+  // OPTIMIZED: Get comprehensive assignment statistics with single query  
+  async getAssignmentStatsWithDetails(assignmentId: number, courseId?: number): Promise<{
     totalStudents: number;
     submittedCount: number;
     notStartedCount: number;

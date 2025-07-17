@@ -1,9 +1,18 @@
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
-import * as schema from "@shared/schema";
+import * as ws from "ws";
+import * as schema from "../shared/schema";
 
-neonConfig.webSocketConstructor = ws;
+// Configure WebSocket constructor for Neon serverless with better error handling
+try {
+  neonConfig.webSocketConstructor = (ws as any).default || ws;
+} catch (error) {
+  console.warn('WebSocket configuration warning:', error);
+  // Fallback to built-in WebSocket if available
+  if (typeof WebSocket !== 'undefined') {
+    neonConfig.webSocketConstructor = WebSocket;
+  }
+}
 
 // Use NEON_DATABASE_URL if available, otherwise fall back to DATABASE_URL
 const databaseUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;

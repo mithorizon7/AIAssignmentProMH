@@ -1,5 +1,5 @@
 import { storage } from '../storage';
-import { InsertSubmission, InsertFeedback, Submission, Feedback } from '@shared/schema';
+import { InsertSubmission, InsertFeedback, Submission, Feedback } from '../../shared/schema';
 import { isGcsConfigured, uploadFile, uploadBuffer, generateSignedUrl } from '../utils/gcs-client';
 import { logger } from '../lib/logger';
 import path from 'path';
