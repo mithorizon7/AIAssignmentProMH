@@ -50,11 +50,40 @@ function generateShareableCode(length = 8): string {
   return code;
 }
 
-// Configure multer for file uploads
+// Configure multer for file uploads with disk storage for production-grade memory management
+const uploadDir = process.env.NODE_ENV === 'production' ? '/tmp/aigrader-uploads' : '/tmp/aigrader-dev-uploads';
+
+// Ensure upload directory exists
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log(`[UPLOAD] Created upload directory: ${uploadDir}`);
+}
+
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+      // Generate unique filename with timestamp and random string
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 15);
+      const extension = path.extname(file.originalname);
+      const filename = `${timestamp}-${randomString}${extension}`;
+      cb(null, filename);
+    }
+  }),
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    // Additional security: validate file types
+    const allowedTypes = Array.from(SUPPORTED_MIME_TYPES);
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Unsupported file type: ${file.mimetype}`));
+    }
   }
 });
 
@@ -791,7 +820,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       submission.fileSize = req.file.size;
       submission.fileName = req.file.originalname;
       submission.fileExtension = extension;
-      submission.content = req.file.buffer.toString('base64');
+      // Read file from disk and convert to base64
+      const fileData = fs.readFileSync(req.file.path);
+      submission.content = fileData.toString('base64');
+      
+      // Clean up temporary file after processing
+      fs.unlinkSync(req.file.path);
+      console.log(`[UPLOAD] Processed and cleaned up file: ${req.file.path}`);
     } else if (submissionType === 'code') {
       if (!code) {
         return res.status(400).json({ message: 'Code content is required for code submissions' });
@@ -861,7 +896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (submissionType === 'file' && req.file) {
         // Validate file buffer exists and is not empty
-        if (!req.file.buffer || req.file.buffer.length === 0) {
+        if (!req.file.path || !fs.existsSync(req.file.path)) {
           console.error(`[SUBMISSION] Empty file buffer received from user ${user.id}`);
           return res.status(400).json({
             message: "File upload failed - empty file",
@@ -899,10 +934,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // For text files, extract content safely
+        // For text files, extract content safely from disk
         if (contentType === 'text' && mimeType.startsWith('text/')) {
           try {
-            content = req.file.buffer.toString('utf8');
+            content = fs.readFileSync(req.file.path, 'utf8');
           } catch (textError: any) {
             console.warn(`[SUBMISSION] Failed to extract text content from file: ${textError.message}`);
             // Continue without text extraction for binary files

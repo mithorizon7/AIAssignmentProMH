@@ -4,7 +4,6 @@ import { isGcsConfigured, uploadFile, uploadBuffer, generateSignedUrl } from '..
 import { logger } from '../lib/logger';
 import path from 'path';
 import crypto from 'crypto';
-import * as fs from 'fs';
 
 export class StorageService {
   // Save submission to database
@@ -65,6 +64,8 @@ export class StorageService {
         console.warn('[StorageService] GCS not configured, storing file locally for development');
         // In development mode, store file temporarily on disk for processing
         const tempDir = '/tmp/aigrader-dev-files';
+        const fs = await import('fs');
+        const pathModule = await import('path');
         
         // Create temp directory if it doesn't exist
         if (!fs.existsSync(tempDir)) {
@@ -72,18 +73,10 @@ export class StorageService {
         }
         
         // Create full path for the temporary file
-        const tempFilePath = path.join(tempDir, `${Date.now()}-${safeFileName}`);
+        const tempFilePath = pathModule.join(tempDir, `${Date.now()}-${safeFileName}`);
         
-        // Handle both disk and memory storage
-        if (file.buffer) {
-          // Memory storage (legacy)
-          fs.writeFileSync(tempFilePath, file.buffer);
-        } else if (file.path) {
-          // Disk storage - copy file to temp location
-          fs.copyFileSync(file.path, tempFilePath);
-        } else {
-          throw new Error('No file buffer or path available');
-        }
+        // Write the file buffer to temporary location
+        fs.writeFileSync(tempFilePath, file.buffer);
         
         console.log(`[StorageService] File stored temporarily at: ${tempFilePath}`);
         
@@ -130,9 +123,11 @@ export class StorageService {
           throw new Error('No file buffer or path available');
         }
       } else {
-        console.warn('[StorageService] GCS not configured, storing anonymous file locally for development');
+        console.warn('[StorageService] GCS not configured, storing file locally for development');
         // In development mode, store file temporarily on disk for processing
         const tempDir = '/tmp/aigrader-dev-files';
+        const fs = await import('fs');
+        const pathModule = await import('path');
         
         // Create temp directory if it doesn't exist
         if (!fs.existsSync(tempDir)) {
@@ -140,20 +135,12 @@ export class StorageService {
         }
         
         // Create full path for the temporary file
-        const tempFilePath = path.join(tempDir, `${Date.now()}-${safeFileName}`);
+        const tempFilePath = pathModule.join(tempDir, `${Date.now()}-${safeFileName}`);
         
-        // Handle both disk and memory storage for anonymous submissions
-        if (file.buffer) {
-          // Memory storage (legacy)
-          fs.writeFileSync(tempFilePath, file.buffer);
-        } else if (file.path) {
-          // Disk storage - copy file to temp location
-          fs.copyFileSync(file.path, tempFilePath);
-        } else {
-          throw new Error('No file buffer or path available');
-        }
+        // Write the file buffer to temporary location
+        fs.writeFileSync(tempFilePath, file.buffer);
         
-        console.log(`[StorageService] Anonymous submission file stored temporarily at: ${tempFilePath}`);
+        console.log(`[StorageService] File stored temporarily at: ${tempFilePath}`);
         
         // Return the local file path for processing
         return tempFilePath;
@@ -179,50 +166,76 @@ export class StorageService {
         return `https://storage.googleapis.com/mock-bucket/${objectPath}`;
       }
     } catch (error) {
-      logger.error('Error generating file URL', { error, objectPath });
-      throw new Error('Failed to generate file URL');
+      console.error('Error generating file URL:', error);
+      throw new Error(`Failed to generate file URL: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  /**
-   * Check if an assignment is active and accepting submissions
-   * @param assignmentId Assignment ID to check
-   * @returns True if assignment is active, false otherwise
-   */
+  // Check if student is enrolled in the course
+  async isStudentEnrolled(userId: number, assignmentId: number): Promise<boolean> {
+    try {
+      const assignment = await storage.getAssignment(assignmentId);
+      if (!assignment) return false;
+      
+      const enrollment = await storage.getEnrollment(userId, assignment.courseId);
+      return !!enrollment;
+    } catch (error) {
+      console.error('Error checking enrollment:', error);
+      throw new Error('Failed to verify enrollment status');
+    }
+  }
+
+  // Check if assignment is still accepting submissions
   async isAssignmentActive(assignmentId: number): Promise<boolean> {
     try {
       const assignment = await storage.getAssignment(assignmentId);
       if (!assignment) return false;
       
-      // Check if assignment status is active
-      if (assignment.status !== 'active') return false;
-      
-      // Check if assignment is past due date
-      if (assignment.dueDate && new Date() > assignment.dueDate) return false;
-      
-      return true;
+      return assignment.status === 'active' && new Date(assignment.dueDate) > new Date();
     } catch (error) {
-      logger.error('Error checking assignment status', { error, assignmentId });
-      return false;
+      console.error('Error checking assignment status:', error);
+      throw new Error('Failed to verify assignment status');
     }
   }
 
-  /**
-   * Check if a student is enrolled in the course for a given assignment
-   * @param studentId Student user ID
-   * @param assignmentId Assignment ID
-   * @returns True if student is enrolled, false otherwise
-   */
-  async isStudentEnrolled(studentId: number, assignmentId: number): Promise<boolean> {
+  // Get submission with feedback
+  async getSubmissionWithFeedback(submissionId: number): Promise<(Submission & { feedback: Feedback | null }) | null> {
     try {
-      const assignment = await storage.getAssignment(assignmentId);
-      if (!assignment || !assignment.courseId) return false;
+      const submission = await storage.getSubmission(submissionId);
+      if (!submission) return null;
       
-      const enrollment = await storage.getEnrollment(studentId, assignment.courseId);
-      return !!enrollment;
+      const feedbackData = await storage.getFeedbackBySubmissionId(submissionId);
+      
+      return {
+        ...submission,
+        feedback: feedbackData || null
+      };
     } catch (error) {
-      logger.error('Error checking student enrollment', { error, studentId, assignmentId });
-      return false;
+      console.error('Error getting submission with feedback:', error);
+      throw new Error('Failed to retrieve submission data');
+    }
+  }
+
+  // Get all submissions for an assignment with feedback
+  async getAssignmentSubmissions(assignmentId: number): Promise<Array<Submission & { feedback: Feedback | null }>> {
+    try {
+      const submissions = await storage.listSubmissionsForAssignment(assignmentId);
+      
+      // Get feedback for each submission
+      const submissionsWithFeedback = await Promise.all(
+        submissions.map(async (submission) => {
+          const feedbackData = await storage.getFeedbackBySubmissionId(submission.id);
+          return {
+            ...submission,
+            feedback: feedbackData || null
+          };
+        })
+      );
+      
+      return submissionsWithFeedback;
+    } catch (error) {
+      console.error('Error getting assignment submissions:', error);
+      throw new Error('Failed to retrieve assignment submissions');
     }
   }
 }
