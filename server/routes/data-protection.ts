@@ -109,6 +109,15 @@ router.post('/requests/:id/process', csrfProtection, async (req, res) => {
       adminNotes,
     });
 
+    // Get the request details first for logging
+    const [request] = await db.select()
+      .from(dataSubjectRequests)
+      .where(eq(dataSubjectRequests.id, requestId));
+
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
     if (validatedAction === 'approve') {
       // Update status to verified first
       await db.update(dataSubjectRequests)
@@ -139,10 +148,10 @@ router.post('/requests/:id/process', csrfProtection, async (req, res) => {
 
     // Log admin action
     await dataProtectionService.logDataAccess({
-      userId: requestId,
+      userId: request.userId,
       action: 'update',
       tableName: 'data_subject_requests',
-      recordId: requestId,
+      recordId: requestId.toString(),
       details: { adminAction: validatedAction, notes: validatedNotes },
       performedBy: adminUserId,
     });
@@ -169,7 +178,7 @@ router.get('/users/:userId/export', async (req, res) => {
       userId,
       action: 'export',
       tableName: 'users',
-      recordId: userId,
+      recordId: userId.toString(),
       details: { exportedBy: adminUserId, totalRecords: Object.keys(userData).length },
       performedBy: adminUserId,
     });
