@@ -108,6 +108,8 @@ class GracefulShutdown {
     // Stop assignment scheduler
     this.registerHandler('assignment-scheduler', async () => {
       try {
+        // Import dynamically to avoid circular dependencies
+        const { assignmentScheduler } = await import('../services/assignment-scheduler');
         assignmentScheduler.stop();
         logger.info('Assignment scheduler stopped');
       } catch (error) {

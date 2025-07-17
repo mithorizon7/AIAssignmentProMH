@@ -19,6 +19,16 @@ import {
   Play
 } from 'lucide-react';
 
+interface AssignmentData {
+  id: number;
+  title: string;
+  dueDate: string;
+  status: string;
+  manualStatus: string;
+  calculatedStatus: string;
+  effectiveStatus: string;
+}
+
 interface StatusAnalysis {
   stats: {
     total: number;
@@ -32,11 +42,11 @@ interface StatusAnalysis {
     };
   };
   assignments: {
-    upcoming: any[];
-    active: any[];
-    completed: any[];
+    upcoming: AssignmentData[];
+    active: AssignmentData[];
+    completed: AssignmentData[];
   };
-  statusMismatches: any[];
+  statusMismatches: AssignmentData[];
   analysis: {
     automatedStatusPreferred: boolean;
     mismatches: number;
@@ -294,7 +304,7 @@ export function AssignmentStatusManager() {
                     </p>
                   ) : (
                     <div className="space-y-3">
-                      {analysis.statusMismatches.map((assignment: any) => (
+                      {analysis.statusMismatches.map((assignment: AssignmentData) => (
                         <div key={assignment.id} className="flex items-center justify-between p-3 border rounded-lg">
                           <div>
                             <p className="font-medium">{assignment.title}</p>
@@ -342,7 +352,7 @@ export function AssignmentStatusManager() {
                       </p>
                     ) : (
                       <div className="space-y-2">
-                        {analysis.assignments[status].map((assignment: any) => (
+                        {analysis.assignments[status].map((assignment: AssignmentData) => (
                           <div key={assignment.id} className="flex items-center justify-between p-3 border rounded-lg">
                             <div>
                               <p className="font-medium">{assignment.title}</p>
