@@ -3,7 +3,8 @@ import { db } from '../db';
 import { submissions, feedback, users } from '@shared/schema';
 import { sql, desc, eq, and, gte, like, or } from 'drizzle-orm';
 import { asyncHandler } from '../lib/error-handler';
-import { requireAuth, requireRole } from '../auth';
+import { requireAuth } from '../auth';
+import { requireRole } from '../middleware/auth';
 import fs from 'fs';
 import path from 'path';
 
@@ -11,7 +12,7 @@ const router = express.Router();
 
 // Protect all admin logs routes
 router.use(requireAuth);
-router.use(requireRole('admin'));
+router.use(requireRole(['admin']));
 
 // Get system logs
 router.get('/system-logs', asyncHandler(async (req, res) => {

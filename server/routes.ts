@@ -483,7 +483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // Create assignment (instructor only)
-  app.post('/api/assignments', requireAuth, requireRole('instructor'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/assignments', requireAuth, flexibleRequireRole(['instructor']), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     try {
       const { title, description, courseId, dueDate, rubric } = req.body;
 
@@ -584,7 +584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Get assignment details for instructor - OPTIMIZED
-  app.get('/api/assignments/:id/details', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/assignments/:id/details', requireAuth, flexibleRequireRole(['instructor']), asyncHandler(async (req: Request, res: Response) => {
     const assignmentId = parseInt(req.params.id);
 
     if (isNaN(assignmentId)) {
@@ -628,7 +628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
 
-  app.patch('/api/assignments/:id/status', requireAuth, requireRole('instructor'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
+  app.patch('/api/assignments/:id/status', requireAuth, flexibleRequireRole(['instructor']), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
     const assignmentId = parseInt(req.params.id);
 
     if (isNaN(assignmentId)) {
@@ -1050,7 +1050,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
   }));
 
-  app.post('/api/courses', requireAuth, requireRole('instructor'), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/courses', requireAuth, flexibleRequireRole(['instructor']), csrfProtection, asyncHandler(async (req: Request, res: Response) => {
       const { name, code, description } = req.body;
 
       const courseSchema = z.object({
@@ -1102,7 +1102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(students);
   }));
 
-  app.get('/api/students/progress/:assignmentId?', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/students/progress/:assignmentId?', requireAuth, flexibleRequireRole(['instructor']), asyncHandler(async (req: Request, res: Response) => {
       let page = 1;
       const pageSize = 10;
       const searchQuery = req.query.search as string || '';
@@ -1221,7 +1221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const { count: countFn } = await import('drizzle-orm');
 
-  app.get('/api/assignments/stats', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/assignments/stats', requireAuth, flexibleRequireRole(['instructor']), asyncHandler(async (req: Request, res: Response) => {
       try {
       let courseId: number | undefined = undefined;
       let assignmentId: number | undefined = undefined;

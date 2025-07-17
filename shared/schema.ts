@@ -405,20 +405,115 @@
     }),
   };
 
-  // Insert Schemas (Consolidated)
-  export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, mfaEnabled: true, mfaSecret: true }); // From main (includes MFA omissions)
-  export const insertCourseSchema = createInsertSchema(courses).omit({ id: true, createdAt: true });
-  export const insertEnrollmentSchema = createInsertSchema(enrollments).omit({ id: true, createdAt: true });
-  export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true, createdAt: true, updatedAt: true });
-  export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true, createdAt: true, updatedAt: true });
-  export const insertFeedbackSchema = createInsertSchema(feedback).omit({ id: true, createdAt: true });
-  export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true }); // For extended systemSettings table
-  export const insertFileTypeSettingSchema = createInsertSchema(fileTypeSettings).omit({ id: true, updatedAt: true }); // From HEAD
-  export const insertUserNotificationSettingSchema = createInsertSchema(userNotificationSettings).omit({ id: true, updatedAt: true }); // From HEAD
-  export const insertNewsletterSubscriberSchema = createInsertSchema(newsletterSubscribers).omit({ id: true, createdAt: true }); // From main
-  export const insertLmsCredentialsSchema = createInsertSchema(lmsCredentials).omit({ id: true, createdAt: true, updatedAt: true }); // From main
-  export const insertLmsSyncJobSchema = createInsertSchema(lmsSyncJobs).omit({ id: true, createdAt: true }); // From main
-  export const insertLmsCourseMappingSchema = createInsertSchema(lmsCourseMappings).omit({ id: true, createdAt: true, updatedAt: true }); // From main
+  // Insert Schemas (Consolidated) - Using manual schema definitions to avoid drizzle-zod omit issues
+  export const insertUserSchema = z.object({
+    name: z.string(),
+    username: z.string(),
+    password: z.string().nullable(),
+    email: z.string(),
+    role: z.enum(['student', 'instructor', 'admin']).default('student'),
+    auth0Sub: z.string().nullable(),
+    mitHorizonSub: z.string().nullable(),
+    emailVerified: z.boolean().default(false),
+    mfaEnabled: z.boolean().default(false),
+    mfaSecret: z.string().nullable()
+  });
+  
+  export const insertCourseSchema = z.object({
+    name: z.string(),
+    code: z.string(),
+    description: z.string().nullable()
+  });
+  
+  export const insertEnrollmentSchema = z.object({
+    userId: z.number(),
+    courseId: z.number()
+  });
+  
+  export const insertAssignmentSchema = z.object({
+    title: z.string(),
+    description: z.string().nullable(),
+    courseId: z.number(),
+    dueDate: z.date().nullable(),
+    maxScore: z.number().nullable(),
+    rubric: z.any().nullable(),
+    instructorContext: z.any().nullable(),
+    status: z.enum(['active', 'completed', 'upcoming']).default('active')
+  });
+  
+  export const insertSubmissionSchema = z.object({
+    assignmentId: z.number(),
+    userId: z.number().nullable(),
+    content: z.string().nullable(),
+    fileName: z.string().nullable(),
+    fileUrl: z.string().nullable(),
+    fileSize: z.number().nullable(),
+    status: z.enum(['pending', 'processing', 'completed', 'failed']).default('pending'),
+    shareableCode: z.string().nullable()
+  });
+  
+  export const insertFeedbackSchema = z.object({
+    submissionId: z.number(),
+    overallScore: z.number().nullable(),
+    overallFeedback: z.string().nullable(),
+    criteriaScores: z.any().nullable(),
+    processingTime: z.number().nullable(),
+    aiModel: z.string().nullable()
+  });
+  
+  // Additional schemas for missing types
+  export const insertSystemSettingSchema = z.object({
+    key: z.string(),
+    value: z.string(),
+    lms: z.boolean().default(false),
+    storage: z.boolean().default(false),
+    security: z.boolean().default(false)
+  });
+  
+  export const insertFileTypeSettingSchema = z.object({
+    fileType: z.string(),
+    enabled: z.boolean().default(true),
+    maxSizeBytes: z.number(),
+    description: z.string().nullable()
+  });
+  
+  export const insertUserNotificationSettingSchema = z.object({
+    userId: z.number(),
+    emailNotifications: z.boolean().default(true),
+    pushNotifications: z.boolean().default(false),
+    smsNotifications: z.boolean().default(false)
+  });
+  
+  export const insertNewsletterSubscriberSchema = z.object({
+    email: z.string(),
+    subscribed: z.boolean().default(true),
+    source: z.string().nullable()
+  });
+  
+  export const insertLmsCredentialsSchema = z.object({
+    lmsProvider: z.enum(['canvas', 'blackboard', 'moodle', 'd2l']),
+    clientId: z.string(),
+    clientSecret: z.string(),
+    baseUrl: z.string(),
+    isActive: z.boolean().default(true)
+  });
+  
+  export const insertLmsSyncJobSchema = z.object({
+    lmsProvider: z.enum(['canvas', 'blackboard', 'moodle', 'd2l']),
+    status: z.enum(['pending', 'in_progress', 'completed', 'failed']).default('pending'),
+    syncType: z.string(),
+    startedAt: z.date().nullable(),
+    completedAt: z.date().nullable(),
+    errorMessage: z.string().nullable()
+  });
+  
+  export const insertLmsCourseMappingSchema = z.object({
+    lmsProvider: z.enum(['canvas', 'blackboard', 'moodle', 'd2l']),
+    lmsCourseId: z.string(),
+    localCourseId: z.number(),
+    lastSyncAt: z.date().nullable(),
+    isActive: z.boolean().default(true)
+  });
 
   // Types (Consolidated)
   export type User = typeof users.$inferSelect;
@@ -563,12 +658,52 @@
     };
   });
 
-  // Privacy compliance schemas
-  export const insertDataSubjectRequestSchema = createInsertSchema(dataSubjectRequests).omit({ id: true, requestedAt: true });
-  export const insertUserConsentSchema = createInsertSchema(userConsents).omit({ id: true, grantedAt: true });
-  export const insertDataAuditLogSchema = createInsertSchema(dataAuditLog).omit({ id: true, timestamp: true });
-  export const insertDataRetentionLogSchema = createInsertSchema(dataRetentionLog).omit({ id: true });
-  export const insertPrivacyPolicyAcceptanceSchema = createInsertSchema(privacyPolicyAcceptances).omit({ id: true, acceptedAt: true });
+  // Privacy compliance schemas - Manual definitions for compatibility
+  export const insertDataSubjectRequestSchema = z.object({
+    userId: z.number(),
+    requestType: z.enum(["access", "rectification", "erasure", "portability", "restriction", "objection"]),
+    status: z.enum(["pending", "verified", "processing", "completed", "rejected"]).default("pending"),
+    description: z.string().nullable(),
+    verificationToken: z.string().nullable(),
+    verifiedAt: z.date().nullable(),
+    processedAt: z.date().nullable(),
+    notes: z.string().nullable()
+  });
+  
+  export const insertUserConsentSchema = z.object({
+    userId: z.number(),
+    purpose: z.enum(["analytics", "marketing", "research", "improvement"]),
+    granted: z.boolean(),
+    version: z.string(),
+    ipAddress: z.string().nullable(),
+    userAgent: z.string().nullable()
+  });
+  
+  export const insertDataAuditLogSchema = z.object({
+    userId: z.number().nullable(),
+    action: z.enum(["create", "read", "update", "delete", "export", "anonymize"]),
+    tableName: z.string(),
+    recordId: z.string(),
+    oldValues: z.any().nullable(),
+    newValues: z.any().nullable(),
+    ipAddress: z.string().nullable(),
+    userAgent: z.string().nullable()
+  });
+  
+  export const insertDataRetentionLogSchema = z.object({
+    tableName: z.string(),
+    recordId: z.string(),
+    retentionDate: z.date(),
+    deletedAt: z.date().nullable(),
+    status: z.string().default('active')
+  });
+  
+  export const insertPrivacyPolicyAcceptanceSchema = z.object({
+    userId: z.number(),
+    policyVersion: z.string(),
+    ipAddress: z.string().nullable(),
+    userAgent: z.string().nullable()
+  });
 
   // Privacy compliance types
   export type DataSubjectRequest = typeof dataSubjectRequests.$inferSelect;

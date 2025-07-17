@@ -3,13 +3,14 @@ import { db } from '../db';
 import { users, assignments, submissions, feedback, courses } from '@shared/schema';
 import { count, sql, eq, desc, and, gte } from 'drizzle-orm';
 import { asyncHandler } from '../lib/error-handler';
-import { requireAuth, requireRole } from '../auth';
+import { requireAuth } from '../auth';
+import { requireRole } from '../middleware/auth';
 
 const router = express.Router();
 
 // Protect all admin stats routes
 router.use(requireAuth);
-router.use(requireRole('admin'));
+router.use(requireRole(['admin']));
 
 // Get real system statistics
 router.get('/system-stats', asyncHandler(async (req, res) => {
