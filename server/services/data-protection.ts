@@ -58,6 +58,10 @@ export class DataProtectionService {
       tableName: 'data_subject_requests',
       recordId: request.id.toString(),
       performedBy: userId,
+      ipAddress: null,
+      userAgent: null,
+      ipAddress: null,
+      userAgent: null,
     });
 
     return request;
@@ -123,6 +127,8 @@ export class DataProtectionService {
       tableName: 'users',
       recordId: request.userId.toString(),
       performedBy: adminUserId,
+      ipAddress: null,
+      userAgent: null,
     });
   }
 
@@ -156,6 +162,8 @@ export class DataProtectionService {
       tableName: 'users',
       recordId: request.userId.toString(),
       performedBy: adminUserId,
+      ipAddress: null,
+      userAgent: null,
     });
   }
 
@@ -215,6 +223,8 @@ export class DataProtectionService {
       tableName: 'users',
       recordId: request.userId.toString(),
       performedBy: adminUserId,
+      ipAddress: null,
+      userAgent: null,
     });
   }
 
@@ -245,6 +255,8 @@ export class DataProtectionService {
       tableName: 'user_consents',
       recordId: request.userId.toString(),
       performedBy: adminUserId,
+      ipAddress: null,
+      userAgent: null,
     });
   }
 
@@ -298,8 +310,8 @@ export class DataProtectionService {
 
     // ✅ COMPLETE: Get comprehensive feedback received (already optimized with submission mapping)
     const feedbackReceivedDetails = userSubmissionsWithDetails
-      .filter(s => s.feedback_id !== null)
-      .map(s => ({
+      .filter((s: any) => s.feedback_id !== null)
+      .map((s: any) => ({
         submission_id: s.id,
         assignment_title: s.assignment_title || 'Unknown Assignment',
         feedback: s.feedback_summary || '',
@@ -346,7 +358,7 @@ export class DataProtectionService {
         role: user.role || 'student',
       },
       // ✅ COMPLETE: Submissions with authentic assignment titles and feedback
-      submissions: userSubmissionsWithDetails.map(s => ({
+      submissions: userSubmissionsWithDetails.map((s: any) => ({
         id: s.id,
         assignment_title: s.assignment_title || 'Assignment Not Found',
         assignment_description: s.assignment_description || '',
@@ -357,7 +369,7 @@ export class DataProtectionService {
         feedback: s.feedback_summary || undefined,
       })),
       // ✅ COMPLETE: Courses with authentic titles and descriptions
-      courses: userCoursesWithDetails.map(c => ({
+      courses: userCoursesWithDetails.map((c: any) => ({
         id: c.course_id,
         title: c.course_title || 'Course Title Not Available',
         description: c.course_description || 'No description available',
@@ -367,7 +379,7 @@ export class DataProtectionService {
       // ✅ COMPLETE: Feedback received with assignment context
       feedback_received: feedbackReceivedDetails,
       // ✅ COMPLETE: Activity logs from audit trail
-      activity_logs: activityLogs.map(log => ({
+      activity_logs: activityLogs.map((log: any) => ({
         action: log.action,
         table_name: log.table_name || 'unknown',
         timestamp: log.timestamp,
@@ -413,6 +425,8 @@ export class DataProtectionService {
       tableName: 'users',
       recordId: userId.toString(),
       performedBy,
+      ipAddress: null,
+      userAgent: null,
     });
   }
 
@@ -497,6 +511,8 @@ export class DataProtectionService {
         tableName: 'users',
         recordId: userId.toString(),
         performedBy,
+      ipAddress: null,
+      userAgent: null,
         timestamp: new Date(),
         details: { 
           deletedUserId: userId,
@@ -595,6 +611,8 @@ export class DataProtectionService {
       ipAddress,
       userAgent,
       performedBy: userId,
+      ipAddress: null,
+      userAgent: null,
     });
 
     return consent;

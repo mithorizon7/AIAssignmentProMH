@@ -157,7 +157,7 @@
     id: serial("id").primaryKey(),
     title: text("title").notNull(),
     description: text("description"),
-    courseId: integer("course_id").references(() => courses.id).notNull(),
+    courseId: integer("course_id").references(() => courses.id, { onDelete: 'cascade' }).notNull(),
     dueDate: timestamp("due_date").notNull(),
     status: assignmentStatusEnum("status").notNull().default('upcoming'),
     shareableCode: text("shareable_code"),
@@ -205,7 +205,7 @@
   // Feedback (using main's version which includes rawResponse, modelName, tokenCount)
   export const feedback = pgTable("feedback", {
     id: serial("id").primaryKey(),
-    submissionId: integer("submission_id").references(() => submissions.id).notNull(),
+    submissionId: integer("submission_id").references(() => submissions.id, { onDelete: 'cascade' }).notNull(),
     strengths: json("strengths").notNull().$type<string[]>(),
     improvements: json("improvements").notNull().$type<string[]>(),
     suggestions: json("suggestions").notNull().$type<string[]>(),
@@ -332,8 +332,8 @@
   // LMS Course Mappings (from main branch)
   export const lmsCourseMappings = pgTable("lms_course_mappings", {
     id: serial("id").primaryKey(),
-    courseId: integer("course_id").references(() => courses.id).notNull(),
-    credentialId: integer("credential_id").references(() => lmsCredentials.id).notNull(),
+    courseId: integer("course_id").references(() => courses.id, { onDelete: 'cascade' }).notNull(),
+    credentialId: integer("credential_id").references(() => lmsCredentials.id, { onDelete: 'cascade' }).notNull(),
     lmsCourseId: text("lms_course_id").notNull(), 
     lmsCourseName: text("lms_course_name"), 
     lastSynced: timestamp("last_synced"),

@@ -532,7 +532,10 @@ export function configureAuth(app: any) {
                   password: null, // No password for SSO users
                   role: 'student',
                   auth0Sub: auth0UserId,
-                  emailVerified
+                  mitHorizonSub: null,
+                  emailVerified: emailVerified || false,
+                  mfaEnabled: false,
+                  mfaSecret: null,
                 });
                 
                 logger.info(`[INFO] Created new user from Auth0 login: ${username}`);
@@ -708,8 +711,11 @@ export function configureAuth(app: any) {
               name,
               password: null, // No password for SSO users
               role: 'student',
+              auth0Sub: null,
               mitHorizonSub: mitHorizonUserId,
-              emailVerified
+              emailVerified: emailVerified || false,
+              mfaEnabled: false,
+              mfaSecret: null,
             });
             
             logger.info(`[INFO] Created new user from MIT Horizon login: ${username}`);
