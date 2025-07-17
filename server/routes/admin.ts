@@ -33,28 +33,43 @@ router.get('/failed-submissions', requireAdmin, asyncHandler(async (req: Request
     res.json(failedSubmissions);
 }));
 
-// Get system load over time using metrics service
+// Get system load over time using metrics service with input validation
 router.get('/load', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
   const { unit = 'day', count = 7 } = req.query;
   
-  const loadData = await metricsService.getSystemLoad(
-    String(unit), 
-    Number(count) || 7
-  );
+  // Validate input parameters to prevent abuse
+  const validUnits = ['hour', 'day', 'week', 'month'];
+  const safeUnit = validUnits.includes(String(unit)) ? String(unit) : 'day';
+  const safeCount = Math.min(Math.max(Number(count) || 7, 1), 365); // Limit to 1-365 periods
   
-  res.json(loadData);
+  console.log(`[ADMIN] Loading system metrics: ${safeCount} ${safeUnit}(s)`);
+  
+  const loadData = await metricsService.getSystemLoad(safeUnit, safeCount);
+  
+  res.json({
+    unit: safeUnit,
+    count: safeCount,
+    data: loadData
+  });
 }));
 
-// Get detailed processing statistics
+// Get detailed processing statistics using optimized database queries
 router.get('/performance', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  console.log('[ADMIN] Calculating performance metrics using database-level aggregation');
+  const startTime = performance.now();
+  
   const [processingStats, percentiles] = await Promise.all([
     metricsService.getProcessingStats(),
     metricsService.getProcessingTimePercentiles()
   ]);
   
+  const calculationTime = Math.round(performance.now() - startTime);
+  console.log(`[ADMIN] Performance metrics calculated in ${calculationTime}ms`);
+  
   res.json({
     ...processingStats,
-    percentiles
+    percentiles,
+    calculationTimeMs: calculationTime
   });
 }));
 
