@@ -331,7 +331,7 @@ export class GeminiAdapter implements AIAdapter {
           modelName: this.modelName,
           rawResponse: JSON.parse(raw),
           tokenCount: tokenCount !== undefined ? tokenCount : 0,
-          _promptTokens: result.usageMetadata?.promptTokenCount,
+          _promptTokens: (result as any)?.usageMetadata?.promptTokenCount,
           _totalTokens: tokenCount !== undefined ? tokenCount : 0
         };
         

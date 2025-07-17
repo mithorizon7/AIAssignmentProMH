@@ -895,9 +895,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let contentType: ContentType | null = null;
 
       if (submissionType === 'file' && req.file) {
-        // Validate file buffer exists and is not empty
+        // Validate file exists on disk and is not empty  
         if (!req.file.path || !fs.existsSync(req.file.path)) {
-          console.error(`[SUBMISSION] Empty file buffer received from user ${user.id}`);
+          console.error(`[SUBMISSION] File upload failed - no file path or file doesn't exist for user ${user.id}`);
+          return res.status(400).json({
+            message: "File upload failed - file not found",
+            details: "The uploaded file could not be processed. Please check the file and try again."
+          });
+        }
+
+        // Check file size on disk
+        const fileStats = fs.statSync(req.file.path);
+        if (fileStats.size === 0) {
+          console.error(`[SUBMISSION] Empty file uploaded by user ${user.id}`);
+          // Clean up empty file
+          fs.unlinkSync(req.file.path);
           return res.status(400).json({
             message: "File upload failed - empty file",
             details: "The uploaded file contains no data. Please check the file and try again."
@@ -1577,7 +1589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (file) {
           // Ensure we have a valid buffer to work with
-          if (!file.buffer || file.buffer.length === 0) {
+          if (!file.path || !fs.existsSync(file.path) || fs.statSync(file.path).size === 0) {
             console.error(`[TEST-RUBRIC] File buffer is empty or undefined`);
             return res.status(400).json({ 
               error: "Invalid file upload",
@@ -1597,22 +1609,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                              file.mimetype.includes('vnd.openxmlformats');
 
           if (isImage) {
-            console.log(`[TEST-RUBRIC] Processing image file: ${file.originalname} (${file.mimetype}), size: ${file.buffer.length} bytes`);
+            console.log(`[TEST-RUBRIC] Processing image file: ${file.originalname} (${file.mimetype}), size: ${file.size} bytes`);
 
             try {
               // Use a more conservative size limit for inline images
               const MAX_INLINE_SIZE = 4 * 1024 * 1024; // 4MB
-              const isSmallImage = file.buffer.length < MAX_INLINE_SIZE;
+              const isSmallImage = file.size < MAX_INLINE_SIZE;
               
               // For small images, use a data URI for more reliable processing
               const imageDataUri = isSmallImage
-                ? `data:${file.mimetype};base64,${file.buffer.toString('base64')}`
+                ? `data:${file.mimetype};base64,${fs.readFileSync(file.path).toString('base64')}`
                 : undefined;
 
               console.log(`[TEST-RUBRIC] Using ${isSmallImage ? 'data URI' : 'Files API'} for image processing`);
 
               feedback = await aiService.analyzeMultimodalSubmission({
-                fileBuffer: file.buffer,
+                filePath: file.path,
                 fileDataUri: imageDataUri,
                 fileName: file.originalname,
                 mimeType: file.mimetype,
@@ -1631,13 +1643,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             }
           } else if (isDocument) {
-            console.log(`[TEST-RUBRIC] Processing document file: ${file.originalname} (${file.mimetype}), size: ${file.buffer.length} bytes`);
+            console.log(`[TEST-RUBRIC] Processing document file: ${file.originalname} (${file.mimetype}), size: ${file.size} bytes`);
 
             try {
               // For documents, always use the fileBuffer approach
               // The AIService will handle uploading to Files API internally
               feedback = await aiService.analyzeMultimodalSubmission({
-                fileBuffer: file.buffer,
+                filePath: file.path,
                 fileName: file.originalname,
                 mimeType: file.mimetype || 'application/octet-stream', // Fallback mime type if none provided
                 assignmentTitle: "Document Analysis",
@@ -1665,9 +1677,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (file.path && fs.existsSync(file.path)) {
                 // For disk storage
                 content = fs.readFileSync(file.path, 'utf8');
-              } else if (file.buffer) {
-                // For memory storage
-                content = file.buffer.toString('utf8');
+              } else {
+                // Fallback: file content not found
+                console.warn(`[TEST-RUBRIC] Could not find file content - no path or buffer available`);
               }
             }
             
