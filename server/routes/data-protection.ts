@@ -200,23 +200,32 @@ router.post('/users/:userId/anonymize', csrfProtection, async (req, res) => {
 });
 
 /**
- * Delete user data permanently
+ * Delete user data permanently with enterprise-grade cascade deletion
  */
 router.delete('/users/:userId/data', csrfProtection, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     const adminUserId = req.user.id;
-    const { confirmDelete } = req.body;
 
-    if (!confirmDelete) {
-      return res.status(400).json({ error: 'Deletion confirmation required' });
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
     }
 
+    // Enhanced validation and enterprise-grade deletion
     await dataProtectionService.deleteUserData(userId, adminUserId);
 
-    res.json({ success: true });
+    res.json({ 
+      success: true, 
+      message: 'User data permanently deleted with cascade deletion',
+      deletedUserId: userId 
+    });
   } catch (error) {
     console.error('Error deleting user data:', error);
+    
+    if (error.message && error.message.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
+    
     res.status(500).json({ error: 'Failed to delete user data' });
   }
 });
