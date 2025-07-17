@@ -814,7 +814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mimeType = req.file.mimetype;
       const contentType = determineContentType(mimeType, req.file.originalname);
 
-      if (!contentType || !isFileTypeAllowed(extension, contentType)) {
+      if (!contentType || !isFileTypeAllowed(mimeType, req.file.originalname)) {
         return res.status(400).json({
           message: `File type .${extension} is not allowed`,
           allowedTypes: [
