@@ -1406,7 +1406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
   }));
 
-  app.get('/api/assignments/:id?/analytics', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/assignments/:id?/analytics', requireAuth, flexibleRequireRole(['instructor']), asyncHandler(async (req: Request, res: Response) => {
       let assignmentId: number | undefined = undefined;
       if (req.params.id) {
         const parsed = parseInt(req.params.id, 10);
@@ -1519,7 +1519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
   }));
 
-  app.post('/api/test-rubric', requireAuth, requireRole('instructor'),
+  app.post('/api/test-rubric', requireAuth, flexibleRequireRole(['instructor']),
     upload.single('file'),
     asyncHandler(async (req: Request, res: Response) => {
       let content = req.body.content;
@@ -1691,7 +1691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
   }));
 
-  app.get('/api/export/grades', requireAuth, requireRole('instructor'), asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/export/grades', requireAuth, flexibleRequireRole(['instructor']), asyncHandler(async (req: Request, res: Response) => {
       const assignmentIdStr = req.query.assignmentId as string;
       if (!assignmentIdStr) {
         return res.status(400).json({ message: 'Assignment ID is required' });
