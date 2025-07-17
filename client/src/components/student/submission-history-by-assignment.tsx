@@ -5,7 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { FeedbackCard } from "@/components/ui/feedback-card";
 import { formatDate } from "@/lib/utils/format";
 import { SubmissionWithFeedback } from "@/lib/types";
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import * as React from "react";
 import { 
   History, Loader2, ArrowUpCircle, FileText, File, 
@@ -68,10 +68,19 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
   const [expandedAssignments, setExpandedAssignments] = useState<Record<number, boolean>>({});
   const [, navigate] = useLocation();
   
-  // Filter assignments that have submissions (moved to top level to avoid conditional hook issues)
-  const assignmentsWithSubmissions = assignments.filter(assignment => 
-    assignment.submissions && assignment.submissions.length > 0
+  // Memoize filtered assignments to prevent unnecessary re-renders
+  const assignmentsWithSubmissions = useMemo(() => 
+    assignments.filter(assignment => 
+      assignment.submissions && assignment.submissions.length > 0
+    ), [assignments]
   );
+  
+  // Memoize submission IDs to detect actual changes
+  const submissionIds = useMemo(() => {
+    return assignmentsWithSubmissions.flatMap(assignment => 
+      assignment.submissions?.map(sub => sub.id) || []
+    ).sort().join(',');
+  }, [assignmentsWithSubmissions]);
   
   // Initialize expanded state to only show the most recent submission for each assignment
   React.useEffect(() => {
@@ -84,21 +93,21 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
       }
     });
     setExpandedFeedbacks(newExpandedState);
-  }, [assignmentsWithSubmissions]);
+  }, [submissionIds]); // Use stable submissionIds instead of assignments
   
-  const toggleFeedback = (submissionId: number) => {
+  const toggleFeedback = useCallback((submissionId: number) => {
     setExpandedFeedbacks(prev => ({
       ...prev,
       [submissionId]: !prev[submissionId]
     }));
-  };
+  }, []);
   
-  const toggleAssignment = (assignmentId: number) => {
+  const toggleAssignment = useCallback((assignmentId: number) => {
     setExpandedAssignments(prev => ({
       ...prev,
       [assignmentId]: !prev[assignmentId]
     }));
-  };
+  }, []);
   
   if (loading) {
     return (
