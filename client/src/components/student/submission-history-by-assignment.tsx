@@ -68,6 +68,24 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
   const [expandedAssignments, setExpandedAssignments] = useState<Record<number, boolean>>({});
   const [, navigate] = useLocation();
   
+  // Filter assignments that have submissions (moved to top level to avoid conditional hook issues)
+  const assignmentsWithSubmissions = assignments.filter(assignment => 
+    assignment.submissions && assignment.submissions.length > 0
+  );
+  
+  // Initialize expanded state to only show the most recent submission for each assignment
+  React.useEffect(() => {
+    const newExpandedState: Record<number, boolean> = {};
+    assignmentsWithSubmissions.forEach(assignment => {
+      if (assignment.submissions && assignment.submissions.length > 0) {
+        // Only expand the first (most recent) submission for each assignment
+        const mostRecentSubmissionId = assignment.submissions[0].id;
+        newExpandedState[mostRecentSubmissionId] = true;
+      }
+    });
+    setExpandedFeedbacks(newExpandedState);
+  }, [assignmentsWithSubmissions]);
+  
   const toggleFeedback = (submissionId: number) => {
     setExpandedFeedbacks(prev => ({
       ...prev,
@@ -95,24 +113,6 @@ export function SubmissionHistoryByAssignment({ assignments, loading = false }: 
       </Card>
     );
   }
-  
-  // Filter assignments that have submissions
-  const assignmentsWithSubmissions = assignments.filter(assignment => 
-    assignment.submissions && assignment.submissions.length > 0
-  );
-  
-  // Initialize expanded state to only show the most recent submission for each assignment
-  React.useEffect(() => {
-    const newExpandedState: Record<number, boolean> = {};
-    assignmentsWithSubmissions.forEach(assignment => {
-      if (assignment.submissions && assignment.submissions.length > 0) {
-        // Only expand the first (most recent) submission for each assignment
-        const mostRecentSubmissionId = assignment.submissions[0].id;
-        newExpandedState[mostRecentSubmissionId] = true;
-      }
-    });
-    setExpandedFeedbacks(newExpandedState);
-  }, [assignmentsWithSubmissions]);
   
   if (assignmentsWithSubmissions.length === 0) {
     return (
