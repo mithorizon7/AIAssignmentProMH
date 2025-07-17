@@ -105,7 +105,9 @@ export interface UserDataExport {
   submissions: Array<{
     id: number;
     assignment_title: string;
+    assignment_description?: string;
     content: string;
+    file_url?: string | null;
     submitted_at: Date | null;
     grade?: number;
     feedback?: string;
@@ -119,6 +121,7 @@ export interface UserDataExport {
   }>;
   feedback_received: Array<{
     submission_id: number;
+    assignment_title?: string;
     feedback: string;
     score: number | null;
     created_at: Date | null;
@@ -130,8 +133,10 @@ export interface UserDataExport {
   }>;
   activity_logs: Array<{
     action: string;
+    table_name?: string;
     timestamp: Date;
     details: Record<string, unknown>;
+    ip_address?: string;
   }>;
 }
 
