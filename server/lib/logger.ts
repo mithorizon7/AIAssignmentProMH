@@ -33,7 +33,7 @@ export interface LoggerConfig {
 const DEFAULT_CONFIG: LoggerConfig = {
   service: 'ai-feedback-platform',
   minLevel: process.env.NODE_ENV === 'production' ? LogLevel.INFO : LogLevel.DEBUG,
-  structured: process.env.NODE_ENV === 'production',
+  structured: process.env.STRUCTURED_LOGGING === 'true',
   maskFields: ['password', 'token', 'secret', 'authorization', 'credit_card', 'creditCard']
 };
 

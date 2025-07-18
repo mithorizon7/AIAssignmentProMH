@@ -55,7 +55,7 @@ const envSchema = z.object({
   
   // Logging
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug', 'trace']).default('info'),
-  STRUCTURED_LOGGING: z.coerce.boolean().default(false)
+  STRUCTURED_LOGGING: z.enum(['true', 'false']).default('false')
 });
 
 // Refined schema for production validation
@@ -68,7 +68,7 @@ const productionSchema = envSchema.extend({
   GEMINI_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   BASE_URL: z.string().url(),
-  STRUCTURED_LOGGING: z.literal(true)
+  STRUCTURED_LOGGING: z.literal('true')
 }).refine(
   (data) => data.GEMINI_API_KEY || data.OPENAI_API_KEY,
   {
