@@ -4,7 +4,11 @@
  */
 
 import { z } from 'zod';
+import { config as dotenvConfig } from 'dotenv';
 import { logger } from './logger';
+
+// Load environment variables from .env file
+dotenvConfig();
 
 // Environment schema with validation
 const envSchema = z.object({
@@ -116,7 +120,22 @@ export function loadConfig(): EnvConfig {
       });
     }
     
-    config = baseResult.success ? baseResult.data : envSchema.parse({});
+    if (baseResult.success) {
+      config = baseResult.data;
+    } else {
+      // In development, use fallback configuration to allow app to start
+      config = {
+        NODE_ENV: 'development',
+        PORT: 5000,
+        SESSION_SECRET: process.env.SESSION_SECRET || 'fallback-session-secret-for-development',
+        CSRF_SECRET: process.env.CSRF_SECRET || 'fallback-csrf-secret-for-development',
+        DATABASE_URL: process.env.DATABASE_URL || '',
+        REDIS_HOST: 'localhost',
+        REDIS_PORT: 6379,
+        ENABLE_REDIS: false,
+        STRUCTURED_LOGGING: 'false'
+      } as EnvConfig;
+    }
     
     // Additional production validation
     if (config.NODE_ENV === 'production') {

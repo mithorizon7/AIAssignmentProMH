@@ -14,13 +14,23 @@ import QueuePerformanceMonitor from '../lib/queue-performance-monitor';
 // Queue name
 const SUBMISSION_QUEUE_NAME = 'submission-processing';
 
-// Disable BullMQ to prevent Redis request limit issues
-const queueActive = false;
-logger.info(`BullMQ queue disabled - using direct processing fallback`, { 
-  active: queueActive, 
-  mode: process.env.NODE_ENV || 'development',
-  reason: 'Redis request limit exceeded - using direct processing to maintain functionality'
-});
+// Enable/disable BullMQ based on Redis configuration and environment
+import { isRedisEnabled } from '../lib/env-config';
+const queueActive = isRedisEnabled();
+
+if (queueActive) {
+  logger.info(`BullMQ queue enabled - using high-performance asynchronous processing`, { 
+    active: queueActive, 
+    mode: process.env.NODE_ENV || 'development',
+    reason: 'Redis infrastructure upgraded - queue processing restored'
+  });
+} else {
+  logger.info(`BullMQ queue disabled - using direct processing fallback`, { 
+    active: queueActive, 
+    mode: process.env.NODE_ENV || 'development',
+    reason: 'Redis disabled via ENABLE_REDIS environment variable'
+  });
+}
 
 // Optimized queue configuration to minimize Redis requests
 const queueConfig = {
@@ -67,12 +77,23 @@ const queueEvents = queueActive
   ? new QueueEvents(SUBMISSION_QUEUE_NAME, { connection: redisClient }) 
   : null;
 
-// Disable performance monitoring to prevent Redis usage
+// Initialize performance monitoring based on queue activation
 let performanceMonitor: QueuePerformanceMonitor | null = null;
-logger.info('Queue performance monitoring disabled', {
-  monitoringEnabled: false,
-  reason: 'Redis request limit optimization'
-});
+
+if (queueActive) {
+  // Enable performance monitoring when queue is active
+  performanceMonitor = new QueuePerformanceMonitor([SUBMISSION_QUEUE_NAME]);
+  logger.info('Queue performance monitoring enabled', {
+    monitoringEnabled: true,
+    reason: 'High-performance queue processing active'
+  });
+} else {
+  // Disable performance monitoring when using fallback
+  logger.info('Queue performance monitoring disabled', {
+    monitoringEnabled: false,
+    reason: 'Queue disabled - using direct processing fallback'
+  });
+}
 
 // Log queue events if active
 if (queueEvents) {
@@ -129,10 +150,16 @@ function createAIService() {
 // Create storage service
 const storageService = new StorageService();
 
-// Skip BullMQ worker initialization - use direct processing instead
+// Initialize BullMQ worker based on queue activation status
 let submissionWorker: SubmissionWorker = null;
-logger.info('BullMQ worker disabled to prevent Redis request limit issues');
-if (false) { // Disabled to prevent Redis usage
+
+if (queueActive) {
+  logger.info('BullMQ worker enabled - high-performance asynchronous processing active');
+} else {
+  logger.info('BullMQ worker disabled - using direct processing fallback');
+}
+
+if (queueActive) { // Enable worker when queue is active
   submissionWorker = new Worker(
     SUBMISSION_QUEUE_NAME,
     async (job: Job) => {
