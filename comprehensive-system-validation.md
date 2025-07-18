@@ -71,7 +71,7 @@
 ### CSRF Token Generation:
 ```json
 {
-  "csrfToken": "31c37bdbf476136442c5c7d8a63f73bd8fb499d9874022998f89050e93991214"
+  "csrfToken": "a_valid_but_non_sensitive_example_csrf_token_string_would_be_here"
 }
 ```
 
