@@ -170,6 +170,41 @@ export function isRedisReady(): boolean {
 }
 
 /**
+ * Wait for Redis client to be ready with timeout
+ * This solves the race condition where validators check Redis status
+ * before the client has finished connecting
+ */
+export function waitForRedisReady(timeout = 5000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // If already ready, resolve immediately
+    if (redisClient.status === 'ready') {
+      return resolve();
+    }
+
+    const readyHandler = () => {
+      clearTimeout(timer);
+      redisClient.removeListener('error', errorHandler);
+      resolve();
+    };
+
+    const errorHandler = (err: Error) => {
+      clearTimeout(timer);
+      redisClient.removeListener('ready', readyHandler);
+      reject(new Error(`Redis connection failed: ${err.message}`));
+    };
+
+    const timer = setTimeout(() => {
+      redisClient.removeListener('ready', readyHandler);
+      redisClient.removeListener('error', errorHandler);
+      reject(new Error('Redis connection timed out'));
+    }, timeout);
+
+    redisClient.once('ready', readyHandler);
+    redisClient.once('error', errorHandler);
+  });
+}
+
+/**
  * Get Redis connection status information
  */
 export function getRedisStatus() {

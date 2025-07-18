@@ -1,0 +1,105 @@
+This is a tricky bug, but the logs provide a clear picture of what's going wrong. This is a race condition in your application's startup code.
+
+What is the Problem?
+
+Your application is connecting to Redis successfully, but the production readiness check is running too fast.
+
+Here's the sequence of events happening, based on your logs:
+
+Your application starts.
+
+The Redis client begins connecting in the background (this is an asynchronous process).
+
+Almost immediately, your "Production Validator" script runs to check if everything is ready.
+
+The validator checks the Redis client's status. Since the client hasn't finished connecting yet, its status is "connecting," not "ready."
+
+The validator sees the "connecting" status, incorrectly assumes Redis has failed, and crashes the application with the error: Redis client not ready for connections.
+
+A few seconds after the crash, the Redis client successfully connects and reports "Redis client ready for commands", but it's too late—the application has already been terminated.
+
+This is why you see a successful connection message right before the application enters the crash loop. The check is simply happening too early.
+
+How to Fix It
+
+The solution is to make the production validator wait for the Redis client to be ready before checking its status. This will resolve the race condition.
+
+Here are clear directions for your developer.
+
+Subject: Fix for Production Validator Race Condition (Redis Check)
+Hi [Developer Name],
+
+We've identified a race condition in the production startup validation that's causing the deployment to fail. The Redis health check is running before the client has had time to connect, resulting in a false negative that crashes the app.
+
+We need to modify the production validator to wait for the Redis client to be fully ready before proceeding.
+
+1. The Problem File
+
+The issue is located in the file that performs the production readiness checks, likely named server/lib/production-validator.ts or similar.
+
+2. The Solution
+
+Please update the Redis check function to be asynchronous and to wait for the client's "ready" event before checking its status.
+
+Current (Incorrect) Logic (example):
+
+TypeScript
+// This is synchronous and runs too early
+function checkRedisStatus() {
+  if (redisClient.status !== 'ready') {
+    throw new Error('Redis client not ready');
+  }
+}
+New (Correct) Logic:
+
+Please implement a new function that returns a Promise. This promise should resolve only when the Redis client either connects successfully or fails definitively.
+
+TypeScript
+// In your redis-client.ts file, add this utility function
+import { redisClient } from './redis-client';
+
+export function waitForRedisReady(timeout = 5000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // If already ready, resolve immediately
+    if (redisClient.status === 'ready') {
+      return resolve();
+    }
+
+    const readyHandler = () => {
+      clearTimeout(timer);
+      redisClient.removeListener('error', errorHandler);
+      resolve();
+    };
+
+    const errorHandler = (err: Error) => {
+      clearTimeout(timer);
+      redisClient.removeListener('ready', readyHandler);
+      reject(new Error(`Redis connection failed: ${err.message}`));
+    };
+
+    const timer = setTimeout(() => {
+      redisClient.removeListener('ready', readyHandler);
+      redisClient.removeListener('error', errorHandler);
+      reject(new Error('Redis connection timed out'));
+    }, timeout);
+
+    redisClient.once('ready', readyHandler);
+    redisClient.once('error', errorHandler);
+  });
+}
+Then, update your production validator to use this new asynchronous function.
+
+TypeScript
+// In your production-validator.ts file
+import { waitForRedisReady } from '../queue/redis-client'; // Adjust path as needed
+
+// ... inside your main validation function
+try {
+  await waitForRedisReady();
+  logger.info('Redis connection is ready.');
+  // Now you can proceed with other checks
+} catch (error) {
+  logger.error('Production readiness validation failed: Redis check failed.', { error: error.message });
+  process.exit(1);
+}
+This change will force the validator to pause and wait for a definitive connection status from Redis, completely eliminating the race condition and allowing the application to deploy successfully.

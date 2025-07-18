@@ -5,7 +5,7 @@
 
 import { logger } from './logger';
 import { db } from '../db';
-import { redisClient, isRedisReady } from '../queue/redis-client';
+import { redisClient, isRedisReady, waitForRedisReady } from '../queue/redis-client';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -97,16 +97,9 @@ async function validateRedis(): Promise<{ valid: boolean; errors: string[]; warn
   const warnings: string[] = [];
   
   try {
-    // Check if Redis client is ready
-    if (!isRedisReady()) {
-      const message = 'Redis client not ready for connections';
-      if (process.env.NODE_ENV === 'production') {
-        errors.push(message);
-      } else {
-        warnings.push(`${message} (acceptable in development mode)`);
-      }
-      return { valid: errors.length === 0, errors, warnings };
-    }
+    // Wait for Redis client to be ready (fixes race condition)
+    await waitForRedisReady();
+    logger.info('Redis connection validated successfully');
     
     // Test Redis connection
     const pong = await redisClient.ping();
