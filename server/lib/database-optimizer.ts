@@ -6,6 +6,7 @@
 import { logger } from './logger';
 import { db } from '../db';
 import { isProduction } from './env-config';
+import { sql } from 'drizzle-orm';
 
 export interface DatabaseMetrics {
   activeConnections: number;
@@ -122,7 +123,7 @@ class DatabaseOptimizer {
       const tables = ['users', 'assignments', 'submissions', 'feedback', 'courses'];
       
       for (const table of tables) {
-        const result = await db.execute(`
+        const result = await db.execute(sql`
           SELECT 
             schemaname,
             tablename,
@@ -130,7 +131,7 @@ class DatabaseOptimizer {
             n_distinct,
             correlation
           FROM pg_stats 
-          WHERE tablename = '${table}'
+          WHERE tablename = ${table}
           ORDER BY n_distinct DESC
         `);
         
@@ -150,7 +151,7 @@ class DatabaseOptimizer {
   private async checkIndexes(): Promise<void> {
     try {
       // Check for missing indexes on foreign keys
-      const result = await db.execute(`
+      const result = await db.execute(sql`
         SELECT 
           t.relname as table_name,
           a.attname as column_name,
@@ -183,7 +184,7 @@ class DatabaseOptimizer {
     try {
       // Clean up old feedback records older than 1 year
       if (isProduction()) {
-        const result = await db.execute(`
+        const result = await db.execute(sql`
           DELETE FROM feedback 
           WHERE created_at < NOW() - INTERVAL '1 year'
         `);
@@ -202,7 +203,7 @@ class DatabaseOptimizer {
    */
   private async updateStatistics(): Promise<void> {
     try {
-      await db.execute('ANALYZE');
+      await db.execute(sql`ANALYZE`);
       logger.info('Database statistics updated');
     } catch (error) {
       logger.warn('Failed to update statistics', { error });
