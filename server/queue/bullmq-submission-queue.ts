@@ -15,8 +15,8 @@ import QueuePerformanceMonitor from '../lib/queue-performance-monitor';
 const SUBMISSION_QUEUE_NAME = 'submission-processing';
 
 // Enable/disable BullMQ based on Redis configuration and environment
-import { isRedisEnabled } from '../lib/env-config';
-const queueActive = isRedisEnabled();
+import { isRedisConfigured } from '../lib/env-config';
+const queueActive = isRedisConfigured();
 
 if (queueActive) {
   logger.info(`BullMQ queue enabled - using high-performance asynchronous processing`, { 
@@ -28,7 +28,7 @@ if (queueActive) {
   logger.info(`BullMQ queue disabled - using direct processing fallback`, { 
     active: queueActive, 
     mode: process.env.NODE_ENV || 'development',
-    reason: 'Redis disabled via ENABLE_REDIS environment variable'
+    reason: 'Redis not configured or unavailable'
   });
 }
 
@@ -80,9 +80,9 @@ const queueEvents = queueActive
 // Initialize performance monitoring based on queue activation
 let performanceMonitor: QueuePerformanceMonitor | null = null;
 
-if (queueActive) {
+if (queueActive && submissionQueue && queueEvents) {
   // Enable performance monitoring when queue is active
-  performanceMonitor = new QueuePerformanceMonitor([SUBMISSION_QUEUE_NAME]);
+  performanceMonitor = new QueuePerformanceMonitor(submissionQueue, queueEvents);
   logger.info('Queue performance monitoring enabled', {
     monitoringEnabled: true,
     reason: 'High-performance queue processing active'

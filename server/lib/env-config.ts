@@ -30,7 +30,6 @@ const envSchema = z.object({
   REDIS_PASSWORD: z.string().optional(),
   REDIS_USERNAME: z.string().optional(),
   REDIS_DB: z.coerce.number().default(0),
-  ENABLE_REDIS: z.coerce.boolean().default(false),
   
   // AI Services
   GEMINI_API_KEY: z.string().optional(),
@@ -132,7 +131,7 @@ export function loadConfig(): EnvConfig {
         DATABASE_URL: process.env.DATABASE_URL || '',
         REDIS_HOST: 'localhost',
         REDIS_PORT: 6379,
-        ENABLE_REDIS: false,
+
         STRUCTURED_LOGGING: 'false'
       } as EnvConfig;
     }
@@ -152,7 +151,7 @@ export function loadConfig(): EnvConfig {
     
     logger.info('Environment configuration loaded', {
       env: config.NODE_ENV,
-      redis_enabled: config.ENABLE_REDIS || config.NODE_ENV === 'production',
+      redis_configured: !!(config.REDIS_URL || config.REDIS_HOST),
       ai_services: {
         gemini: !!config.GEMINI_API_KEY,
         openai: !!config.OPENAI_API_KEY
@@ -202,11 +201,11 @@ export function isDevelopment(): boolean {
 }
 
 /**
- * Checks if Redis is enabled
+ * Check if Redis is configured
  */
-export function isRedisEnabled(): boolean {
+export function isRedisConfigured(): boolean {
   const cfg = getConfig();
-  return cfg.ENABLE_REDIS || cfg.NODE_ENV === 'production';
+  return !!(cfg.REDIS_URL || cfg.REDIS_HOST);
 }
 
 /**

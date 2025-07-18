@@ -17,8 +17,6 @@ The platform uses Redis through BullMQ for reliable queue processing. This enabl
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NODE_ENV` | When set to 'production', activates Redis/BullMQ by default | 'development' |
-| `ENABLE_REDIS` | Force enable Redis even in non-production environments | 'false' |
 | `REDIS_URL` | Complete Redis connection string (e.g., redis://username:password@host:port) | - |
 | `REDIS_HOST` | Redis server hostname (used if REDIS_URL is not provided) | 'localhost' |
 | `REDIS_PORT` | Redis server port (used if REDIS_URL is not provided) | 6379 |
@@ -28,11 +26,11 @@ The platform uses Redis through BullMQ for reliable queue processing. This enabl
 
 ### Connection Logic
 
-The system uses the following logic to determine whether to use Redis:
+The system uses Redis for queue processing and session management. Connection is established using:
+1. The `REDIS_URL` if provided
+2. Individual connection parameters (`REDIS_HOST`, `REDIS_PORT`, etc.) if `REDIS_URL` is not provided
 
-1. If `NODE_ENV=production`, Redis is enabled by default
-2. If `ENABLE_REDIS=true`, Redis is enabled regardless of environment
-3. If `REDIS_URL` is provided, Redis is enabled regardless of other settings
+If Redis connection fails, the system will use fallback implementations for development.
 
 When Redis is enabled, the system connects using:
 1. The `REDIS_URL` if provided
