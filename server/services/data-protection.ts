@@ -60,8 +60,6 @@ export class DataProtectionService {
       performedBy: userId,
       ipAddress: null,
       userAgent: null,
-      ipAddress: null,
-      userAgent: null,
     });
 
     return request;
@@ -511,15 +509,14 @@ export class DataProtectionService {
         tableName: 'users',
         recordId: userId.toString(),
         performedBy,
-      ipAddress: null,
-      userAgent: null,
         timestamp: new Date(),
         details: { 
           deletedUserId: userId,
           submissionsDeleted: submissionIds.length,
           cascadeComplete: true
         },
-        ipAddress: 'system'
+        ipAddress: 'system',
+        userAgent: null
       });
     } catch (error) {
       console.warn(`[DATA-PROTECTION] Could not log final deletion: ${error}`);
@@ -608,11 +605,9 @@ export class DataProtectionService {
       action: 'create',
       tableName: 'user_consents',
       recordId: consent.id.toString(),
+      performedBy: userId,
       ipAddress,
       userAgent,
-      performedBy: userId,
-      ipAddress: null,
-      userAgent: null,
     });
 
     return consent;

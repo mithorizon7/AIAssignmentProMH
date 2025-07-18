@@ -38,14 +38,12 @@ function createRedisConfig(): RedisConfig {
     // Enhanced configuration for REDIS_URL
     const config: RedisConfig = {
       maxRetriesPerRequest: null,    // Required for BullMQ
-      retryDelayOnFailover: 100,     // Fast failover
+      retryDelayOnFailover: 2000,    // 2s retry delay to reduce frequency
       lazyConnect: true,             // Connect only when needed
       
       // Upstash Redis performance optimizations
-      keepAlive: 30000,              // Keep connections alive for 30s
-      connectTimeout: 10000,         // 10s connection timeout
-      lazyConnect: true,
-      maxRetriesPerRequest: null,
+      keepAlive: 60000,              // 60s keep-alive to reduce connection overhead
+      connectTimeout: 8000,          // 8s connection timeout
       
       // Connection pooling optimized for Redis request limits
       family: 4,                     // IPv4
@@ -54,12 +52,7 @@ function createRedisConfig(): RedisConfig {
       
       // Upstash-specific optimizations for request efficiency
       commandTimeout: 8000,          // 8s command timeout
-      retryDelayOnFailover: 2000,    // 2s retry delay to reduce frequency
       enableOfflineQueue: false,     // Disable offline queue for immediate errors
-      maxRetriesPerRequest: null,    // Required for BullMQ blocking operations
-      connectTimeout: 8000,          // 8s connection timeout
-      lazyConnect: true,             // Only connect when needed
-      keepAlive: 60000,              // 60s keep-alive to reduce connection overhead
     };
     
     // Automatic TLS detection for cloud Redis services
