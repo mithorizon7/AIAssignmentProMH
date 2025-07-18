@@ -1,0 +1,252 @@
+2025-07-18T16:08:55Z info: Deployment: 2fa10bf8-5774-42e3-bfea-305d01635907
+2025-07-18T16:08:55Z info: Build: 55913671-f36d-4a16-9faa-7b351d68015c
+2025-07-18T16:08:55Z info: Connecting to builder
+2025-07-18T16:08:56Z info: Builder connected
+2025-07-18T16:08:57Z info: Installing packages
+2025-07-18T16:08:58Z info: Starting Build
+
+> rest-express@1.0.0 build
+> vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+
+vite v6.3.5 building for production...
+
+transforming...
+
+✓ 3280 modules transformed.
+
+rendering chunks...
+
+computing gzip size...
+
+../dist/public/index.html                     1.22 kB │ gzip:   0.61 kB
+
+../dist/public/assets/index-ypJN6hAg.css    164.66 kB │ gzip:  23.27 kB
+
+../dist/public/assets/index-BVzK4Rqg.js   1,598.23 kB │ gzip: 436.56 kB
+
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+✓ built in 16.39s
+
+▲ [WARNING] Duplicate key "lazyConnect" in object literal [duplicate-object-key]
+
+    server/queue/redis-client.ts:47:6:
+      47 │       lazyConnect: true,
+         ╵       ~~~~~~~~~~~
+
+  The original key "lazyConnect" is here:
+
+    server/queue/redis-client.ts:42:6:
+      42 │       lazyConnect: true,             // Connect only when needed
+         ╵       ~~~~~~~~~~~
+
+▲ [WARNING] Duplicate key "maxRetriesPerRequest" in object literal [duplicate-object-key]
+
+    server/queue/redis-client.ts:48:6:
+      48 │       maxRetriesPerRequest: null,
+         ╵       ~~~~~~~~~~~~~~~~~~~~
+
+  The original key "maxRetriesPerRequest" is here:
+
+    server/queue/redis-client.ts:40:6:
+      40 │       maxRetriesPerRequest: null,    // Required for BullMQ
+         ╵       ~~~~~~~~~~~~~~~~~~~~
+
+▲ [WARNING] Duplicate key "retryDelayOnFailover" in object literal [duplicate-object-key]
+
+    server/queue/redis-client.ts:57:6:
+      57 │       retryDelayOnFailover: 2000,    // 2s retry delay to reduce f...
+         ╵       ~~~~~~~~~~~~~~~~~~~~
+
+  The original key "retryDelayOnFailover" is here:
+
+    server/queue/redis-client.ts:41:6:
+      41 │       retryDelayOnFailover: 100,     // Fast failover
+         ╵       ~~~~~~~~~~~~~~~~~~~~
+
+
+▲ [WARNING] Duplicate key "maxRetriesPerRequest" in object literal [duplicate-object-key]
+
+    server/queue/redis-client.ts:59:6:
+      59 │       maxRetriesPerRequest: null,    // Required for BullMQ blocki...
+         ╵       ~~~~~~~~~~~~~~~~~~~~
+
+  The original key "maxRetriesPerRequest" is here:
+
+    server/queue/redis-client.ts:48:6:
+      48 │       maxRetriesPerRequest: null,
+         ╵       ~~~~~~~~~~~~~~~~~~~~
+
+▲ [WARNING] Duplicate key "connectTimeout" in object literal [duplicate-object-key]
+
+    server/queue/redis-client.ts:60:6:
+      60 │       connectTimeout: 8000,          // 8s connection timeout
+         ╵       ~~~~~~~~~~~~~~
+
+  The original key "connectTimeout" is here:
+
+    server/queue/redis-client.ts:46:6:
+      46 │       connectTimeout: 10000,         // 10s connection timeout
+         ╵       ~~~~~~~~~~~~~~
+
+▲ [WARNING] Duplicate key "lazyConnect" in object literal [duplicate-object-key]
+
+    server/queue/redis-client.ts:61:6:
+      61 │       lazyConnect: true,             // Only connect when needed
+         ╵       ~~~~~~~~~~~
+
+  The original key "lazyConnect" is here:
+
+    server/queue/redis-client.ts:47:6:
+      47 │       lazyConnect: true,
+         ╵       ~~~~~~~~~~~
+
+6 of 12 warnings shown (disable the message limit with --log-limit=0)
+
+
+  dist/index.js  490.1kb
+
+⚡ Done in 994ms
+
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.4.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.4.2
+npm notice To update run: npm install -g npm@11.4.2
+npm notice
+
+2025-07-18T16:09:30Z info: Pushing pid1 binary layer...
+2025-07-18T16:09:32Z info: Created pid1 binary layer
+2025-07-18T16:09:34Z info: Pushing Repl layer...
+2025-07-18T16:09:34Z info: Pushing hosting layer...
+2025-07-18T16:09:34Z info: Retrieved cached nix layer
+2025-07-18T16:09:34Z info: Created hosting layer
+2025-07-18T16:10:24Z info: Created Repl layer
+2025-07-18T16:10:24Z info: Pushing Repl (cache) layer...
+2025-07-18T16:10:24Z info: Created Repl (cache) layer
+2025-07-18T16:10:25Z info: Pushed image manifest
+2025-07-18T16:10:25Z info: Pushed soci index manifest
+2025-07-18T16:10:29Z info: Creating Autoscale service
+forwarding local port 5000 to external port 80 (mapped as 1104)
+starting up user application
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+{"timestamp":"2025-07-18T16:12:03.919Z","level":"info","message":"BullMQ queue disabled - using direct processing fallback","service":"queue-service","context":{"active":false,"mode":"production","reason":"Redis request limit exceeded - using direct processing to maintain functionality"}}
+> rest-express@1.0.0 start
+npm notice New major version of npm available! 10.8.2 -> 11.4.2
+{"timestamp":"2025-07-18T16:12:03.919Z","level":"info","message":"BullMQ worker disabled to prevent Redis request limit issues","service":"queue-service"}
+❌ Production environment validation failed:
+  - BASE_URL: Required
+{"timestamp":"2025-07-18T16:12:05.234Z","level":"info","message":"BullMQ worker disabled to prevent Redis request limit issues","service":"queue-service"}
+> NODE_ENV=production node dist/index.js
+{"timestamp":"2025-07-18T16:12:06.856Z","level":"info","message":"Redis TLS enabled with cloud optimizations","service":"ai-feedback-platform","context":{"provider":"Upstash","optimizations":["TLS","Auto-pipelining","Connection pooling"]}}
+{"timestamp":"2025-07-18T16:12:03.921Z","level":"info","message":"Security audit system initialized with fallback mode","service":"queue-service","context":{"queueName":"security-audit","reason":"Redis request limit optimization - using direct processing"}}
+> rest-express@1.0.0 start
+npm notice
+❌ Production environment validation failed:
+{"timestamp":"2025-07-18T16:12:05.234Z","level":"info","message":"BullMQ queue disabled - using direct processing fallback","service":"queue-service","context":{"active":false,"mode":"production","reason":"Redis request limit exceeded - using direct processing to maintain functionality"}}
+> NODE_ENV=production node dist/index.js
+{"timestamp":"2025-07-18T16:12:03.919Z","level":"info","message":"Queue performance monitoring disabled","service":"queue-service","context":{"monitoringEnabled":false,"reason":"Redis request limit optimization"}}
+{"timestamp":"2025-07-18T16:12:05.234Z","level":"info","message":"Queue performance monitoring disabled","service":"queue-service","context":{"monitoringEnabled":false,"reason":"Redis request limit optimization"}}
+npm notice
+  - STRUCTURED_LOGGING: Invalid literal value, expected true
+command finished with error [npm run start]: exit status 1
+npm notice To update run: npm install -g npm@11.4.2
+  - BASE_URL: Required
+{"timestamp":"2025-07-18T16:12:03.915Z","level":"info","message":"Redis TLS enabled with cloud optimizations","service":"ai-feedback-platform","context":{"provider":"Upstash","optimizations":["TLS","Auto-pipelining","Connection pooling"]}}
+> rest-express@1.0.0 start
+command finished with error [npm run start]: exit status 1
+{"timestamp":"2025-07-18T16:12:06.860Z","level":"info","message":"BullMQ queue disabled - using direct processing fallback","service":"queue-service","context":{"active":false,"mode":"production","reason":"Redis request limit exceeded - using direct processing to maintain functionality"}}
+> NODE_ENV=production node dist/index.js
+{"timestamp":"2025-07-18T16:12:06.864Z","level":"info","message":"Security audit system initialized with fallback mode","service":"queue-service","context":{"queueName":"security-audit","reason":"Redis request limit optimization - using direct processing"}}
+❌ Production environment validation failed:
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.4.2
+command finished with error [npm run start]: exit status 1
+{"timestamp":"2025-07-18T16:12:06.860Z","level":"info","message":"BullMQ worker disabled to prevent Redis request limit issues","service":"queue-service"}
+  - STRUCTURED_LOGGING: Invalid literal value, expected true
+{"timestamp":"2025-07-18T16:12:05.230Z","level":"info","message":"Redis TLS enabled with cloud optimizations","service":"ai-feedback-platform","context":{"provider":"Upstash","optimizations":["TLS","Auto-pipelining","Connection pooling"]}}
+  - STRUCTURED_LOGGING: Invalid literal value, expected true
+  - BASE_URL: Required
+{"timestamp":"2025-07-18T16:12:05.236Z","level":"info","message":"Security audit system initialized with fallback mode","service":"queue-service","context":{"queueName":"security-audit","reason":"Redis request limit optimization - using direct processing"}}
+{"timestamp":"2025-07-18T16:12:06.860Z","level":"info","message":"Queue performance monitoring disabled","service":"queue-service","context":{"monitoringEnabled":false,"reason":"Redis request limit optimization"}}
+{"timestamp":"2025-07-18T16:12:08.587Z","level":"info","message":"BullMQ worker disabled to prevent Redis request limit issues","service":"queue-service"}
+> rest-express@1.0.0 start
+{"timestamp":"2025-07-18T16:12:08.587Z","level":"info","message":"BullMQ queue disabled - using direct processing fallback","service":"queue-service","context":{"active":false,"mode":"production","reason":"Redis request limit exceeded - using direct processing to maintain functionality"}}
+{"timestamp":"2025-07-18T16:12:08.587Z","level":"info","message":"Queue performance monitoring disabled","service":"queue-service","context":{"monitoringEnabled":false,"reason":"Redis request limit optimization"}}
+  - BASE_URL: Required
+  - BASE_URL: Required
+{"timestamp":"2025-07-18T16:12:08.584Z","level":"info","message":"Redis TLS enabled with cloud optimizations","service":"ai-feedback-platform","context":{"provider":"Upstash","optimizations":["TLS","Auto-pipelining","Connection pooling"]}}
+{"timestamp":"2025-07-18T16:12:08.590Z","level":"info","message":"Security audit system initialized with fallback mode","service":"queue-service","context":{"queueName":"security-audit","reason":"Redis request limit optimization - using direct processing"}}
+{"timestamp":"2025-07-18T16:12:11.804Z","level":"info","message":"Redis TLS enabled with cloud optimizations","service":"ai-feedback-platform","context":{"provider":"Upstash","optimizations":["TLS","Auto-pipelining","Connection pooling"]}}
+{"timestamp":"2025-07-18T16:12:11.808Z","level":"info","message":"Queue performance monitoring disabled","service":"queue-service","context":{"monitoringEnabled":false,"reason":"Redis request limit optimization"}}
+{"timestamp":"2025-07-18T16:12:10.570Z","level":"info","message":"Queue performance monitoring disabled","service":"queue-service","context":{"monitoringEnabled":false,"reason":"Redis request limit optimization"}}
+  - BASE_URL: Required
+❌ Production environment validation failed:
+  - STRUCTURED_LOGGING: Invalid literal value, expected true
+  - STRUCTURED_LOGGING: Invalid literal value, expected true
+{"timestamp":"2025-07-18T16:12:11.810Z","level":"info","message":"Security audit system initialized with fallback mode","service":"queue-service","context":{"queueName":"security-audit","reason":"Redis request limit optimization - using direct processing"}}
+{"timestamp":"2025-07-18T16:12:10.570Z","level":"info","message":"BullMQ queue disabled - using direct processing fallback","service":"queue-service","context":{"active":false,"mode":"production","reason":"Redis request limit exceeded - using direct processing to maintain functionality"}}
+  - STRUCTURED_LOGGING: Invalid literal value, expected true
+command finished with error [npm run start]: exit status 1
+{"timestamp":"2025-07-18T16:12:11.808Z","level":"info","message":"BullMQ worker disabled to prevent Redis request limit issues","service":"queue-service"}
+command finished with error [npm run start]: exit status 1
+{"timestamp":"2025-07-18T16:12:10.571Z","level":"info","message":"BullMQ worker disabled to prevent Redis request limit issues","service":"queue-service"}
+{"timestamp":"2025-07-18T16:12:10.573Z","level":"info","message":"Security audit system initialized with fallback mode","service":"queue-service","context":{"queueName":"security-audit","reason":"Redis request limit optimization - using direct processing"}}
+❌ Production environment validation failed:
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+command finished with error [npm run start]: exit status 1
+> NODE_ENV=production node dist/index.js
+{"timestamp":"2025-07-18T16:12:11.807Z","level":"info","message":"BullMQ queue disabled - using direct processing fallback","service":"queue-service","context":{"active":false,"mode":"production","reason":"Redis request limit exceeded - using direct processing to maintain functionality"}}
+{"timestamp":"2025-07-18T16:12:10.567Z","level":"info","message":"Redis TLS enabled with cloud optimizations","service":"ai-feedback-platform","context":{"provider":"Upstash","optimizations":["TLS","Auto-pipelining","Connection pooling"]}}
+❌ Production environment validation failed:
+> rest-express@1.0.0 start
+  - BASE_URL: Required
+{"timestamp":"2025-07-18T16:12:15.031Z","level":"info","message":"Queue performance monitoring disabled","service":"queue-service","context":{"monitoringEnabled":false,"reason":"Redis request limit optimization"}}
+> NODE_ENV=production node dist/index.js
+{"timestamp":"2025-07-18T16:12:15.027Z","level":"info","message":"Redis TLS enabled with cloud optimizations","service":"ai-feedback-platform","context":{"provider":"Upstash","optimizations":["TLS","Auto-pipelining","Connection pooling"]}}
+command finished with error [npm run start]: exit status 1
+{"timestamp":"2025-07-18T16:12:15.031Z","level":"info","message":"BullMQ worker disabled to prevent Redis request limit issues","service":"queue-service"}
+❌ Production environment validation failed:
+{"timestamp":"2025-07-18T16:12:15.031Z","level":"info","message":"BullMQ queue disabled - using direct processing fallback","service":"queue-service","context":{"active":false,"mode":"production","reason":"Redis request limit exceeded - using direct processing to maintain functionality"}}
+{"timestamp":"2025-07-18T16:12:15.034Z","level":"info","message":"Security audit system initialized with fallback mode","service":"queue-service","context":{"queueName":"security-audit","reason":"Redis request limit optimization - using direct processing"}}
+  - STRUCTURED_LOGGING: Invalid literal value, expected true
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+{"timestamp":"2025-07-18T16:12:22.363Z","level":"info","message":"Security audit system initialized with fallback mode","service":"queue-service","context":{"queueName":"security-audit","reason":"Redis request limit optimization - using direct processing"}}
+command finished with error [npm run start]: exit status 1
+{"timestamp":"2025-07-18T16:12:22.356Z","level":"info","message":"Redis TLS enabled with cloud optimizations","service":"ai-feedback-platform","context":{"provider":"Upstash","optimizations":["TLS","Auto-pipelining","Connection pooling"]}}
+{"timestamp":"2025-07-18T16:12:22.359Z","level":"info","message":"BullMQ queue disabled - using direct processing fallback","service":"queue-service","context":{"active":false,"mode":"production","reason":"Redis request limit exceeded - using direct processing to maintain functionality"}}
+  - STRUCTURED_LOGGING: Invalid literal value, expected true
+  - BASE_URL: Required
+{"timestamp":"2025-07-18T16:12:22.359Z","level":"info","message":"Queue performance monitoring disabled","service":"queue-service","context":{"monitoringEnabled":false,"reason":"Redis request limit optimization"}}
+{"timestamp":"2025-07-18T16:12:22.359Z","level":"info","message":"BullMQ worker disabled to prevent Redis request limit issues","service":"queue-service"}
+❌ Production environment validation failed:
+> NODE_ENV=production node dist/index.js
+> rest-express@1.0.0 start
+{"timestamp":"2025-07-18T16:12:28.541Z","level":"info","message":"Redis TLS enabled with cloud optimizations","service":"ai-feedback-platform","context":{"provider":"Upstash","optimizations":["TLS","Auto-pipelining","Connection pooling"]}}
+{"timestamp":"2025-07-18T16:12:28.545Z","level":"info","message":"Queue performance monitoring disabled","service":"queue-service","context":{"monitoringEnabled":false,"reason":"Redis request limit optimization"}}
+{"timestamp":"2025-07-18T16:12:28.545Z","level":"info","message":"BullMQ queue disabled - using direct processing fallback","service":"queue-service","context":{"active":false,"mode":"production","reason":"Redis request limit exceeded - using direct processing to maintain functionality"}}
+{"timestamp":"2025-07-18T16:12:28.547Z","level":"info","message":"Security audit system initialized with fallback mode","service":"queue-service","context":{"queueName":"security-audit","reason":"Redis request limit optimization - using direct processing"}}
+  - BASE_URL: Required
+  - STRUCTURED_LOGGING: Invalid literal value, expected true
+{"timestamp":"2025-07-18T16:12:28.545Z","level":"info","message":"BullMQ worker disabled to prevent Redis request limit issues","service":"queue-service"}
+command finished with error [npm run start]: exit status 1
+❌ Production environment validation failed:
+> NODE_ENV=production node dist/index.js
+> rest-express@1.0.0 start
+{"timestamp":"2025-07-18T16:12:34.668Z","level":"info","message":"Redis TLS enabled with cloud optimizations","service":"ai-feedback-platform","context":{"provider":"Upstash","optimizations":["TLS","Auto-pipelining","Connection pooling"]}}
+crash loop detected
+{"timestamp":"2025-07-18T16:12:34.673Z","level":"info","message":"BullMQ worker disabled to prevent Redis request limit issues","service":"queue-service"}
+{"timestamp":"2025-07-18T16:12:34.672Z","level":"info","message":"Queue performance monitoring disabled","service":"queue-service","context":{"monitoringEnabled":false,"reason":"Redis request limit optimization"}}
+❌ Production environment validation failed:
+{"timestamp":"2025-07-18T16:12:34.672Z","level":"info","message":"BullMQ queue disabled - using direct processing fallback","service":"queue-service","context":{"active":false,"mode":"production","reason":"Redis request limit exceeded - using direct processing to maintain functionality"}}
+  - BASE_URL: Required
+{"timestamp":"2025-07-18T16:12:34.681Z","level":"info","message":"Security audit system initialized with fallback mode","service":"queue-service","context":{"queueName":"security-audit","reason":"Redis request limit optimization - using direct processing"}}
+  - STRUCTURED_LOGGING: Invalid literal value, expected true
+command finished with error [npm run start]: exit status 1
+2025-07-18T16:13:18Z error: The deployment is crash looping. This can happen if the run command fails or exits immediately after starting. Check the logs for more information.
