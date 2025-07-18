@@ -224,11 +224,11 @@ aigrader/
 
 ## 📚 Documentation
 
-- **[API Documentation](docs/API_DOCUMENTATION.md)** - Complete API reference
-- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment instructions
-- **[User Guide](docs/USER_GUIDE.md)** - End-user documentation
-- **[Architecture Overview](docs/ARCHITECTURE.md)** - Technical architecture details
-- **[CHANGELOG](CHANGELOG.md)** - Version history and updates
+- **[📖 Documentation Index](docs/README.md)** - Complete documentation guide organized by audience
+- **[👥 User Guide](docs/user/USER_GUIDE.md)** - For students, instructors, and administrators
+- **[🛠️ Developer Docs](docs/developer/README.md)** - Architecture, API reference, and technical guides
+- **[🚀 Deployment Guide](docs/operations/DEPLOYMENT.md)** - Production deployment instructions
+- **[📝 CHANGELOG](CHANGELOG.md)** - Version history and updates
 
 ---
 
