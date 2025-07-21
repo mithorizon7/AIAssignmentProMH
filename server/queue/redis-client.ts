@@ -51,9 +51,8 @@ function createRedisConfig(): RedisConfig {
       maxLoadingTimeout: 10000,      // 10s max loading timeout
       
       // Upstash-specific optimizations for request efficiency
-      commandTimeout: 3000,          // 3s command timeout (reduced from 8s)
+      commandTimeout: 8000,          // 8s command timeout
       enableOfflineQueue: false,     // Disable offline queue for immediate errors
-      maxRetriesPerRequest: null,    // Required by BullMQ
     };
     
     // Automatic TLS detection for cloud Redis services
@@ -82,13 +81,13 @@ function createRedisConfig(): RedisConfig {
     db: parseInt(process.env.REDIS_DB || '0'),
     
     // Performance settings optimized for Redis request limits
-    maxRetriesPerRequest: null,    // Required by BullMQ
-    retryDelayOnFailover: 1000,    // 1s retry delay (reduced from 2s)
+    maxRetriesPerRequest: null,    // Required for BullMQ
+    retryDelayOnFailover: 2000,    // 2s retry delay to reduce frequency
     lazyConnect: true,             // Only connect when needed
-    keepAlive: 30000,              // 30s keep-alive (reduced from 60s)
-    connectTimeout: 3000,          // 3s connection timeout (reduced from 8s)
+    keepAlive: 60000,              // 60s keep-alive to reduce connection overhead
+    connectTimeout: 8000,          // 8s connection timeout
     enableAutoPipelining: false,   // Disable auto-pipelining to reduce request count
-    commandTimeout: 3000,          // 3s command timeout (reduced from 8s)
+    commandTimeout: 8000,          // 8s command timeout
     enableOfflineQueue: false      // Disable offline queue for immediate errors
   };
 }
