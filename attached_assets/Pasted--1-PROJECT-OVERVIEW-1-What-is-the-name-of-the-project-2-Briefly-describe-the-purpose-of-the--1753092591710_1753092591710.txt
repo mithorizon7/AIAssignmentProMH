@@ -1,0 +1,58 @@
+🔍 1. PROJECT OVERVIEW
+1. What is the name of the project?
+2. Briefly describe the purpose of the application and the problem it solves:
+3. Who are the intended users?
+4. What is the desired launch date or deadline?
+
+🧱 2. CURRENT DEVELOPMENT STATUS
+5. What percentage of the project would you say is complete?
+6. Which features are already completed?
+7. Which features are in progress or pending?
+8. Are there any known bugs or technical blockers?
+9. Is there documentation available (technical, functional, etc.)?
+   - ☐ Yes
+   - ☐ No
+   - If yes, please share links or files:
+
+💻 3. TECHNICAL DETAILS
+10. What is the technology stack used (languages, frameworks, databases)?
+11. Is the project monolithic or modular/microservices?
+12. Are there third-party services or APIs integrated (e.g., Stripe, Firebase, Maps)?
+13. Please list the platforms/environments used (e.g., AWS, Azure, Vercel, etc.):
+
+🧠 4. CODEBASE & DEVELOPMENT PRACTICES
+14. Where is the source code hosted (e.g., GitHub, GitLab, Bitbucket)?
+15. Is there a branching strategy in place?
+16. Is CI/CD implemented?
+   - ☐ Yes
+   - ☐ No
+17. Are there automated tests?
+   - ☐ Unit tests
+   - ☐ Integration tests
+   - ☐ None
+18. Are there areas of the codebase that you believe require refactoring?
+ 
+🔐 5. SECURITY & COMPLIANCE
+19. Are there any specific compliance requirements (e.g., GDPR, HIPAA)?
+20. Is user authentication and authorization implemented?
+21. Are there known security concerns?
+📋 6. REQUIREMENTS & DESIGN
+22. Is there a product specification document or backlog?
+   - ☐ Yes
+   - ☐ No
+   - If yes, please attach or share a link:
+23. Are UI/UX designs finalized (e.g., in Figma or Adobe XD)?
+   - ☐ Yes
+   - ☐ No
+24. Are acceptance criteria for features clearly defined?
+25. Are priorities identified (must-have vs. nice-to-have)?
+👥 7. TEAM & ACCESS
+26. Will the current developer / pers assist with the transition?
+   - ☐ Yes
+   - ☐ No
+28. Please indicate access you can provide:
+   - ☐ Source code repository
+   - ☐ Staging environment
+   - ☐ Production environment
+   - ☐ Database access or dumps
+   - ☐ Hosting provider credentials
