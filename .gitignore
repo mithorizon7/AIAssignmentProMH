@@ -3,7 +3,12 @@ dist
 .DS_Store
 server/public
 vite.config.ts.*
-axial-chemist-459819-h4-5c8a24efbaed.json
+# Google Cloud Service Account files
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!components.json
 *.tar.gz
 # Ignore large binaries we do not need in Git
 attached_assets/*.pdf
