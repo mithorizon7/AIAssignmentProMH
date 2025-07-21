@@ -1,6 +1,6 @@
 # AIGrader - AI-Powered Assignment Feedback Platform
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/your-repo/aigrader)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/mithorizon7/AIAssignmentProMH)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue.svg)](https://www.typescriptlang.org/)
@@ -11,7 +11,7 @@ AIGrader is an enterprise-grade AI-powered educational assessment platform that 
 
 ## 📸 Live Demo
 
-🌐 **[View Live Demo](https://aigrader.replit.app)** ← Try it now!
+🌐 **[View Live Demo](https://replit.com/@mithorizon7/AIAssignmentProMH)** ← Try it now!
 
 *Experience the platform with sample assignments and see AI feedback generation in real-time.*
 
@@ -81,8 +81,8 @@ Before you begin, ensure you have the following installed:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/aigrader.git
-   cd aigrader
+   git clone https://github.com/mithorizon7/AIAssignmentProMH.git
+   cd AIAssignmentProMH
    ```
 
 2. **Install dependencies**
@@ -228,7 +228,7 @@ aigrader/
 - **[👥 User Guide](docs/user/USER_GUIDE.md)** - For students, instructors, and administrators
 - **[🛠️ Developer Docs](docs/developer/README.md)** - Architecture, API reference, and technical guides
 - **[🚀 Deployment Guide](docs/operations/DEPLOYMENT.md)** - Production deployment instructions
-- **[📝 CHANGELOG](CHANGELOG.md)** - Version history and updates
+- **[📝 CHANGELOG](docs/archive/CHANGELOG.md)** - Version history and updates
 
 ---
 
@@ -253,7 +253,7 @@ We welcome contributions! Here's how to get started:
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ---
 
@@ -279,7 +279,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**[⭐ Star this repository](https://github.com/your-username/aigrader)** if you find AIGrader useful!
+**[⭐ Star this repository](https://github.com/mithorizon7/AIAssignmentProMH)** if you find AIGrader useful!
 
 *Built with ❤️ for educators and students worldwide*
 
